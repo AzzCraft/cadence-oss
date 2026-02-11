@@ -1,0 +1,33 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://azzcraft.example/schemas/remote_exec_task.schema.json",
+  "title": "RemoteExecTaskEnvelope",
+  "type": "object",
+  "required": [
+    "taskId",
+    "profile",
+    "inputs",
+    "security"
+  ],
+  "properties": {
+    "taskId": {
+      "type": "string"
+    },
+    "profile": {
+      "type": "string",
+      "enum": [
+        "pr",
+        "nightly",
+        "release",
+        "full"
+      ]
+    },
+    "inputs": {
+      "type": "object"
+    },
+    "security": {
+      "type": "object"
+    }
+  },
+  "additionalProperties": true
+}

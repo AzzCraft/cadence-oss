@@ -1,0 +1,91 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://azzcraft.dev/cadence/schemas/pipeline_result.schema.json",
+  "title": "PipelineResult",
+  "type": "object",
+  "additionalProperties": true,
+  "properties": {
+    "schemaVersion": {
+      "$ref": "common.schema.json#/$defs/semver"
+    },
+    "runId": {
+      "type": "string"
+    },
+    "pipeline": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "id"
+      ]
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "ok",
+        "degraded",
+        "error",
+        "cancelled"
+      ]
+    },
+    "output": {
+      "type": "object"
+    },
+    "warnings": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "stageSummaries": {
+      "type": "array",
+      "items": {
+        "$ref": "common.schema.json#/$defs/stageSummary"
+      }
+    },
+    "budget": {
+      "$ref": "common.schema.json#/$defs/budget"
+    },
+    "diagnostics": {
+      "$ref": "common.schema.json#/$defs/diagnostics"
+    },
+    "manifestRef": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "runId": {
+          "type": "string"
+        },
+        "manifestHash": {
+          "$ref": "common.schema.json#/$defs/sha256"
+        }
+      },
+      "required": [
+        "runId",
+        "manifestHash"
+      ]
+    },
+    "error": {
+      "anyOf": [
+        {
+          "type": "null"
+        },
+        {
+          "$ref": "common.schema.json#/$defs/errorEnvelope"
+        }
+      ]
+    }
+  },
+  "required": [
+    "schemaVersion",
+    "runId",
+    "pipeline",
+    "status",
+    "budget",
+    "manifestRef"
+  ]
+}

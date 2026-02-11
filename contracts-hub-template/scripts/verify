@@ -1,0 +1,9 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+cd "$ROOT_DIR"
+
+echo "[contracts-hub-template] contract completeness (schema + semantics + fixtures + checks + ids)"
+python3 ./contracts/scripts/verify.py
+echo "[contracts-hub-template] OK"

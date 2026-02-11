@@ -1,0 +1,85 @@
+{
+  "createdAt": "2026-01-23T10:00:00Z",
+  "diagnostics": {
+    "codes": [
+      "job.succeeded"
+    ],
+    "counters": {},
+    "kv": {},
+    "notes": []
+  },
+  "error": null,
+  "jobId": "job_demo_001",
+  "jobType": "cadence.verify",
+  "runs": [
+    {
+      "attempt": 1,
+      "finishedAt": "2026-01-23T10:00:02Z",
+      "manifestRef": {
+        "manifestHash": "sha256:3333333333333333333333333333333333333333333333333333333333333333",
+        "runId": "2026-01-23T10:00:00Z/abcd"
+      },
+      "result": {
+        "budget": {
+          "allocated": {
+            "externalCalls": 50,
+            "timeMs": 1500,
+            "tokens": 2000
+          },
+          "children": [],
+          "consumed": {
+            "externalCalls": 3,
+            "timeMs": 108,
+            "tokens": 812
+          },
+          "remaining": {
+            "externalCalls": 47,
+            "timeMs": 1392,
+            "tokens": 1188
+          },
+          "scope": "pipeline",
+          "termination": {
+            "code": "ok"
+          }
+        },
+        "diagnostics": {
+          "codes": [
+            "pipeline.succeeded"
+          ],
+          "counters": {},
+          "kv": {},
+          "notes": []
+        },
+        "error": null,
+        "manifestRef": {
+          "manifestHash": "sha256:2222222222222222222222222222222222222222222222222222222222222222",
+          "runId": "2026-01-23T10:00:00Z/abcd"
+        },
+        "output": {
+          "decision": "pass"
+        },
+        "pipeline": {
+          "id": "summarize.v2"
+        },
+        "runId": "2026-01-23T10:00:00Z/abcd",
+        "schemaVersion": "1.0.0",
+        "stageSummaries": [
+          {
+            "codes": [
+              "ok"
+            ],
+            "stageId": "verify",
+            "status": "ok",
+            "timeMs": 10
+          }
+        ],
+        "status": "ok",
+        "warnings": []
+      },
+      "startedAt": "2026-01-23T10:00:01Z"
+    }
+  ],
+  "schemaVersion": "1.0.0",
+  "status": "succeeded",
+  "updatedAt": "2026-01-23T10:00:02Z"
+}

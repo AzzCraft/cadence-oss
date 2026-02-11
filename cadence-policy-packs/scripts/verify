@@ -1,0 +1,16 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+cd "$ROOT_DIR"
+
+echo "[cadence-policy-packs] validate pack.yaml (lightweight)"
+PACK="packs/unified-v17-baseline/pack.yaml"
+
+[ -f "$PACK" ] || { echo "missing $PACK"; exit 2; }
+
+grep -qE '^id:' "$PACK" || { echo "pack.yaml missing id"; exit 2; }
+grep -qE '^version:' "$PACK" || { echo "pack.yaml missing version"; exit 2; }
+grep -qE '^rules:' "$PACK" || { echo "pack.yaml missing rules"; exit 2; }
+
+echo "[cadence-policy-packs] OK"

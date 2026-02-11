@@ -1,0 +1,89 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://azzcraft.example/schemas/cadence_lock.schema.json",
+  "title": "cadence.lock",
+  "type": "object",
+  "required": [
+    "cadence_cli"
+  ],
+  "properties": {
+    "cadence_cli": {
+      "type": "object",
+      "required": [
+        "version"
+      ],
+      "properties": {
+        "version": {
+          "type": "string"
+        },
+        "sha256": {
+          "type": "string"
+        },
+        "signature": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": true
+    },
+    "plugins": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "name",
+          "version"
+        ],
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "version": {
+            "type": "string"
+          },
+          "sha256": {
+            "type": "string"
+          },
+          "signature": {
+            "type": "string"
+          },
+          "entrypoint": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": true
+      }
+    },
+    "policy_packs": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "name",
+          "version"
+        ],
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "version": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": true
+      }
+    },
+    "runners": {
+      "type": "object"
+    },
+    "generators": {
+      "type": "object"
+    },
+    "contracts": {
+      "type": "object"
+    },
+    "compatWindows": {
+      "type": "object"
+    }
+  },
+  "additionalProperties": true
+}

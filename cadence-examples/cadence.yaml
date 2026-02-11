@@ -1,0 +1,7 @@
+projectId: example-app
+mode: strict_offline
+policies:
+  - unified-v17-baseline
+ui:
+  enabled: true
+  profile: pr

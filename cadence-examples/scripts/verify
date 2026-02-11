@@ -1,0 +1,30 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+cd "$ROOT_DIR"
+
+bash ./cadencew verify --profile dev
+
+# Validate evidence artifacts against protocol validators (stdlib-only)
+python3 - <<'PY'
+import sys
+from pathlib import Path
+
+here = Path('.')
+out_dir = here / '.cadence' / 'out'
+assert out_dir.is_dir(), 'missing .cadence/out'
+
+# Prefer a stable alias directory if available.
+# This reduces "where did the run folder go" confusion and makes automation deterministic.
+alias = out_dir / 'latest'
+if alias.is_dir():
+    latest = alias
+else:
+    latest = sorted([p for p in out_dir.iterdir() if p.is_dir()])[-1]
+
+tools = (here / '..' / 'cadence-protocol' / 'tools').resolve()
+sys.path.insert(0, str(tools))
+import validate_artifacts  # type: ignore
+raise SystemExit(validate_artifacts.main(['validate_artifacts.py', str(latest)]))
+PY

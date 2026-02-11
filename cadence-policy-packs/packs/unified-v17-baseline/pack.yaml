@@ -1,0 +1,21 @@
+id: unified-v17-baseline
+version: 1.0.0
+description: "Baseline rules aligned to Unified v17 (placeholder)"
+rules:
+  - ruleId: SDMM-DEEP-IMPORT
+    severity: P0
+    tier: Tier1
+    params:
+      allowedPrefixes:
+        - "@app/"
+  - ruleId: CONTRACT-BREAKING-CHANGE
+    severity: P0
+    tier: Tier2
+    params:
+      requireCompatTests: true
+  - ruleId: SECRET-SCAN
+    severity: P0
+    tier: Tier1
+    params:
+      patterns:
+        - "AKIA[0-9A-Z]{16}"

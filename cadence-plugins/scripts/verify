@@ -1,0 +1,38 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+cd "$ROOT_DIR"
+
+echo "[cadence-plugins] self-test ts + python plugins"
+python3 - <<'PY'
+import json, subprocess, tempfile
+from pathlib import Path
+
+root = Path('.').resolve()
+
+with tempfile.TemporaryDirectory() as d:
+    repo = Path(d)
+    (repo / 'src').mkdir(parents=True, exist_ok=True)
+    # A file that triggers deep import
+    (repo / 'src' / 'a.ts').write_text("import x from 'pkg/internal/x';\n", encoding='utf-8')
+    req = {"protocolVersion":"1.0.0","repoRoot":str(repo),"files":["src/a.ts"],"mode":"verify"}
+
+    ts = root / 'plugins' / 'ts' / 'index.mjs'
+    out = subprocess.check_output(['node', str(ts)], input=(json.dumps(req)+'\n').encode('utf-8'))
+    resp = json.loads(out.decode('utf-8'))
+    assert resp.get('violations'), 'ts plugin produced no violations'
+    assert any(v.get('ruleId')=='SDMM_DEEP_IMPORT' for v in resp['violations']), 'ts plugin missing deep import violation'
+
+    (repo / 'src' / 'b.py').write_text("from foo.internal import bar\n", encoding='utf-8')
+    req2 = {"protocolVersion":"1.0.0","repoRoot":str(repo),"files":["src/b.py"],"mode":"verify"}
+    py = root / 'plugins' / 'python' / 'plugin.py'
+    out2 = subprocess.check_output(['python3', str(py)], input=(json.dumps(req2)+'\n').encode('utf-8'))
+    resp2 = json.loads(out2.decode('utf-8'))
+    assert resp2.get('violations'), 'python plugin produced no violations'
+    assert any(v.get('ruleId')=='SDMM_DEEP_IMPORT' for v in resp2['violations']), 'python plugin missing deep import violation'
+
+print('OK: plugins produce deterministic violations')
+PY
+
+echo "[cadence-plugins] OK"

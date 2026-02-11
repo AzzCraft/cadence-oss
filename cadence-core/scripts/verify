@@ -1,0 +1,18 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+cd "$ROOT_DIR"
+
+export CGO_ENABLED=0
+
+echo "[cadence-core] go test"
+go test ./...
+
+echo "[cadence-core] go vet"
+go vet ./...
+
+echo "[cadence-core] build"
+go build -o cadence ./cmd/cadence
+
+echo "[cadence-core] OK"

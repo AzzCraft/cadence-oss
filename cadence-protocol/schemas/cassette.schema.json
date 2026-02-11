@@ -1,0 +1,55 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://azzcraft.example/schemas/cassette.schema.json",
+  "title": "Cassette v1",
+  "type": "object",
+  "required": [
+    "schemaVersion",
+    "cassetteId",
+    "modelVersion",
+    "contextHash",
+    "outputHash",
+    "policyId",
+    "budget"
+  ],
+  "properties": {
+    "schemaVersion": {
+      "type": "string"
+    },
+    "cassetteId": {
+      "type": "string"
+    },
+    "createdAt": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "modelVersion": {
+      "type": "string"
+    },
+    "adapterVersion": {
+      "type": "string"
+    },
+    "contextHash": {
+      "type": "string"
+    },
+    "inputsSummary": {
+      "type": "object"
+    },
+    "evidenceRefs": {
+      "type": "array",
+      "items": {
+        "type": "object"
+      }
+    },
+    "outputHash": {
+      "type": "string"
+    },
+    "policyId": {
+      "type": "string"
+    },
+    "budget": {
+      "type": "object"
+    }
+  },
+  "additionalProperties": true
+}

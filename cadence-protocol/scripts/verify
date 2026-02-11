@@ -1,0 +1,54 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+cd "$ROOT_DIR"
+
+echo "[cadence-protocol] validate schemas (lightweight, stdlib-only) + validate examples"
+python3 - <<'PY'
+import json
+from pathlib import Path
+
+from tools.validate import (
+    validate_run_manifest,
+    validate_pipeline_result,
+    validate_job_envelope,
+    validate_dataset_manifest,
+    validate_eval_report,
+)
+
+schemas_dir = Path('schemas')
+examples_dir = Path('examples')
+
+schema_files = sorted(schemas_dir.glob('*.schema.json'))
+assert schema_files, 'no schema files'
+for p in schema_files:
+    data = json.loads(p.read_text(encoding='utf-8'))
+    for k in ('$schema', '$id', 'title'):
+        if k not in data:
+            raise SystemExit(f"missing {k} in {p}")
+    # A key normative invariant from DAS: RunManifest MUST NOT embed manifestHash.
+    if p.name == 'run_manifest.schema.json':
+        not_block = data.get('not', {})
+        req = (not_block.get('required') or [])
+        if 'manifestHash' not in req:
+            raise SystemExit('run_manifest.schema.json should forbid manifestHash via not.required')
+
+print(f"OK: {len(schema_files)} schema docs parsed")
+
+def _validate_example(name: str, fn):
+    ex = examples_dir / name
+    if not ex.exists():
+        return
+    inst = json.loads(ex.read_text(encoding='utf-8'))
+    fn(inst)
+    print(f"OK: {name} validated")
+
+_validate_example('run_manifest.example.json', validate_run_manifest)
+_validate_example('pipeline_result.example.json', validate_pipeline_result)
+_validate_example('job_envelope.example.json', validate_job_envelope)
+_validate_example('dataset_manifest.example.json', validate_dataset_manifest)
+_validate_example('eval_report.example.json', validate_eval_report)
+
+print('[cadence-protocol] OK')
+PY

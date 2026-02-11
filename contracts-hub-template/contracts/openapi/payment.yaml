@@ -1,0 +1,32 @@
+openapi: 3.0.3
+info:
+  title: Payment API
+  version: 0.1.0
+paths:
+  /payments:
+    post:
+      operationId: createPayment
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreatePaymentRequest'
+      responses:
+        '201':
+          description: created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Payment'
+components:
+  schemas:
+    CreatePaymentRequest:
+      type: object
+      additionalProperties: false
+      properties:
+        amountCents: { type: integer, minimum: 0 }
+        currency: { type: string, minLength: 3, maxLength: 3 }
+      required: [amountCents, currency]
+    Payment:
+      $ref: '../schemas/payment.schema.json'
