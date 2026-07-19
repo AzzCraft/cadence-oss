@@ -7,11 +7,11 @@ import (
   "strings"
 )
 
-// RunAll runs the built-in demo rules.
+// RunAll runs the built-in baseline rules.
 func RunAll(repoRoot string) ([]Violation, error) {
   var out []Violation
 
-  // Regexes are intentionally conservative (false positives acceptable in this scaffold).
+  // Regexes are intentionally conservative to keep the offline baseline deterministic.
   secretRules := []struct {
     id       string
     sev      Severity
@@ -19,8 +19,12 @@ func RunAll(repoRoot string) ([]Violation, error) {
     message  string
   }{
     {"SEC_TEST_AUTH_TOKEN", SevP0, regexp.MustCompile(`TEST_AUTH_TOKEN`), "Hardcoded TEST_AUTH_TOKEN detected"},
-    {"SEC_PRIVATE_KEY", SevP0, regexp.MustCompile(`BEGIN (RSA |EC |)PRIVATE KEY`), "Private key material detected"},
+    {"SEC_PRIVATE_KEY", SevP0, regexp.MustCompile(`BEGIN (RSA |EC |DSA |OPENSSH |)PRIVATE KEY`), "Private key material detected"},
     {"SEC_AWS_KEY", SevP0, regexp.MustCompile(`AKIA[0-9A-Z]{16}`), "Potential AWS access key detected"},
+    {"SEC_GCP_KEY", SevP0, regexp.MustCompile(`AIza[0-9A-Za-z_-]{35}`), "Potential GCP API key detected"},
+    {"SEC_GITHUB_TOKEN", SevP0, regexp.MustCompile(`gh[ps]_[0-9A-Za-z]{36}`), "Potential GitHub token detected"},
+    {"SEC_GENERIC_SECRET", SevP1, regexp.MustCompile(`(?i)(?:password|secret|token|api_key)\s*[:=]\s*['\"][^'\"]{8,}`), "Potential hardcoded credential detected"},
+    {"SEC_JWT", SevP1, regexp.MustCompile(`eyJ[A-Za-z0-9_-]{10,}\.eyJ[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]+`), "Potential JWT token detected"},
   }
 
   deepImport := regexp.MustCompile(`(?m)^\s*import\s+.*\s+from\s+['\"]([^'\"]+)['\"];?\s*$`)
@@ -57,7 +61,7 @@ func RunAll(repoRoot string) ([]Violation, error) {
     return nil, err
   }
 
-  // Contract completeness (very small demo rule): if contracts/schemas exists, each schema should have at least one fixture file.
+  // Contract completeness baseline: if contracts/schemas exists, each schema should have at least one fixture file.
   contractViolations, err := checkContractCompleteness(repoRoot)
   if err != nil {
     return nil, err

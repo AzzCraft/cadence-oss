@@ -11,3 +11,14 @@ Cadence Core is designed to be *runtime offline*:
 
 ## Offline attestation (optional)
 If configured, an Egress Guard can enforce deny-egress at the process/container layer and emit an attestation artifact into the Evidence output.
+
+## Subprocess environment policy
+
+Cadence subprocesses do not inherit the full parent environment.
+
+- Sandbox launcher env is reduced to an allowlisted parent-key set plus
+  explicit `CADENCE_SANDBOX_*` markers.
+- Plugin subprocess env is reduced to manifest allowlists plus explicit
+  `CADENCE_PLUGIN_*` markers.
+- Parent env keys with reserved `CADENCE_SANDBOX_` or `CADENCE_PLUGIN_`
+  prefixes are rejected before verify runs.

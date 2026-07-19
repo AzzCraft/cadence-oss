@@ -1,0 +1,24 @@
+{
+  "task": "CAD-005",
+  "schemaVersion": "1.0.0",
+  "registryId": "cadence-local-test",
+  "entries": [
+    {
+      "kind": "plugin",
+      "id": "cadence-plugin-python",
+      "version": "1.0.0",
+      "ref": "manifests/cadence-plugin-python.json",
+      "status": "active",
+      "trusted": true,
+      "signer": "azzcraft-release",
+      "channel": "stable",
+      "sha256": "sha256:0000000000000000000000000000000000000000000000000000000000000000"
+    }
+  ],
+  "expectedFailure": {
+    "task": "CAD-005",
+    "code": "registry.hash.mismatch",
+    "item": "cadence-plugin-python",
+    "message": "CAD-005 registry.hash.mismatch: cadence-plugin-python digest does not match local artifact"
+  }
+}

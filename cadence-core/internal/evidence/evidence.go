@@ -9,6 +9,8 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"sort"
+	"strings"
 	"time"
 )
 
@@ -94,10 +96,20 @@ type ManifestRef struct {
 	ManifestHash string `json:"manifestHash"`
 }
 
+// AuditMeta holds wall-clock timestamps and host-specific metadata that are
+// explicitly NOT part of the deterministic identity of a run.  They exist for
+// audit, traceability, and operational diagnostics only.
+type AuditMeta struct {
+	CreatedAt  string `json:"createdAt"`
+	FinishedAt string `json:"finishedAt,omitempty"`
+	HostID     string `json:"hostId,omitempty"`
+}
+
 type RunManifest struct {
 	SchemaVersion   string            `json:"schemaVersion"`
 	RunID           string            `json:"runId"`
 	CreatedAt       string            `json:"createdAt"`
+	AuditMeta       *AuditMeta        `json:"auditMeta,omitempty"`
 	Correlation     *Correlation      `json:"correlation,omitempty"`
 	Pipeline        Pipeline          `json:"pipeline"`
 	Algorithm       Algorithm         `json:"algorithm"`
@@ -186,8 +198,14 @@ func ValidateRunManifest(m RunManifest) error {
 	if m.RunID == "" {
 		return errors.New("runManifest.runId is required")
 	}
-	if _, err := time.Parse(time.RFC3339, m.CreatedAt); err != nil {
-		return fmt.Errorf("runManifest.createdAt must be RFC3339, got %q", m.CreatedAt)
+	if m.CreatedAt != "" {
+		if _, err := time.Parse(time.RFC3339, m.CreatedAt); err != nil {
+			return fmt.Errorf("runManifest.createdAt must be RFC3339, got %q", m.CreatedAt)
+		}
+	} else if m.AuditMeta != nil && m.AuditMeta.CreatedAt != "" {
+		if _, err := time.Parse(time.RFC3339, m.AuditMeta.CreatedAt); err != nil {
+			return fmt.Errorf("runManifest.auditMeta.createdAt must be RFC3339, got %q", m.AuditMeta.CreatedAt)
+		}
 	}
 	if m.Pipeline.ID == "" {
 		return errors.New("runManifest.pipeline.id is required")
@@ -226,8 +244,10 @@ func ValidateRunManifest(m RunManifest) error {
 	default:
 		return fmt.Errorf("runManifest.determinism.tier invalid: %q", m.Determinism.Tier)
 	}
-	if err := validateBudget(m.Budget, "runManifest.budget"); err != nil {
-		return err
+	if m.Budget.Scope != "" || m.Budget.Allocated != nil || m.Budget.Consumed != nil || m.Budget.Remaining != nil {
+		if err := validateBudget(m.Budget, "runManifest.budget"); err != nil {
+			return err
+		}
 	}
 	return nil
 }
@@ -253,8 +273,10 @@ func ValidatePipelineResult(r PipelineResult) error {
 	if !shaRe.MatchString(r.ManifestRef.ManifestHash) {
 		return fmt.Errorf("pipelineResult.manifestRef.manifestHash must be sha256:..., got %q", r.ManifestRef.ManifestHash)
 	}
-	if err := validateBudget(r.Budget, "pipelineResult.budget"); err != nil {
-		return err
+	if r.Budget.Scope != "" || r.Budget.Allocated != nil || r.Budget.Consumed != nil || r.Budget.Remaining != nil {
+		if err := validateBudget(r.Budget, "pipelineResult.budget"); err != nil {
+			return err
+		}
 	}
 	return nil
 }
@@ -274,11 +296,15 @@ func ValidateJobEnvelope(j JobEnvelope) error {
 	default:
 		return fmt.Errorf("jobEnvelope.status invalid: %q", j.Status)
 	}
-	if _, err := time.Parse(time.RFC3339, j.CreatedAt); err != nil {
-		return fmt.Errorf("jobEnvelope.createdAt must be RFC3339, got %q", j.CreatedAt)
+	if j.CreatedAt != "" {
+		if _, err := time.Parse(time.RFC3339, j.CreatedAt); err != nil {
+			return fmt.Errorf("jobEnvelope.createdAt must be RFC3339, got %q", j.CreatedAt)
+		}
 	}
-	if _, err := time.Parse(time.RFC3339, j.UpdatedAt); err != nil {
-		return fmt.Errorf("jobEnvelope.updatedAt must be RFC3339, got %q", j.UpdatedAt)
+	if j.UpdatedAt != "" {
+		if _, err := time.Parse(time.RFC3339, j.UpdatedAt); err != nil {
+			return fmt.Errorf("jobEnvelope.updatedAt must be RFC3339, got %q", j.UpdatedAt)
+		}
 	}
 	if j.ProfileID == "" {
 		return errors.New("jobEnvelope.profileId is required")
@@ -295,11 +321,15 @@ func ValidateJobEnvelope(j JobEnvelope) error {
 		if run.Attempt < 1 {
 			return fmt.Errorf("jobEnvelope.runs[%d].attempt must be >= 1", i)
 		}
-		if _, err := time.Parse(time.RFC3339, run.StartedAt); err != nil {
-			return fmt.Errorf("jobEnvelope.runs[%d].startedAt must be RFC3339", i)
+		if run.StartedAt != "" {
+			if _, err := time.Parse(time.RFC3339, run.StartedAt); err != nil {
+				return fmt.Errorf("jobEnvelope.runs[%d].startedAt must be RFC3339", i)
+			}
 		}
-		if _, err := time.Parse(time.RFC3339, run.FinishedAt); err != nil {
-			return fmt.Errorf("jobEnvelope.runs[%d].finishedAt must be RFC3339", i)
+		if run.FinishedAt != "" {
+			if _, err := time.Parse(time.RFC3339, run.FinishedAt); err != nil {
+				return fmt.Errorf("jobEnvelope.runs[%d].finishedAt must be RFC3339", i)
+			}
 		}
 		if run.ManifestRef.RunID == "" || run.ManifestRef.ManifestHash == "" {
 			return fmt.Errorf("jobEnvelope.runs[%d].manifestRef is required", i)
@@ -310,7 +340,6 @@ func ValidateJobEnvelope(j JobEnvelope) error {
 		if err := ValidatePipelineResult(run.Result); err != nil {
 			return fmt.Errorf("jobEnvelope.runs[%d].result invalid: %w", i, err)
 		}
-		// Strong consistency: run.manifestRef must match result.manifestRef.
 		if run.Result.ManifestRef.ManifestHash != run.ManifestRef.ManifestHash || run.Result.ManifestRef.RunID != run.ManifestRef.RunID {
 			return fmt.Errorf("jobEnvelope.runs[%d] manifestRef mismatch between run and result", i)
 		}
@@ -337,6 +366,119 @@ func validateBudget(b Budget, path string) error {
 		if err := validateBudget(c, fmt.Sprintf("%s.children[%d]", path, i)); err != nil {
 			return err
 		}
+	}
+	return nil
+}
+
+// AuditMetadata contains wall-clock and operator-facing metadata that is
+// explicitly separated from the deterministic identity of the evidence bundle.
+// These fields MUST NOT influence BundleHash or any deterministic closure check.
+type AuditMetadata struct {
+	BundleID  string `json:"bundleId"`
+	Timestamp string `json:"timestamp"`
+	Operator  string `json:"operator,omitempty"`
+	Host      string `json:"host,omitempty"`
+}
+
+// EvidenceBundle aggregates all evidence artifacts from a single verify run.
+// The deterministic identity is defined by SchemaVersion, RunManifestRef,
+// PipelineResultRef, ArtifactPaths, and BundleHash. Wall-clock metadata lives
+// in the Audit field and MUST NOT affect BundleHash computation.
+type EvidenceBundle struct {
+	SchemaVersion     string        `json:"schemaVersion"`
+	Audit             AuditMetadata `json:"audit"`
+	RunManifestRef    string        `json:"runManifestRef"`
+	PipelineResultRef string        `json:"pipelineResultRef"`
+	JobEnvelopeRef    string        `json:"jobEnvelopeRef,omitempty"`
+	ArtifactPaths     []string      `json:"artifactPaths"`
+	BundleHash        string        `json:"bundleHash"`
+	Signature         string        `json:"signature,omitempty"`
+}
+
+var excludedEvidenceArtifacts = map[string]struct{}{
+	"evidence-bundle.json":    {},
+	"replay-package.json":     {},
+	"replay-bundle.json":      {},
+	"manifest-signature.json": {},
+	"bundle-signature.json":   {},
+}
+
+func shouldExcludeEvidenceArtifact(rel string) bool {
+	rel = filepath.ToSlash(rel)
+	if _, excluded := excludedEvidenceArtifacts[rel]; excluded {
+		return true
+	}
+	return strings.HasSuffix(rel, ".signature.json")
+}
+
+// BuildEvidenceBundle constructs an EvidenceBundle from the evidence directory.
+// It walks the directory, computes a content-addressed hash of all artifacts,
+// and returns the assembled bundle.
+func BuildEvidenceBundle(evidenceDir string, runManifestRef, pipelineResultRef string) (*EvidenceBundle, error) {
+	if evidenceDir == "" {
+		return nil, errors.New("evidenceDir is required")
+	}
+	var paths []string
+	err := filepath.Walk(evidenceDir, func(path string, info os.FileInfo, err error) error {
+		if err != nil {
+			return err
+		}
+		if !info.IsDir() {
+			rel, _ := filepath.Rel(evidenceDir, path)
+			if shouldExcludeEvidenceArtifact(rel) {
+				return nil
+			}
+			paths = append(paths, rel)
+		}
+		return nil
+	})
+	if err != nil {
+		return nil, fmt.Errorf("walking evidence dir: %w", err)
+	}
+	sort.Strings(paths)
+
+	h := sha256.New()
+	for _, p := range paths {
+		data, err := os.ReadFile(filepath.Join(evidenceDir, p))
+		if err != nil {
+			return nil, fmt.Errorf("reading %s: %w", p, err)
+		}
+		h.Write([]byte(p))
+		h.Write(data)
+	}
+	bundleHash := "sha256:" + hex.EncodeToString(h.Sum(nil))
+
+	return &EvidenceBundle{
+		SchemaVersion: SchemaVersionV1,
+		Audit: AuditMetadata{
+			BundleID:  fmt.Sprintf("bundle-%d", time.Now().UnixNano()),
+			Timestamp: time.Now().UTC().Format(time.RFC3339),
+		},
+		RunManifestRef:    runManifestRef,
+		PipelineResultRef: pipelineResultRef,
+		ArtifactPaths:     paths,
+		BundleHash:        bundleHash,
+	}, nil
+}
+
+// VerifyBundleIntegrity recomputes the hash of all artifacts in the evidence
+// directory and checks it matches the bundle's recorded hash.
+func VerifyBundleIntegrity(bundle EvidenceBundle, evidenceDir string) error {
+	if bundle.BundleHash == "" {
+		return errors.New("bundle has no hash")
+	}
+	h := sha256.New()
+	for _, p := range bundle.ArtifactPaths {
+		data, err := os.ReadFile(filepath.Join(evidenceDir, p))
+		if err != nil {
+			return fmt.Errorf("missing artifact %s: %w", p, err)
+		}
+		h.Write([]byte(p))
+		h.Write(data)
+	}
+	got := "sha256:" + hex.EncodeToString(h.Sum(nil))
+	if got != bundle.BundleHash {
+		return fmt.Errorf("bundle hash mismatch: expected %s, got %s", bundle.BundleHash, got)
 	}
 	return nil
 }

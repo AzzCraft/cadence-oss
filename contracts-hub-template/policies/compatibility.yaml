@@ -1,8 +1,0 @@
-id: contracts-compat
-version: 1.0.0
-rules:
-  - ruleId: CONTRACT-BREAKING-CHANGE
-    severity: P0
-    params:
-      forbidRemovingRequiredFields: true
-      forbidRemovingEndpoints: true

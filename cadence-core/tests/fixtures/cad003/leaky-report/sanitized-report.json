@@ -1,0 +1,38 @@
+{
+  "task": "CAD-003",
+  "offline": true,
+  "runManifestRef": "<path>/.cadence/out/run-manifest.json",
+  "inputCassetteRef": "<path>/input-cassette.json",
+  "compare": {
+    "same": false,
+    "diffs": [
+      {
+        "field": "pipelineResult.output.path",
+        "expected": "<path>/output.json",
+        "actual": "<path>/output.json",
+        "reason": "<token> changed replay output"
+      }
+    ]
+  },
+  "artifacts": [
+    {
+      "path": "<path>/.cadence/out/run-manifest.json",
+      "uri": "file://<path>/.cadence/out/run-manifest.json"
+    },
+    {
+      "path": "<path>/token.txt",
+      "uri": "file://<path>/input-cassette.json?token=<token>&api_key=<token>"
+    }
+  ],
+  "headers": {
+    "Authorization": "<redacted>"
+  },
+  "diagnostics": [
+    {
+      "task": "CAD-003",
+      "code": "PATH_OR_TOKEN_LEAK",
+      "field": "artifacts[1].uri",
+      "message": "CAD-003 replay report sanitizer redacted leaked field artifacts[1].uri"
+    }
+  ]
+}

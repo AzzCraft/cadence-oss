@@ -1,35 +1,29 @@
 # Cadence OSS
 
-Cadence OSS is the open-source part of the Cadence governance and verification toolchain.
-
-This repo is designed to be vendored into a product repository and used as the "verify gate" layer.
-
-Recommended usage:
-
-- Use **DAS Suite** to pull this repo into `src/cadence-oss`.
-- Use `cadencew verify` from inside a product repo, or vendor Cadence into `vendor/cadence`.
+Cadence OSS is an offline verification command-line runtime. This first public
+release contains the Go implementation in `cadence-core` and its tests.
 
 ## What is included
 
-This repo contains a multi-package layout:
+- `cadence-core/` — offline Go CLI (`verify`, `scan`, `report`, `lock`, and `doctor`)
+- `cadence-core/internal/` — verification, evidence, replay comparison, and policy implementation
+- `cadence-core/scripts/verify` — complete public-source test, vet, and build gate
 
-- `cadence-core/` — offline deterministic CLI (`verify`, `scan`, `adopt`, `report`, `lock`, `doctor`)
-- `cadence-protocol/` — JSON schemas + lightweight validators
-- `cadence-plugins/` — stdlib-only plugin demos (Node + Python)
-- `cadence-policy-packs/` — sample policy packs
-- `contracts-hub-template/` — example contract hub layout
-- `cadence-examples/` — consumer repo demonstrating `cadencew verify`
 
+## Verification
+
+```bash
+bash ./scripts/verify
+```
 
 ## Quickstart
 
-Run the OSS verifications:
+Run all public-source checks:
 
 ```bash
-bash ./cadence-core/scripts/verify
+bash ./scripts/verify
 ```
 
-## Notes
-
-- The Cadence Pro and Enterprise repos are optional and may be private.
-- DAS Suite can skip them automatically when you do not have permission.
+The public v1 runtime does not execute third-party plugins: configured plugin
+execution fails closed until a platform-enforced isolated runner is available.
+Replay comparison requires separate expected and actual bundles.

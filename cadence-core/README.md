@@ -3,9 +3,9 @@
 Cadence **offline deterministic** Core CLI (Go).
 
 ## Goals
-- Provide a single canonical entrypoint per repo: `./cadencew verify`
+- Provide a deterministic verification CLI
 - Deterministic, reproducible, auditable results
-- Plugin-driven language support (batch protocol)
+- Fail closed when an unavailable execution boundary is requested
 - Evidence artifacts aligned to DAS: RunManifest / PipelineResult / JobEnvelope
 
 ## Non-goals

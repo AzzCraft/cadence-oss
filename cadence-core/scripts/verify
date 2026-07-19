@@ -5,6 +5,29 @@ ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT_DIR"
 
 export CGO_ENABLED=0
+export GOPROXY=off
+export GOSUMDB=off
+if [[ -n "${GOFLAGS:-}" ]]; then
+  export GOFLAGS="${GOFLAGS} -mod=vendor"
+else
+  export GOFLAGS="-mod=vendor"
+fi
+
+make_temp_dir() {
+  local prefix="$1"
+  local base="${TMPDIR:-/tmp}"
+  local dir=""
+  if dir="$(mktemp -d "${base}/${prefix}.XXXXXX" 2>/dev/null)"; then
+    printf '%s\n' "$dir"
+    return 0
+  fi
+  python3 - "$prefix" "$base" <<'PY'
+import sys
+import tempfile
+
+print(tempfile.mkdtemp(prefix=sys.argv[1] + ".", dir=sys.argv[2]))
+PY
+}
 
 echo "[cadence-core] go test"
 go test ./...
@@ -13,6 +36,8 @@ echo "[cadence-core] go vet"
 go vet ./...
 
 echo "[cadence-core] build"
-go build -o cadence ./cmd/cadence
+tmpdir="$(make_temp_dir cadence-core)"
+trap 'rm -rf "$tmpdir"' EXIT
+go build -o "$tmpdir/cadence" ./cmd/cadence
 
 echo "[cadence-core] OK"

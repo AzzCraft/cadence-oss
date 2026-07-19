@@ -1,0 +1,10 @@
+{
+  "task": "CAD-005",
+  "pack": "legacy-v1-pack",
+  "expectedFailure": {
+    "task": "CAD-005",
+    "code": "policy.runtime.incompatible",
+    "item": "legacy-v1-pack",
+    "message": "CAD-005 policy.runtime.incompatible: legacy-v1-pack requires protocol 1.0.x but runtime provides 1.4.x"
+  }
+}

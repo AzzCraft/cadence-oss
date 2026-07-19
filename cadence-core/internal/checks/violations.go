@@ -41,3 +41,27 @@ func fingerprint(ruleID, message, file string, line int) string {
   sum := sha256.Sum256([]byte(fmt.Sprintf("%s\n%s\n%s\n%d", ruleID, message, file, line)))
   return "sha256:" + hex.EncodeToString(sum[:])
 }
+
+// FilterBySeverity returns only violations matching the given severity.
+func FilterBySeverity(violations []Violation, sev Severity) []Violation {
+  var out []Violation
+  for _, v := range violations {
+    if v.Severity == sev {
+      out = append(out, v)
+    }
+  }
+  return out
+}
+
+// GroupByFile groups violations by their source file path.
+func GroupByFile(violations []Violation) map[string][]Violation {
+  groups := make(map[string][]Violation)
+  for _, v := range violations {
+    key := v.File
+    if key == "" {
+      key = "(no file)"
+    }
+    groups[key] = append(groups[key], v)
+  }
+  return groups
+}

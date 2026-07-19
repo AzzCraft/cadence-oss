@@ -1,0 +1,16 @@
+{
+  "task": "CAD-004",
+  "status": "denied",
+  "code": "sandbox.network.denied",
+  "message": "CAD-004 sandbox.network.denied: plugin malicious-network requested undeclared capability network.connect",
+  "audit": {
+    "pluginId": "malicious-network",
+    "profile": "readonly-no-network",
+    "denied": [
+      {
+        "code": "sandbox.network.denied",
+        "capability": "network.connect"
+      }
+    ]
+  }
+}

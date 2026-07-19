@@ -1,0 +1,86 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+usage() {
+  cat <<'USAGE'
+Usage:
+  scripts/replay --bundle PATH --out-dir PATH
+
+Verifies that a replay bundle still matches the referenced output directory.
+USAGE
+}
+
+BUNDLE=""
+OUT_DIR=""
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --bundle)
+      BUNDLE="${2:-}"
+      shift 2
+      ;;
+    --out-dir)
+      OUT_DIR="${2:-}"
+      shift 2
+      ;;
+    -h|--help)
+      usage
+      exit 0
+      ;;
+    *)
+      echo "Unknown argument: $1" >&2
+      usage
+      exit 2
+      ;;
+  esac
+done
+
+if [[ -z "$BUNDLE" || -z "$OUT_DIR" ]]; then
+  usage
+  exit 2
+fi
+
+python3 - "$BUNDLE" "$OUT_DIR" <<'PY'
+import hashlib
+import json
+import os
+import stat
+import sys
+from pathlib import Path
+
+bundle_path = Path(sys.argv[1])
+out_dir = Path(sys.argv[2])
+bundle = json.loads(bundle_path.read_text(encoding="utf-8"))
+
+combined = hashlib.sha256()
+for snap in bundle.get("snapshots", []):
+    rel = snap["relPath"]
+    target = out_dir / Path(rel)
+    data = target.read_bytes()
+    payload_hash = "sha256:" + hashlib.sha256(data).hexdigest()
+    if payload_hash != snap["fileHash"]:
+        raise SystemExit(f"hash mismatch for {rel}: expected {snap['fileHash']}, got {payload_hash}")
+
+    info = target.stat()
+    mode = format(stat.S_IMODE(info.st_mode), "04o")
+    if snap.get("mode") and mode != snap["mode"]:
+        raise SystemExit(f"mode mismatch for {rel}: expected {snap['mode']}, got {mode}")
+    if int(snap["size"]) != info.st_size:
+        raise SystemExit(f"size mismatch for {rel}: expected {snap['size']}, got {info.st_size}")
+
+    combined.update(rel.encode("utf-8"))
+    combined.update(b"\x00")
+    combined.update(str(snap.get("mode", "")).encode("utf-8"))
+    combined.update(b"\x00")
+    combined.update(str(snap["size"]).encode("utf-8"))
+    combined.update(b"\x00")
+    combined.update(snap["fileHash"].encode("utf-8"))
+    combined.update(b"\n")
+
+actual_bundle_hash = "sha256:" + combined.hexdigest()
+if actual_bundle_hash != bundle.get("bundleHash"):
+    raise SystemExit(
+        f"bundleHash mismatch: expected {bundle.get('bundleHash')}, got {actual_bundle_hash}"
+    )
+
+print("replay verify: OK")
+PY

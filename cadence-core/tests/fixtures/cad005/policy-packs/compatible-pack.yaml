@@ -1,0 +1,10 @@
+id: core-v140-baseline
+schemaVersion: 1.0.0
+version: 1.4.0
+channel: stable
+runtimeCompatibility:
+  cadenceCore: ">=1.4.0 <1.5.0"
+  protocol: "1.4.x"
+rules:
+  - ruleId: CONTRACT-BREAKING-CHANGE
+    severity: P0

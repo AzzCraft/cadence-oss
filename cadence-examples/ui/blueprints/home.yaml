@@ -1,7 +1,0 @@
-id: home
-routes:
-  - path: "/"
-    component: "HomePage"
-authProfile: "test"
-states:
-  loading: true

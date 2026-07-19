@@ -1,0 +1,24 @@
+{
+  "task": "CAD-005",
+  "schemaVersion": "1.0.0",
+  "registryId": "cadence-local-test",
+  "entries": [
+    {
+      "kind": "plugin",
+      "id": "malicious-plugin",
+      "version": "9.9.9",
+      "ref": "manifests/malicious-plugin.json",
+      "status": "revoked",
+      "trusted": false,
+      "signer": "unknown",
+      "channel": "stable",
+      "sha256": "sha256:9999999999999999999999999999999999999999999999999999999999999999"
+    }
+  ],
+  "expectedFailure": {
+    "task": "CAD-005",
+    "code": "registry.revoked",
+    "item": "malicious-plugin",
+    "message": "CAD-005 registry.revoked: malicious-plugin is revoked or untrusted"
+  }
+}

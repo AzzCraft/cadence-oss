@@ -1,0 +1,13 @@
+projectId: fixture-project
+mode: strict_offline
+closureRef: suite_version_closure.json
+toolingLock: tooling_lock.json
+runtimeRef: runtime.json
+registryRef: registry.json
+sandboxRef: sandbox.json
+rootAnchor: hsm://tenant/root
+policies:
+  - standard-ui-v140
+ui:
+  enabled: false
+  profile: pr

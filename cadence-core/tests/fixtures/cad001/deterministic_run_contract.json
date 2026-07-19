@@ -1,0 +1,37 @@
+{
+  "task": "CAD-001",
+  "fixedClock": "2026-04-25T00:00:00Z",
+  "inputs": {
+    "workspaceHash": "workspace-sha-001",
+    "profile": "ci",
+    "attempt": 1,
+    "extra": {
+      "inputHash": "input-sha-001"
+    }
+  },
+  "repeatedRuns": [
+    {
+      "runId": "bcc8fdce8b3cdd1865ba9e00150ca9f1bcda5b22aad5331377d3839551c7d138",
+      "timestamp": "2026-04-25T00:00:00Z"
+    },
+    {
+      "runId": "bcc8fdce8b3cdd1865ba9e00150ca9f1bcda5b22aad5331377d3839551c7d138",
+      "timestamp": "2026-04-25T00:00:00Z"
+    }
+  ],
+  "changedAttempt": {
+    "runId": "0a0ea2ced041683244fa8b26af999c697d3c7a36c3daff58bc315ccf76c0c232",
+    "timestamp": "2026-04-25T00:00:00Z"
+  },
+  "changedInput": {
+    "runId": "b0a98c49510164d24d0841f3ed4bfab06fc4bef6e5b2681d533ca0ad6c9d7884",
+    "timestamp": "2026-04-25T00:00:00Z"
+  },
+  "diagnostics": [
+    {
+      "task": "CAD-001",
+      "field": "timestamp",
+      "message": "CAD-001 deterministic run timestamp mismatch: expected fixed timestamp 2026-04-25T00:00:00Z for replay evidence"
+    }
+  ]
+}
