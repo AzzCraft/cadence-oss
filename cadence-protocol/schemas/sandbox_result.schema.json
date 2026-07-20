@@ -1,0 +1,64 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://azzcraft.com/cadence/schemas/sandbox_result.schema.json",
+  "title": "SandboxResult",
+  "description": "Runtime-aligned sandbox execution result. Legacy abstract envelopes such as sandboxId/runId/details are not supported.",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "schemaVersion": { "$ref": "common.schema.json#/$defs/semver" },
+    "profileId": { "type": "string", "minLength": 1 },
+    "backend": { "type": "string", "minLength": 1 },
+    "mode": { "type": "string", "minLength": 1 },
+    "isolationLevel": { "type": "string", "minLength": 1 },
+    "command": {
+      "type": "array",
+      "items": { "type": "string" }
+    },
+    "workDir": { "type": "string", "minLength": 1 },
+    "filesystem": { "type": "string" },
+    "networkAccess": { "type": "boolean" },
+    "readOnlyInputs": { "type": "boolean" },
+    "writableOutputDir": { "type": "string" },
+    "allowedMounts": {
+      "type": "array",
+      "items": { "type": "string" }
+    },
+    "resourceLimits": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "maxMemoryMb": { "type": "integer" },
+        "maxCpuMs": { "type": "integer" },
+        "maxDiskMb": { "type": "integer" },
+        "cpuLimit": { "type": "integer" },
+        "memoryLimitMB": { "type": "integer" },
+        "pidsLimit": { "type": "integer" },
+        "timeoutSeconds": { "type": "integer" }
+      }
+    },
+    "checks": {
+      "type": "array",
+      "items": { "type": "string" }
+    },
+    "backendEvidence": {
+      "type": "object",
+      "additionalProperties": true
+    },
+    "isolationProbeRef": { "type": "string" },
+    "namespaceProofHash": { "type": "string" },
+    "passed": { "type": "boolean" },
+    "status": {
+      "type": "string",
+      "enum": ["ok", "denied", "timeout", "execution_error"]
+    },
+    "exitCode": { "type": "integer" },
+    "stdoutHash": { "type": "string" },
+    "stderrHash": { "type": "string" },
+    "failureReasons": {
+      "type": "array",
+      "items": { "type": "string" }
+    }
+  },
+  "required": ["schemaVersion", "profileId", "backend", "mode", "isolationLevel", "command", "workDir", "networkAccess", "checks", "passed", "status"]
+}

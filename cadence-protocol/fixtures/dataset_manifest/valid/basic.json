@@ -1,0 +1,36 @@
+{
+  "schemaVersion": "1.0.0",
+  "datasetId": "ds_fixture",
+  "datasetVersion": "2026-01-27",
+  "owner": "ml-platform",
+  "pointOfContact": "slack:#ml-quality",
+  "intendedUse": {
+    "purpose": "Fixture test dataset",
+    "restrictions": ["no-external-distribution"]
+  },
+  "provenance": {
+    "source": "fixture",
+    "collectionMethod": "synthetic"
+  },
+  "license": {
+    "terms": "internal",
+    "restrictions": ["no-external-distribution"]
+  },
+  "sensitivity": {
+    "pii": "none",
+    "accessLevel": "restricted"
+  },
+  "schemaRef": "schemas/record.schema.json",
+  "splits": {
+    "ci": { "count": 1 }
+  },
+  "contentHash": "sha256:0000000000000000000000000000000000000000000000000000000000000000",
+  "contentHashMethod": "sha256",
+  "artifactRefs": {
+    "raw": { "uri": "file://datasets/fixture/raw.jsonl" }
+  },
+  "retention": {
+    "windowDays": 90,
+    "deletionOwner": "ml-platform"
+  }
+}

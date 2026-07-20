@@ -1,0 +1,36 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://azzcraft.com/cadence/schemas/plugin_manifest.schema.json",
+  "title": "PluginManifest",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "schemaVersion": { "$ref": "common.schema.json#/$defs/semver" },
+    "pluginId": { "type": "string" },
+    "displayName": { "type": "string" },
+    "version": { "$ref": "common.schema.json#/$defs/semver" },
+    "kind": { "type": "string" },
+    "language": { "type": "string" },
+    "protocol": { "type": "string" },
+    "entryPoint": { "type": "string" },
+    "entrypoint": { "type": "string" },
+    "runtime": { "type": "string" },
+    "capabilities": {
+      "type": "array",
+      "items": { "type": "string" }
+    },
+    "timeoutMs": { "type": "integer", "minimum": 0 },
+    "compatWindow": {
+      "type": "object",
+      "properties": {
+        "from": { "type": "string", "format": "date-time" },
+        "until": { "type": "string", "format": "date-time" }
+      }
+    },
+    "envAllowlist": {
+      "type": "array",
+      "items": { "type": "string" }
+    }
+  },
+  "required": ["schemaVersion", "pluginId", "entryPoint", "capabilities"]
+}

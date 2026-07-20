@@ -1,0 +1,18 @@
+{
+  "pidNamespaced": true,
+  "mountNamespaced": false,
+  "netNamespaced": false,
+  "seccompActive": true,
+  "cgroupFenced": true,
+  "cgroupVersion": "v2",
+  "readonlyRoot": false,
+  "namespaceProofs": [
+    {
+      "namespace": "mnt",
+      "selfDescriptor": "mnt:[4026533000]",
+      "initDescriptor": "mnt:[4026531840]",
+      "matchesInit": false
+    }
+  ],
+  "namespaceProofHash": "sha256:2222222222222222222222222222222222222222222222222222222222222222"
+}

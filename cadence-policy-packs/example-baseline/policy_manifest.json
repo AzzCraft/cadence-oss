@@ -1,0 +1,11 @@
+{
+  "packId": "example.baseline",
+  "version": "v0.1.0",
+  "tier": "oss",
+  "description": "Baseline example policy pack with deterministic allow/deny rule metadata for local verification.",
+  "rules": [],
+  "compatibility": {
+    "cadenceCore": ">=0.1.0",
+    "standard": ">=v10.0"
+  }
+}

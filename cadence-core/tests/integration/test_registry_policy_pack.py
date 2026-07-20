@@ -60,7 +60,7 @@ def test_cad_005_revoked_hash_mismatch_and_policy_pack_failures_name_item() -> N
         assert required in compatible_pack
     assert incompatible["expectedFailure"]["task"] == "CAD-005"
     assert incompatible["expectedFailure"]["code"] == "policy.runtime.incompatible"
-    assert incompatible["expectedFailure"]["item"] == "legacy-v1-pack"
+    assert incompatible["expectedFailure"]["item"] == "legacy-v0-pack"
     assert "CAD-005" in incompatible["expectedFailure"]["message"]
 
     assert "runtimeCompatibility" in compatible_pack

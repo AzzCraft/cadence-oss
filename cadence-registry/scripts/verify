@@ -1,0 +1,115 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+cd "$(dirname "$0")/.."
+
+echo "[cadence-registry] verify indexes"
+
+for doc in docs/TRUST_MODEL.md docs/INDEX_FORMAT.md docs/DEPRECATION_POLICY.md; do
+  if [[ ! -f "$doc" ]]; then
+    echo "  FAIL: missing required doc: $doc"
+    echo "[cadence-registry] FAIL"
+    exit 1
+  fi
+done
+
+python3 - <<'PY'
+from __future__ import annotations
+
+import json
+import re
+import sys
+from pathlib import Path
+
+ROOT = Path(".").resolve()
+SHA256_RE = re.compile(r"^sha256:[0-9a-f]{64}$")
+COMPAT_WINDOW_RE = re.compile(
+    r"^(current|until \d{4}-\d{2}-\d{2}|from \d{4}-\d{2}-\d{2} to \d{4}-\d{2}-\d{2})$"
+)
+REQUIRED_ENTRY_KEYS = {
+    "id",
+    "kind",
+    "version",
+    "status",
+    "digest",
+    "ref",
+    "trust",
+    "deprecatedAt",
+    "deprecationReason",
+    "compatWindow",
+}
+
+
+def fail(message: str) -> None:
+    print(f"  FAIL: {message}", file=sys.stderr)
+    raise SystemExit(1)
+
+
+def validate_entry(entry: dict, source: str, index: int) -> None:
+    missing = sorted(REQUIRED_ENTRY_KEYS - set(entry))
+    if missing:
+        fail(f"{source} entry[{index}] missing keys: {', '.join(missing)}")
+    if entry["status"] not in {"active", "deprecated", "removed"}:
+        fail(f"{source} entry[{index}] invalid status: {entry['status']}")
+    if not isinstance(entry["digest"], str) or not SHA256_RE.match(entry["digest"]):
+        fail(f"{source} entry[{index}] digest must be sha256:<64-hex>")
+    if not isinstance(entry["compatWindow"], str) or not COMPAT_WINDOW_RE.match(entry["compatWindow"]):
+        fail(f"{source} entry[{index}] invalid compatWindow: {entry['compatWindow']!r}")
+    trust = entry["trust"]
+    if not isinstance(trust, dict):
+        fail(f"{source} entry[{index}] trust must be an object")
+    if not isinstance(trust.get("signer"), str) or not trust["signer"].strip():
+        fail(f"{source} entry[{index}] trust.signer is required")
+    if not isinstance(trust.get("allowlisted"), bool):
+        fail(f"{source} entry[{index}] trust.allowlisted must be boolean")
+    if entry["status"] == "active":
+        if entry["deprecatedAt"] is not None or entry["deprecationReason"] is not None:
+            fail(f"{source} entry[{index}] active entries must set deprecatedAt/deprecationReason to null")
+    else:
+        if not isinstance(entry["deprecatedAt"], str) or not entry["deprecatedAt"].strip():
+            fail(f"{source} entry[{index}] deprecatedAt is required for status={entry['status']}")
+        if not isinstance(entry["deprecationReason"], str) or not entry["deprecationReason"].strip():
+            fail(f"{source} entry[{index}] deprecationReason is required for status={entry['status']}")
+
+
+index_entries = {}
+for index_path in sorted((ROOT / "indexes").glob("*.json")):
+    payload = json.loads(index_path.read_text(encoding="utf-8"))
+    for key in ("schemaVersion", "indexId", "entries"):
+        if key not in payload:
+            fail(f"{index_path.name} missing top-level key {key}")
+    for idx, entry in enumerate(payload["entries"]):
+        validate_entry(entry, index_path.name, idx)
+        resolved = (index_path.parent / entry["ref"]).resolve()
+        if not resolved.exists():
+            fail(f"{index_path.name} entry[{idx}] ref target not found: {entry['ref']}")
+        key = (entry["kind"], entry["id"])
+        if key in index_entries:
+            fail(f"duplicate index entry for {key}")
+        index_entries[key] = entry
+
+for root_name in ("registry.json", "registry-core.json"):
+    root_registry = json.loads((ROOT / root_name).read_text(encoding="utf-8"))
+    for key in ("schemaVersion", "registryId", "entries"):
+        if key not in root_registry:
+            fail(f"{root_name} missing top-level key {key}")
+    for idx, entry in enumerate(root_registry["entries"]):
+        validate_entry(entry, root_name, idx)
+        key = (entry["kind"], entry["id"])
+        if key not in index_entries:
+            fail(f"{root_name} entry[{idx}] missing from indexes: {key}")
+        indexed = index_entries[key]
+        for field in ("version", "status", "digest", "deprecatedAt", "deprecationReason", "compatWindow", "trust"):
+            if entry.get(field) != indexed.get(field):
+                fail(
+                    f"{root_name} entry[{idx}] field mismatch for {field}: "
+                    f"{entry.get(field)!r} != {indexed.get(field)!r}"
+                )
+        resolved = (ROOT / entry["ref"]).resolve()
+        if not resolved.exists():
+            fail(f"{root_name} entry[{idx}] ref target not found: {entry['ref']}")
+PY
+
+python3 -m unittest discover -s tests -p 'test_*.py'
+
+echo "[cadence-registry] OK"

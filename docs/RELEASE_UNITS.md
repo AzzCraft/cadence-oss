@@ -1,11 +1,18 @@
 # Release Units
 
-Cadence OSS v1.0.0 is a **core-only** public source release. Its only runtime
-unit is `cadence-core/`; root files provide release policy, legal notices, and
-verification.
+Cadence OSS v1.1.0 is an eight-unit public source bundle. The positive export
+boundary is limited to these unit roots and the root release files:
 
-The architecture also has protocol, plugin, policy-pack, contract-hub,
-examples, sandbox, and registry concepts. They are not included, supported, or
-verified in this archive. A future, separately reviewed bundle may add them as
-backward-compatible functionality, but no command or document in v1.0.0
-requires their presence.
+- `cadence-core` — offline verification runtime and CLI.
+- `cadence-protocol` — schemas, canonicalization, and migrations.
+- `cadence-plugins` — reviewed, opt-in plugin implementations and manifests.
+- `cadence-policy-packs` — reviewed policy packs.
+- `contracts-hub-template` — self-verifying contract-hub starter.
+- `cadence-examples` — clean-room consumer examples.
+- `cadence-sandbox` — sandbox profiles and adapters.
+- `cadence-registry` — reviewed local registry indexes and resolver.
+
+The source workspace also contains demos, deployment material, pilots,
+training, product scripts, and other non-product areas. They are not part of
+the v1.1.0 public export. `scripts/verify` preserves the v1.0 core-only fast
+contract; `scripts/verify --full` verifies every listed unit.

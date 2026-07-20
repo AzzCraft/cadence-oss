@@ -1,0 +1,42 @@
+{
+  "algorithm": {
+    "version": "git:legacy"
+  },
+  "budget": {
+    "allocated": {
+      "timeMs": 1000
+    },
+    "children": [],
+    "consumed": {
+      "timeMs": 150
+    },
+    "remaining": {
+      "timeMs": 850
+    },
+    "scope": "pipeline",
+    "termination": {
+      "code": "ok"
+    }
+  },
+  "config": {
+    "configId": "cfg_legacy",
+    "profileId": "prod@4"
+  },
+  "contracts": {
+    "run.manifest.v1": "1.0.0"
+  },
+  "createdAt": "2026-04-08T08:00:00Z",
+  "determinism": {
+    "tier": "tier1"
+  },
+  "inputRef": {
+    "inputHash": "sha256:1111111111111111111111111111111111111111111111111111111111111111",
+    "rawInputId": "raw:legacy"
+  },
+  "manifestHash": "sha256:2222222222222222222222222222222222222222222222222222222222222222",
+  "pipeline": {
+    "id": "legacy.pipeline"
+  },
+  "runId": "2026-04-08T08:00:00Z/legacy",
+  "sideEffectsMode": "dryRun"
+}

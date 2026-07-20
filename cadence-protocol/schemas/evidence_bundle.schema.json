@@ -1,0 +1,15 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://azzcraft.com/cadence/schemas/evidence_bundle.schema.json",
+  "title": "EvidenceBundle",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "schemaVersion": { "$ref": "common.schema.json#/$defs/semver" },
+    "evidenceId": { "type": "string" },
+    "runManifestRef": { "type": "string" },
+    "pipelineResultRef": { "type": "string" },
+    "jobEnvelopeRef": { "type": "string" }
+  },
+  "required": ["schemaVersion", "evidenceId", "runManifestRef", "pipelineResultRef", "jobEnvelopeRef"]
+}

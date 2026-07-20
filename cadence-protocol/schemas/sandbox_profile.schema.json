@@ -1,0 +1,49 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://cadence.azzcraft.com/schemas/sandbox_profile.schema.json",
+  "title": "Cadence Sandbox Profile",
+  "description": "Defines the sandboxing constraints for a cadence pipeline run.",
+  "type": "object",
+  "required": ["schemaVersion", "sandboxId", "filesystem", "networkAccess", "timeSource"],
+  "additionalProperties": false,
+  "properties": {
+    "schemaVersion": {
+      "type": "string",
+      "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$"
+    },
+    "sandboxId": {
+      "type": "string",
+      "minLength": 1
+    },
+    "filesystem": {
+      "type": "string",
+      "enum": ["read-only", "workspace-only", "host"]
+    },
+    "networkAccess": {
+      "type": "boolean"
+    },
+    "timeSource": {
+      "type": "string",
+      "enum": ["system", "injected", "epoch-frozen"]
+    },
+    "deterministicClock": {
+      "type": "boolean"
+    },
+    "allowedMounts": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "limits": {
+      "type": "object",
+      "properties": {
+        "maxCpuSeconds": { "type": "integer", "minimum": 0 },
+        "maxMemoryMB": { "type": "integer", "minimum": 0 },
+        "maxDiskMB": { "type": "integer", "minimum": 0 }
+      },
+      "additionalProperties": false
+    }
+  }
+}

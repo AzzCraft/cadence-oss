@@ -1,0 +1,209 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+cd "$ROOT_DIR"
+export PYTHONDONTWRITEBYTECODE=1
+
+echo "[cadence-protocol] validate schemas (lightweight, stdlib-only) + validate examples + validate fixtures"
+python3 - <<'PY'
+import json
+from pathlib import Path
+
+from tools.validate import (
+    validate_run_manifest,
+    validate_pipeline_result,
+    validate_job_envelope,
+    validate_dataset_manifest,
+    validate_eval_report,
+    validate_evidence_bundle,
+    validate_replay_package,
+    validate_replay_bundle,
+    validate_signature,
+    validate_envelope,
+    validate_signature_envelope,
+    validate_plugin_manifest,
+    validate_plugin_registry_index,
+    validate_registry_entry,
+    validate_sandbox_result,
+    validate_waiver,
+    validate_waiver_file,
+    validate_key_hierarchy,
+    validate_approval_chain,
+    validate_isolation_probe,
+    validate_hsm_anchor,
+    validate_waiver_audit_trail,
+)
+
+schemas_dir = Path('schemas')
+examples_dir = Path('examples')
+fixtures_dir = Path('fixtures')
+docs_dir = Path('docs')
+
+required_docs = [
+    docs_dir / 'CANONICALIZATION.md',
+    docs_dir / 'VERSIONING.md',
+    docs_dir / 'MIGRATIONS.md',
+    docs_dir / 'COMPATIBILITY_MATRIX.md',
+]
+missing_docs = [p.as_posix() for p in required_docs if not p.exists()]
+if missing_docs:
+    raise SystemExit("FAIL: missing protocol docs:\n- " + "\n- ".join(missing_docs))
+
+# --- Schema structural checks ---
+schema_files = sorted(schemas_dir.glob('*.schema.json'))
+assert schema_files, 'no schema files'
+for p in schema_files:
+    data = json.loads(p.read_text(encoding='utf-8'))
+    for k in ('$schema', '$id', 'title'):
+        if k not in data:
+            raise SystemExit(f"missing {k} in {p}")
+    if p.name == 'run_manifest.schema.json':
+        not_block = data.get('not', {})
+        req = (not_block.get('required') or [])
+        if 'manifestHash' not in req:
+            raise SystemExit('run_manifest.schema.json should forbid manifestHash via not.required')
+
+print(f"OK: {len(schema_files)} schema docs parsed")
+
+# --- Example validation (fail-hard: missing governed examples are errors) ---
+GOVERNED_EXAMPLES = {
+    'run_manifest.example.json': validate_run_manifest,
+    'pipeline_result.example.json': validate_pipeline_result,
+    'job_envelope.example.json': validate_job_envelope,
+    'dataset_manifest.example.json': validate_dataset_manifest,
+    'eval_report.example.json': validate_eval_report,
+    'evidence_bundle.example.json': validate_evidence_bundle,
+    'replay_package.example.json': validate_replay_package,
+    'replay_bundle.example.json': validate_replay_bundle,
+    'signature.example.json': validate_signature,
+    'envelope.example.json': validate_envelope,
+    'signature_envelope.example.json': validate_signature_envelope,
+    'plugin_manifest.example.json': validate_plugin_manifest,
+    'plugin_registry_index.example.json': validate_plugin_registry_index,
+    'registry_entry.example.json': validate_registry_entry,
+    'sandbox_result.example.json': validate_sandbox_result,
+    'waiver.example.json': validate_waiver,
+    'waiver_file.example.json': validate_waiver_file,
+    'key_hierarchy.example.json': validate_key_hierarchy,
+    'approval_chain.example.json': validate_approval_chain,
+    'isolation_probe.example.json': validate_isolation_probe,
+    'hsm_anchor.example.json': validate_hsm_anchor,
+    'waiver_audit_trail.example.json': validate_waiver_audit_trail,
+}
+
+for name, fn in GOVERNED_EXAMPLES.items():
+    ex = examples_dir / name
+    if not ex.exists():
+        raise SystemExit(f"FAIL: governed example missing: {ex}")
+    inst = json.loads(ex.read_text(encoding='utf-8'))
+    fn(inst)
+    print(f"OK: {name} validated")
+
+# --- Fixture validation (fail-hard: governed families must have valid+invalid dirs) ---
+GOVERNED_FIXTURE_VALIDATORS = {
+    'run_manifest': validate_run_manifest,
+    'pipeline_result': validate_pipeline_result,
+    'job_envelope': validate_job_envelope,
+    'dataset_manifest': validate_dataset_manifest,
+    'eval_report': validate_eval_report,
+    'plugin_manifest': validate_plugin_manifest,
+    'plugin_registry_index': validate_plugin_registry_index,
+    'registry_entry': validate_registry_entry,
+    'replay_package': validate_replay_package,
+    'replay_bundle': validate_replay_bundle,
+    'evidence_bundle': validate_evidence_bundle,
+    'signature': validate_signature,
+    'envelope': validate_envelope,
+    'signature_envelope': validate_signature_envelope,
+    'sandbox_result': validate_sandbox_result,
+    'waiver': validate_waiver,
+    'waiver_file': validate_waiver_file,
+    'key_hierarchy': validate_key_hierarchy,
+    'approval_chain': validate_approval_chain,
+    'isolation_probe': validate_isolation_probe,
+    'hsm_anchor': validate_hsm_anchor,
+    'waiver_audit_trail': validate_waiver_audit_trail,
+}
+
+# Schema-conformance-only fixtures (validated via JSON Schema structure, not Python validators)
+SCHEMA_ONLY_FIXTURES = {'sandbox_profile', 'runtime_profile'}
+
+fixture_count = 0
+for family, fn in GOVERNED_FIXTURE_VALIDATORS.items():
+    family_dir = fixtures_dir / family
+    valid_dir = family_dir / 'valid'
+    invalid_dir = family_dir / 'invalid'
+    if not family_dir.is_dir():
+        raise SystemExit(f"FAIL: missing fixture family directory: {family_dir}")
+    if not valid_dir.is_dir() or not list(valid_dir.glob('*.json')):
+        raise SystemExit(f"FAIL: no valid fixtures in {valid_dir}")
+    if not invalid_dir.is_dir() or not list(invalid_dir.glob('*.json')):
+        raise SystemExit(f"FAIL: no invalid fixtures in {invalid_dir}")
+    for fp in sorted(valid_dir.glob('*.json')):
+        inst = json.loads(fp.read_text(encoding='utf-8'))
+        fn(inst)
+        fixture_count += 1
+    for fp in sorted(invalid_dir.glob('*.json')):
+        inst = json.loads(fp.read_text(encoding='utf-8'))
+        try:
+            fn(inst)
+            raise SystemExit(f"FAIL: invalid fixture should have been rejected: {fp}")
+        except (ValueError, KeyError):
+            pass
+        fixture_count += 1
+
+for family in SCHEMA_ONLY_FIXTURES:
+    family_dir = fixtures_dir / family
+    valid_dir = family_dir / 'valid'
+    invalid_dir = family_dir / 'invalid'
+    if not family_dir.is_dir():
+        raise SystemExit(f"FAIL: missing fixture family directory: {family_dir}")
+    if not valid_dir.is_dir() or not list(valid_dir.glob('*.json')):
+        raise SystemExit(f"FAIL: no valid fixtures in {valid_dir}")
+    if not invalid_dir.is_dir() or not list(invalid_dir.glob('*.json')):
+        raise SystemExit(f"FAIL: no invalid fixtures in {invalid_dir}")
+    schema_path = schemas_dir / f'{family}.schema.json'
+    if not schema_path.exists():
+        raise SystemExit(f"FAIL: schema not found for fixture family: {schema_path}")
+    schema = json.loads(schema_path.read_text(encoding='utf-8'))
+    required_keys = schema.get('required', [])
+    for fp in sorted(valid_dir.glob('*.json')):
+        inst = json.loads(fp.read_text(encoding='utf-8'))
+        for k in required_keys:
+            if k not in inst:
+                raise SystemExit(f"FAIL: valid fixture {fp} missing required key '{k}'")
+        fixture_count += 1
+    for fp in sorted(invalid_dir.glob('*.json')):
+        inst = json.loads(fp.read_text(encoding='utf-8'))
+        missing = [k for k in required_keys if k not in inst]
+        if not missing:
+            raise SystemExit(f"FAIL: invalid fixture {fp} satisfies all required keys (should be invalid)")
+        fixture_count += 1
+
+print(f"OK: {fixture_count} fixtures validated")
+
+def _load_json(path: Path):
+    return json.loads(path.read_text(encoding='utf-8'))
+
+equivalent_pairs = {
+    'examples/replay_bundle.example.json': 'examples/replay_package.example.json',
+    'examples/registry_entry.example.json': 'examples/plugin_registry_index.example.json',
+    'examples/signature_envelope.example.json': 'examples/signature.example.json',
+    'fixtures/replay_bundle/valid/basic.json': 'fixtures/replay_package/valid/basic.json',
+    'fixtures/replay_bundle/invalid/missing_required.json': 'fixtures/replay_package/invalid/missing_required.json',
+    'fixtures/registry_entry/valid/basic.json': 'fixtures/plugin_registry_index/valid/basic.json',
+    'fixtures/registry_entry/invalid/missing_required.json': 'fixtures/plugin_registry_index/invalid/missing_required.json',
+    'fixtures/signature_envelope/valid/basic.json': 'fixtures/signature/valid/basic.json',
+    'fixtures/signature_envelope/invalid/missing_required.json': 'fixtures/signature/invalid/missing_required.json',
+}
+for left_rel, right_rel in equivalent_pairs.items():
+    left = Path(left_rel)
+    right = Path(right_rel)
+    if _load_json(left) != _load_json(right):
+        raise SystemExit(f"FAIL: canonical/alias drift between {left_rel} and {right_rel}")
+print("OK: canonical and alias payload pairs are equivalent where intended")
+print('[cadence-protocol] OK')
+PY
+
+bash ./scripts/verify-compat

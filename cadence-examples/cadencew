@@ -1,0 +1,64 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# Cadence Wrapper (cadencew)
+#
+# This wrapper follows the spirit of "Docs as Software":
+# - A repo pins the CLI via tooling_lock.json
+# - cadencew resolves the pinned CLI and runs it deterministically
+#
+# In this offline-friendly repo, if no pinned binary is available,
+# cadencew builds cadence-core from the local source tree.
+
+ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+BIN_DIR="$ROOT_DIR/.cadence/bin"
+BIN="$BIN_DIR/cadence"
+LOCAL_CORE="$ROOT_DIR/../cadence-core"
+
+needs_rebuild() {
+  if [[ ! -x "$BIN" ]]; then
+    return 0
+  fi
+  if [[ ! -d "$LOCAL_CORE" ]]; then
+    return 1
+  fi
+  if find "$LOCAL_CORE" -type f \( -name '*.go' -o -name 'go.mod' -o -name 'go.sum' \) -newer "$BIN" | grep -q .; then
+    return 0
+  fi
+  return 1
+}
+
+ensure_bin() {
+  # Prefer the local cadence-core tree when present so the wrapper follows the
+  # checked-out source of truth rather than a stale cached or global binary.
+  if [[ -d "$LOCAL_CORE" ]]; then
+    mkdir -p "$BIN_DIR"
+    if needs_rebuild; then
+      echo "cadencew: building cadence-core -> $BIN"
+      (cd "$LOCAL_CORE" && go build -trimpath -buildvcs=false -mod=vendor -o "$BIN" ./cmd/cadence)
+      chmod +x "$BIN"
+    fi
+    return 0
+  fi
+
+  # If cadence is already installed globally, use it.
+  if command -v cadence >/dev/null 2>&1; then
+    return 0
+  fi
+
+  echo "cadencew: cannot locate cadence-core to build, and no system cadence found" >&2
+  exit 127
+}
+
+ensure_bin
+
+if [[ ! -f "$ROOT_DIR/tooling_lock.json" ]]; then
+  echo "cadencew: missing tooling_lock.json" >&2
+  exit 2
+fi
+
+if [[ -x "$BIN" ]]; then
+  exec "$BIN" "$@"
+else
+  exec cadence "$@"
+fi

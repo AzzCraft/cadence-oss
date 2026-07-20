@@ -1,0 +1,7 @@
+{
+  "schemaVersion": "1.0.0",
+  "runtimeId": "strict_offline",
+  "description": "Default offline runtime profile for Cadence OSS examples.",
+  "networkAccess": false,
+  "deterministicClock": true
+}

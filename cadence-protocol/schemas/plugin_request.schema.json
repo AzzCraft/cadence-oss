@@ -1,0 +1,53 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://azzcraft.com/schemas/plugin_request.schema.json",
+  "title": "Cadence Plugin Request",
+  "type": "object",
+  "required": [
+    "schemaVersion",
+    "protocolVersion",
+    "repoRoot",
+    "files",
+    "mode"
+  ],
+  "properties": {
+    "schemaVersion": {
+      "type": "string"
+    },
+    "protocolVersion": {
+      "type": "string"
+    },
+    "repoRoot": {
+      "type": "string"
+    },
+    "files": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "changedFiles": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "config": {
+      "type": "object"
+    },
+    "mode": {
+      "type": "string",
+      "enum": [
+        "scan",
+        "verify"
+      ]
+    },
+    "constraints": {
+      "type": "object"
+    },
+    "compat": {
+      "type": "object"
+    }
+  },
+  "additionalProperties": false
+}

@@ -1,0 +1,9 @@
+{
+  "schemaVersion": "1.0.0",
+  "closureId": "closure-001",
+  "standardVersion": "1.4.0",
+  "suiteVersion": "1.0.0",
+  "componentVersions": {
+    "cadence-core": "1.0.0"
+  }
+}

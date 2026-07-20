@@ -1,0 +1,31 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://azzcraft.com/schemas/plugin_response.schema.json",
+  "title": "Cadence Plugin Response",
+  "type": "object",
+  "required": [
+    "schemaVersion",
+    "protocolVersion"
+  ],
+  "properties": {
+    "schemaVersion": {
+      "type": "string"
+    },
+    "protocolVersion": {
+      "type": "string"
+    },
+    "ir": {
+      "type": "object"
+    },
+    "violations": {
+      "type": "array",
+      "items": {
+        "type": "object"
+      }
+    },
+    "metrics": {
+      "type": "object"
+    }
+  },
+  "additionalProperties": false
+}

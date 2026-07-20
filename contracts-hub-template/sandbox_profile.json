@@ -1,0 +1,10 @@
+{
+  "schemaVersion": "1.0.0",
+  "profileId": "contracts-hub-template",
+  "filesystem": "read-only-input",
+  "networkAccess": false,
+  "readOnlyInputs": true,
+  "writableOutputDir": ".cadence/out",
+  "allowedMounts": [],
+  "resourceLimits": { "timeoutSeconds": 120 }
+}

@@ -1,7 +1,9 @@
 # Third Party Notices
 
-This public source release contains first-party Go code and the vendored modules
-recorded by `cadence-core/vendor/modules.txt`.
+This public source release contains first-party Go, Python, TypeScript, JSON,
+and shell source. The only redistributed third-party source is the vendored Go
+modules recorded by `cadence-core/vendor/modules.txt`; Python and Node are
+external verification runtimes, not redistributed dependencies.
 
 ## Included Notices
 

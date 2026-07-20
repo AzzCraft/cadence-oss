@@ -1,0 +1,12 @@
+{
+  "name": "cadence-node-product-example",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "verify": "node index.js"
+  },
+  "das": {
+    "taskId": "DAS-03-014",
+    "profile": "oss"
+  }
+}

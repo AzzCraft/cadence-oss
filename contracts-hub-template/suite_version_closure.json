@@ -1,0 +1,8 @@
+{
+  "schemaVersion": "1.0.0",
+  "suiteVersion": "1.0.0",
+  "standardVersion": "1.4.0",
+  "componentVersions": {
+    "cadence_cli": "1.0.0"
+  }
+}

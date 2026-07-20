@@ -1,0 +1,59 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://azzcraft.com/cadence/registry/trust_index.schema.json",
+  "title": "Cadence Registry Trust Index",
+  "description": "DAS-04-013 — trust index of plugins, policy packs, runtime images. Includes revocation list and signing keys.",
+  "type": "object",
+  "required": ["schemaVersion", "generatedAt", "entries", "revocations", "keys"],
+  "additionalProperties": false,
+  "properties": {
+    "schemaVersion": {"const": 1},
+    "generatedAt": {"type": "string", "format": "date-time"},
+    "entries": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "kind", "version", "sha256", "signedBy"],
+        "additionalProperties": false,
+        "properties": {
+          "id": {"type": "string"},
+          "kind": {"type": "string", "enum": ["plugin", "policy-pack", "runtime-image"]},
+          "version": {"type": "string"},
+          "sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+          "signedBy": {"type": "string", "description": "key id"},
+          "publishedAt": {"type": "string", "format": "date-time"},
+          "tier": {"type": "string", "enum": ["oss", "team", "pro", "enterprise", "gov", "full"]}
+        }
+      }
+    },
+    "revocations": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "version", "reason", "revokedAt"],
+        "additionalProperties": false,
+        "properties": {
+          "id": {"type": "string"},
+          "version": {"type": "string"},
+          "reason": {"type": "string"},
+          "revokedAt": {"type": "string", "format": "date-time"},
+          "replacement": {"type": "string"}
+        }
+      }
+    },
+    "keys": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["keyId", "alg", "publicKey"],
+        "additionalProperties": false,
+        "properties": {
+          "keyId": {"type": "string"},
+          "alg": {"type": "string", "enum": ["ed25519", "ecdsa-p256", "rsa-pss-2048"]},
+          "publicKey": {"type": "string"},
+          "expiresAt": {"type": "string", "format": "date-time"}
+        }
+      }
+    }
+  }
+}

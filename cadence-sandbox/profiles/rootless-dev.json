@@ -1,0 +1,29 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://azzcraft.com/cadence/sandbox/profiles/rootless-dev.json",
+  "task": "DAS-04-011",
+  "schemaVersion": "1.0.0",
+  "profileId": "rootless-dev",
+  "backend": "host-local",
+  "description": "Development profile — rootless container, workspace-only FS, network disabled.",
+  "filesystem": {
+    "mode": "workspace-only",
+    "readOnlyInputs": true,
+    "writableOutputDir": ".cadence/out"
+  },
+  "network": {
+    "access": false
+  },
+  "resources": {
+    "cpuLimit": null,
+    "memoryLimitMB": null,
+    "pidsLimit": null,
+    "timeoutSeconds": 300
+  },
+  "timeSource": "injected",
+  "escapeClassification": {
+    "networkViolation": "hard_fail",
+    "filesystemViolation": "hard_fail",
+    "resourceExceeded": "soft_fail"
+  }
+}

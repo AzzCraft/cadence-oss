@@ -1,0 +1,25 @@
+{
+  "schemaVersion": "1.0.0",
+  "profileId": "test-sandbox",
+  "backend": "host-local",
+  "mode": "backend-adapter",
+  "isolationLevel": "backend-host-local-declared",
+  "command": ["cadence", "scan", "--json"],
+  "workDir": "/workspace/repo",
+  "filesystem": "workspace-only",
+  "networkAccess": false,
+  "readOnlyInputs": true,
+  "writableOutputDir": ".cadence/out",
+  "allowedMounts": ["./cache"],
+  "checks": ["backend:host-local", "network-disabled-declared"],
+  "backendEvidence": {
+    "launcher": "exec.CommandContext"
+  },
+  "isolationProbeRef": "isolation-probe.json",
+  "namespaceProofHash": "sha256:4444444444444444444444444444444444444444444444444444444444444444",
+  "passed": true,
+  "status": "ok",
+  "exitCode": 0,
+  "stdoutHash": "sha256:5555555555555555555555555555555555555555555555555555555555555555",
+  "stderrHash": "sha256:6666666666666666666666666666666666666666666666666666666666666666"
+}

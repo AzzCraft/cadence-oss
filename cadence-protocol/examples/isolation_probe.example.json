@@ -1,0 +1,19 @@
+{
+  "schemaVersion": "1.0.0",
+  "pidNamespaced": true,
+  "mountNamespaced": true,
+  "netNamespaced": false,
+  "seccompActive": true,
+  "cgroupFenced": true,
+  "cgroupVersion": "v2",
+  "readonlyRoot": true,
+  "namespaceProofs": [
+    {
+      "namespace": "pid",
+      "selfDescriptor": "pid:[4026532845]",
+      "initDescriptor": "pid:[4026531836]",
+      "matchesInit": false
+    }
+  ],
+  "namespaceProofHash": "sha256:1111111111111111111111111111111111111111111111111111111111111111"
+}

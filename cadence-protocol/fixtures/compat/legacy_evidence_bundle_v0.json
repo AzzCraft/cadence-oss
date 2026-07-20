@@ -1,0 +1,7 @@
+{
+  "schemaVersion": "0.9.0",
+  "evidenceId": "evidence_legacy",
+  "runManifestRef": "examples/run_manifest.example.json",
+  "pipelineResultRef": "examples/pipeline_result.example.json",
+  "jobEnvelopeRef": "examples/job_envelope.example.json"
+}

@@ -1,0 +1,7 @@
+{
+  "schemaVersion": "1.0.0",
+  "sandboxId": "fixture-sandbox",
+  "filesystem": "workspace-only",
+  "networkAccess": false,
+  "timeSource": "injected"
+}

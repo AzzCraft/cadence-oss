@@ -1,0 +1,9 @@
+{
+  "schemaVersion": "1.0.0",
+  "reportId": "rpt-001",
+  "timestamp": "2026-04-20T00:00:00Z",
+  "summary": {
+    "status": "PASS",
+    "totalViolations": 0
+  }
+}

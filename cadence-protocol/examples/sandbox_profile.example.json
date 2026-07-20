@@ -1,0 +1,7 @@
+{
+  "schemaVersion": "1.0.0",
+  "sandboxId": "sbx-001",
+  "filesystem": "read-only",
+  "networkAccess": false,
+  "timeSource": "system"
+}

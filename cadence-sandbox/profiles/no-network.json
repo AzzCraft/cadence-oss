@@ -1,0 +1,47 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://azzcraft.com/cadence/sandbox/profiles/no-network.json",
+  "title": "Cadence sandbox profile: no-network",
+  "task": "DAS-04-010",
+  "schemaVersion": "1.0.0",
+  "profileId": "no-network",
+  "backend": "container-runtime",
+  "profile": "no-network",
+  "description": "Default plugin sandbox profile with all egress denied. Plugins must explicitly opt in via manifest permissions to receive any network access.",
+  "network": {
+    "access": false,
+    "egress": "deny",
+    "ingress": "deny",
+    "allowedHosts": [],
+    "allowedPorts": [],
+    "dnsResolution": "deny"
+  },
+  "filesystem": {
+    "mode": "container-isolated",
+    "readOnlyInputs": true,
+    "writableOutputDir": "/workspace/.cadence/out",
+    "rootMode": "read-only",
+    "writableMounts": ["/tmp/artifacts"],
+    "deniedPaths": ["/etc", "/var", "/root", "/home"]
+  },
+  "resources": {
+    "cpuLimit": 2,
+    "memoryLimitMB": 4096,
+    "pidsLimit": 256,
+    "timeoutSeconds": 600
+  },
+  "timeSource": "injected",
+  "escapeClassification": {
+    "networkViolation": "hard_fail",
+    "filesystemViolation": "hard_fail",
+    "resourceExceeded": "hard_fail"
+  },
+  "process": {
+    "noNewPrivileges": true,
+    "dropCapabilities": ["ALL"]
+  },
+  "syscalls": {
+    "policy": "default-deny",
+    "allowedGroups": ["io", "fs-readonly", "fs-write-tmp", "process-self"]
+  }
+}

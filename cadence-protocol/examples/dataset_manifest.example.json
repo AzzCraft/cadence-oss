@@ -1,0 +1,49 @@
+{
+  "schemaVersion": "1.0.0",
+  "datasetId": "ds_ui_gen_demo",
+  "datasetVersion": "2026-01-27",
+  "owner": "ml-platform",
+  "pointOfContact": "slack:#ml-quality",
+  "intendedUse": {
+    "purpose": "Demo UI generation fine-tune set",
+    "restrictions": [
+      "no-external-distribution"
+    ]
+  },
+  "provenance": {
+    "source": "cadence-ui/examples/app",
+    "collectionMethod": "paired blueprint->managed output",
+    "generatedAt": "2026-01-27",
+    "generatedBy": "pipeline:dataset_build@demo"
+  },
+  "license": {
+    "terms": "internal",
+    "restrictions": [
+      "no-external-distribution"
+    ]
+  },
+  "sensitivity": {
+    "pii": "none",
+    "accessLevel": "restricted"
+  },
+  "schemaRef": "schemas/ui_gen_record.schema.json",
+  "splits": {
+    "ci": {
+      "count": 1
+    }
+  },
+  "contentHash": "sha256:0000000000000000000000000000000000000000000000000000000000000000",
+  "contentHashMethod": "sha256",
+  "artifactRefs": {
+    "raw": {
+      "uri": "file://datasets/ds_ui_gen_demo/2026-01-27/raw.jsonl"
+    },
+    "normalized": {
+      "uri": "file://datasets/ds_ui_gen_demo/2026-01-27/normalized.jsonl"
+    }
+  },
+  "retention": {
+    "windowDays": 90,
+    "deletionOwner": "ml-platform"
+  }
+}

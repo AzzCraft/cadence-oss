@@ -1,0 +1,9 @@
+projectId: headless-minimal
+mode: strict_offline
+closureRef: suite_version_closure.json
+toolingLock: tooling_lock.json
+runtimeRef: ../../../cadence-sandbox/runtime_profile.json
+registryRef: ../../../cadence-registry/registry-core.json
+sandboxRef: ../../../cadence-sandbox/sandbox_profile.json
+policies:
+  - headless-v140

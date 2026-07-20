@@ -1,0 +1,6 @@
+{
+  "schemaVersion": "1.0.0",
+  "os": "linux",
+  "arch": "amd64",
+  "goVersion": "1.22.0"
+}

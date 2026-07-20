@@ -1,0 +1,14 @@
+{
+  "schemaVersion": "1.0.0",
+  "profileId": "test-sandbox",
+  "backend": "host-local",
+  "mode": "backend-adapter",
+  "isolationLevel": "backend-host-local-declared",
+  "command": ["cadence", "scan", "--json"],
+  "workDir": "/workspace/repo",
+  "networkAccess": false,
+  "checks": ["backend:host-local"],
+  "passed": true,
+  "status": "ok",
+  "filesystem": "workspace-only"
+}

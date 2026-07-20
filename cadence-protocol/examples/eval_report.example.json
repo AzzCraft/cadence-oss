@@ -1,0 +1,25 @@
+{
+  "schemaVersion": "1.0.0",
+  "evalId": "ui_gen_demo.ci",
+  "runAt": "2026-01-27T18:00:00Z",
+  "dataset": {
+    "datasetId": "ds_ui_gen_demo",
+    "datasetVersion": "2026-01-27"
+  },
+  "thresholds": {
+    "syntheticScore": 0.5
+  },
+  "metrics": {
+    "syntheticScore": 0.82,
+    "records": 1
+  },
+  "status": "pass",
+  "artifacts": {
+    "fullReportRef": "file://./evals/ui_gen_demo/2026-01-27/full_report.json"
+  },
+  "diagnostics": {
+    "codes": [
+      "eval.passed"
+    ]
+  }
+}

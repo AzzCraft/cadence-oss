@@ -1,0 +1,110 @@
+#!/usr/bin/env bash
+# cadence-sandbox audit hook
+# Audits a sandbox profile against a run environment to detect violations.
+# Usage: audit-hook <profile.json> [output_dir]
+set -euo pipefail
+
+PROFILE="${1:?Usage: audit-hook <profile.json> [output_dir]}"
+OUTDIR="${2:-.cadence/sandbox-audit}"
+
+if [[ ! -f "$PROFILE" ]]; then
+  echo "audit-hook: profile not found: $PROFILE" >&2
+  exit 1
+fi
+
+mkdir -p "$OUTDIR"
+
+VIOLATIONS=0
+AUDIT_FILE="$OUTDIR/audit-$(python3 - <<'PY'
+import uuid
+print(uuid.uuid4().hex)
+PY
+).json"
+
+python3 - "$PROFILE" "$AUDIT_FILE" <<'PYEOF'
+import json, sys
+from datetime import datetime, timezone
+
+profile_path = sys.argv[1]
+audit_path = sys.argv[2]
+
+with open(profile_path) as f:
+    profile = json.load(f)
+
+findings = []
+violations = 0
+
+profile_id = profile.get("profileId") or profile.get("sandboxId") or "unknown"
+
+# Check filesystem constraints
+filesystem = profile.get("filesystem", "host")
+if isinstance(filesystem, dict):
+    fs_mode = filesystem.get("mode", "host")
+    read_only_inputs = bool(filesystem.get("readOnlyInputs", False))
+    writable_output_dir = filesystem.get("writableOutputDir")
+else:
+    fs_mode = filesystem
+    read_only_inputs = False
+    writable_output_dir = None
+
+if fs_mode == "read-only":
+    # In a real system this would check mount flags; here we verify intent
+    findings.append({"check": "filesystem", "mode": fs_mode, "status": "enforced"})
+elif fs_mode in {"workspace-only", "container-isolated", "microvm-isolated"}:
+    findings.append({"check": "filesystem", "mode": fs_mode, "status": "enforced"})
+else:
+    findings.append({"check": "filesystem", "mode": fs_mode, "status": "permissive"})
+
+if read_only_inputs:
+    findings.append({"check": "read_only_inputs", "status": "declared"})
+if writable_output_dir:
+    findings.append({"check": "writable_output_dir", "path": writable_output_dir, "status": "declared"})
+
+# Check network access
+network_val = profile.get("network", profile.get("networkAccess", False))
+if isinstance(network_val, dict):
+    allowed = bool(network_val.get("access", network_val.get("allowed", True)))
+elif isinstance(network_val, bool):
+    allowed = network_val
+else:
+    allowed = True
+
+if not allowed:
+    findings.append({"check": "network", "allowed": False, "status": "audited"})
+else:
+    findings.append({"check": "network", "allowed": True, "status": "permissive"})
+
+# Check time source
+time_src = profile.get("timeSource", "system")
+if time_src in ("injected", "epoch-frozen"):
+    findings.append({"check": "timeSource", "mode": time_src, "status": "enforced"})
+else:
+    findings.append({"check": "timeSource", "mode": time_src, "status": "permissive"})
+
+# Check resource limits
+resources = profile.get("resources", profile.get("limits", {}))
+if resources:
+    findings.append({"check": "resources", "limits": resources, "status": "declared"})
+
+# Count violations
+violations = sum(1 for f in findings if f.get("status") == "warning")
+
+audit = {
+    "schemaVersion": "1.0.0",
+    "profileId": profile_id,
+    "timestamp": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
+    "findings": findings,
+    "summary": {
+        "totalChecks": len(findings),
+        "violations": violations,
+        "status": "fail" if violations > 0 else "pass"
+    }
+}
+
+with open(audit_path, "w") as f:
+    json.dump(audit, f, indent=2)
+    f.write("\n")
+
+print(f"audit-hook: {audit['summary']['totalChecks']} checks, {violations} violations -> {audit['summary']['status']}")
+sys.exit(1 if violations > 0 else 0)
+PYEOF

@@ -1,0 +1,10 @@
+{
+  "name": "@azzcraft/cadence-bridge-eslint",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "bin": {
+    "cadence-bridge-eslint": "./index.mjs"
+  },
+  "license": "Apache-2.0"
+}

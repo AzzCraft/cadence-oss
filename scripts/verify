@@ -40,7 +40,24 @@ SOURCE_ID="$(git -C "$ROOT_DIR" rev-parse --verify HEAD 2>/dev/null || printf '%
 printf '%s\n' "mode=$MODE cadenceVersion=$(tr -d '[:space:]' < VERSION) dasStandardVersion=1.4.0 source=$SOURCE_ID go=$ACTUAL_GO python=$(python3 --version 2>&1 || printf unavailable)"
 
 if [[ "$MODE" == "full" ]]; then
+  command -v python3 >/dev/null 2>&1 || { echo "Python 3.10 or newer is required for --full." >&2; exit 127; }
+  REQUIRED_PYTEST="9.0.3"
+  ACTUAL_PYTEST="$(python3 -c 'import pytest; print(pytest.__version__)' 2>/dev/null || true)"
+  if [[ "$ACTUAL_PYTEST" != "$REQUIRED_PYTEST" ]]; then
+    echo "pytest $REQUIRED_PYTEST is required for --full; install requirements-verify.txt." >&2
+    exit 1
+  fi
+  command -v node >/dev/null 2>&1 || { echo "Node.js 20 or newer is required for --full." >&2; exit 127; }
+  NODE_MAJOR="$(node -p 'process.versions.node.split(".")[0]' 2>/dev/null || true)"
+  if [[ ! "$NODE_MAJOR" =~ ^[0-9]+$ ]] || (( NODE_MAJOR < 20 )); then
+    echo "Node.js 20 or newer is required for --full; found $(node --version 2>/dev/null || printf unavailable)." >&2
+    exit 1
+  fi
   bash ./cadence-core/scripts/verify-full
+  for unit in cadence-protocol cadence-plugins cadence-policy-packs contracts-hub-template cadence-examples cadence-sandbox cadence-registry; do
+    echo "[cadence-oss] full verification: $unit"
+    bash "./$unit/scripts/verify" --full
+  done
 else
   bash ./cadence-core/scripts/verify
 fi
@@ -51,7 +68,10 @@ while IFS= read -r -d '' go_file; do
   if [[ -n "$formatted_path" ]]; then
     UNFORMATTED="${UNFORMATTED}${formatted_path}\n"
   fi
-done < <(find ./cadence-core -path './cadence-core/vendor' -prune -o -type f -name '*.go' -print0)
+done < <(find . \
+  -path './cadence-core/vendor' -prune -o \
+  -path './cadence-examples/.cadence' -prune -o \
+  -type f -name '*.go' -print0)
 if [[ -n "$UNFORMATTED" ]]; then
   echo "first-party Go source is not gofmt-clean" >&2
   printf '%b' "$UNFORMATTED" >&2

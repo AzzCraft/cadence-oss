@@ -1,0 +1,12 @@
+projectId: contracts-hub-template
+mode: strict_offline
+closureRef: suite_version_closure.json
+toolingLock: tooling_lock.json
+runtimeRef: cadence_lock.json
+registryRef: registry.json
+sandboxRef: sandbox_profile.json
+policies:
+  - core-v140-baseline
+ui:
+  enabled: false
+  profile: headless

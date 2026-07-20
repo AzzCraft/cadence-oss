@@ -1,0 +1,8 @@
+{
+  "schemaVersion": "1.0.0",
+  "signatureId": "sig_demo",
+  "algorithm": "ed25519",
+  "signer": "cadence-oss-ci",
+  "payloadHash": "sha256:4444444444444444444444444444444444444444444444444444444444444444",
+  "signature": "demo-signature"
+}

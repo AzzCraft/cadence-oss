@@ -1,0 +1,9 @@
+{
+  "schemaVersion": 1,
+  "taskId": "DAS-03-019",
+  "policyPack": "oss-minimum",
+  "rules": [
+    {"id": "verify-before-release", "severity": "error"},
+    {"id": "evidence-index-required", "severity": "error"}
+  ]
+}

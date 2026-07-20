@@ -1,0 +1,31 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://azzcraft.com/cadence/schemas/closure_profile.schema.json",
+  "title": "ClosureProfile",
+  "description": "Suite version closure profile for deterministic reproducibility",
+  "type": "object",
+  "properties": {
+    "schemaVersion": { "type": "string", "const": "1.0.0" },
+    "closureId": { "type": "string" },
+    "timestamp": { "type": "string", "format": "date-time" },
+    "standardVersion": { "type": "string" },
+    "standardManifestVersion": { "type": "string" },
+    "suiteVersion": { "type": "string" },
+    "toolingLockVersion": { "type": "string" },
+    "componentVersions": {
+      "type": "object",
+      "additionalProperties": { "type": "string" }
+    },
+    "policyPackVersions": {
+      "type": "object",
+      "additionalProperties": { "type": "string" }
+    },
+    "pluginVersions": {
+      "type": "object",
+      "additionalProperties": { "type": "string" }
+    },
+    "suiteDigest": { "type": "string" }
+  },
+  "required": ["schemaVersion", "closureId", "standardVersion", "suiteVersion", "componentVersions"],
+  "additionalProperties": false
+}

@@ -1,0 +1,42 @@
+{
+  "schemaVersion": "1.0.0",
+  "jobId": "job_demo",
+  "jobType": "verify",
+  "status": "succeeded",
+  "createdAt": "2026-04-08T09:00:00Z",
+  "updatedAt": "2026-04-08T09:02:00Z",
+  "profileId": "prod@4",
+  "sideEffectsMode": "dryRun",
+  "runs": [
+    {
+      "attempt": 1,
+      "startedAt": "2026-04-08T09:00:30Z",
+      "finishedAt": "2026-04-08T09:01:00Z",
+      "manifestRef": {
+        "runId": "2026-04-08T09:00:00Z/example",
+        "manifestHash": "sha256:3333333333333333333333333333333333333333333333333333333333333333"
+      },
+      "result": {
+        "schemaVersion": "1.0.0",
+        "runId": "2026-04-08T09:00:00Z/example",
+        "pipeline": {
+          "id": "verify.example"
+        },
+        "status": "ok",
+        "output": {},
+        "budget": {
+          "scope": "pipeline",
+          "allocated": { "timeMs": 1000 },
+          "consumed": { "timeMs": 100 },
+          "remaining": { "timeMs": 900 },
+          "termination": { "code": "ok" },
+          "children": []
+        },
+        "manifestRef": {
+          "runId": "2026-04-08T09:00:00Z/example",
+          "manifestHash": "sha256:3333333333333333333333333333333333333333333333333333333333333333"
+        }
+      }
+    }
+  ]
+}

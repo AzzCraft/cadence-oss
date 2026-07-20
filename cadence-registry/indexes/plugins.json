@@ -1,0 +1,38 @@
+{
+  "$schema": "../schemas/registry_index.schema.json",
+  "schemaVersion": "1.0.0",
+  "indexId": "plugins",
+  "description": "Registered Cadence plugins available for use in verify pipelines.",
+  "entries": [
+    {
+      "id": "cadence-plugin-ts",
+      "kind": "plugin",
+      "version": "1.0.0",
+      "digest": "sha256:105eedea7eac58bcfdff4f40d247a14d2ec6d02ffaa66fdef923a69be1bfa753",
+      "status": "active",
+      "deprecatedAt": null,
+      "deprecationReason": null,
+      "compatWindow": "current",
+      "ref": "../../cadence-plugins/manifests/cadence-plugin-ts.json",
+      "trust": {
+        "signer": "cadence-core-team",
+        "allowlisted": true
+      }
+    },
+    {
+      "id": "cadence-plugin-python",
+      "kind": "plugin",
+      "version": "1.0.0",
+      "digest": "sha256:d6f382e886aa0d46b594bae093ee29b78e9906d6f20fb7db6e537b48b70986fe",
+      "status": "active",
+      "deprecatedAt": null,
+      "deprecationReason": null,
+      "compatWindow": "current",
+      "ref": "../../cadence-plugins/manifests/cadence-plugin-python.json",
+      "trust": {
+        "signer": "cadence-core-team",
+        "allowlisted": true
+      }
+    }
+  ]
+}

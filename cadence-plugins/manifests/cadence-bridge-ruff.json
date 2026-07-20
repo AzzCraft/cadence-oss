@@ -1,0 +1,25 @@
+{
+  "schemaVersion": "1.0.0",
+  "pluginId": "cadence-bridge-ruff",
+  "displayName": "Cadence Ruff Bridge",
+  "version": "1.0.0",
+  "kind": "bridge",
+  "language": "python",
+  "protocol": "1.0.0",
+  "entrypoint": "plugin.py",
+  "runtime": "python3",
+  "capabilities": ["verify", "ruff-delegation"],
+  "sandboxProfile": "readonly-no-network",
+  "permissions": {
+    "network": false,
+    "filesystem": {
+      "read": ["src/**"],
+      "write": ["out/**"]
+    },
+    "envRead": ["PATH", "TMPDIR"]
+  },
+  "compatWindow": {
+    "minProtocol": "1.0.0",
+    "maxProtocol": "1.x"
+  }
+}

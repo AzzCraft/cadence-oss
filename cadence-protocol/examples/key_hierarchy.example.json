@@ -1,0 +1,15 @@
+{
+  "schemaVersion": "1.0.0",
+  "depth": 1,
+  "levels": [
+    {
+      "level": 0,
+      "role": "root-and-leaf",
+      "algorithm": "hmac-sha256",
+      "keyId": "sha256:3333333333333333333333333333333333333333333333333333333333333333",
+      "anchor": "kms://tenant/root"
+    }
+  ],
+  "leafKeyId": "sha256:3333333333333333333333333333333333333333333333333333333333333333",
+  "rootAnchor": "kms://tenant/root"
+}

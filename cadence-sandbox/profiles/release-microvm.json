@@ -1,0 +1,29 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://azzcraft.com/cadence/sandbox/profiles/release-microvm.json",
+  "task": "DAS-04-011",
+  "schemaVersion": "1.0.0",
+  "profileId": "release-microvm",
+  "backend": "microvm-runtime",
+  "description": "Release profile — micro-VM isolated, strict resource limits, full audit hooks.",
+  "filesystem": {
+    "mode": "microvm-isolated",
+    "readOnlyInputs": true,
+    "writableOutputDir": "/output"
+  },
+  "network": {
+    "access": false
+  },
+  "resources": {
+    "cpuLimit": 4,
+    "memoryLimitMB": 8192,
+    "pidsLimit": 512,
+    "timeoutSeconds": 1800
+  },
+  "timeSource": "injected",
+  "escapeClassification": {
+    "networkViolation": "hard_fail",
+    "filesystemViolation": "hard_fail",
+    "resourceExceeded": "hard_fail"
+  }
+}

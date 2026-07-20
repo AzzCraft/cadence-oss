@@ -1,0 +1,9 @@
+{
+  "schemaVersion": "1.0.0",
+  "cassetteId": "cass-001",
+  "modelVersion": "v1.0",
+  "contextHash": "sha256:ctx",
+  "outputHash": "sha256:out",
+  "policyId": "policy-default",
+  "budget": {}
+}

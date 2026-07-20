@@ -1,0 +1,8 @@
+{
+  "mountNamespaced": false,
+  "netNamespaced": false,
+  "seccompActive": true,
+  "cgroupFenced": true,
+  "cgroupVersion": "v2",
+  "readonlyRoot": false
+}

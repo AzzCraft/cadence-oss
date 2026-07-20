@@ -1,0 +1,9 @@
+{
+  "schemaVersion": "1.0.0",
+  "anchorId": "kms://tenant/root",
+  "provider": "kms",
+  "keyUri": "kms://tenant/root",
+  "attestation": "external-kms-anchor-active",
+  "hardwareBacked": true,
+  "status": "active"
+}

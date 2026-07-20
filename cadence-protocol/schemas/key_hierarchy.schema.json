@@ -1,0 +1,31 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://azzcraft.com/cadence/schemas/key_hierarchy.schema.json",
+  "title": "KeyHierarchy",
+  "description": "Signing key chain-of-trust from root anchor to leaf signing key.",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "schemaVersion": { "$ref": "common.schema.json#/$defs/semver" },
+    "depth": { "type": "integer", "minimum": 1 },
+    "levels": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "level": { "type": "integer", "minimum": 0 },
+          "role": { "type": "string" },
+          "algorithm": { "type": "string" },
+          "keyId": { "type": "string" },
+          "issuerKeyId": { "type": "string" },
+          "anchor": { "type": "string" }
+        },
+        "required": ["level", "role", "algorithm", "keyId", "anchor"]
+      },
+      "minItems": 1
+    },
+    "leafKeyId": { "type": "string" },
+    "rootAnchor": { "type": "string" }
+  },
+  "required": ["schemaVersion", "depth", "levels", "leafKeyId", "rootAnchor"]
+}

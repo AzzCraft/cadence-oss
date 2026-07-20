@@ -8,9 +8,9 @@ export CGO_ENABLED=0
 export GOPROXY=off
 export GOSUMDB=off
 if [[ -n "${GOFLAGS:-}" ]]; then
-  export GOFLAGS="${GOFLAGS} -mod=vendor"
+  export GOFLAGS="${GOFLAGS} -mod=vendor -buildvcs=false"
 else
-  export GOFLAGS="-mod=vendor"
+  export GOFLAGS="-mod=vendor -buildvcs=false"
 fi
 
 make_temp_dir() {
@@ -38,6 +38,6 @@ go vet ./...
 echo "[cadence-core] build"
 tmpdir="$(make_temp_dir cadence-core)"
 trap 'rm -rf "$tmpdir"' EXIT
-go build -o "$tmpdir/cadence" ./cmd/cadence
+go build -trimpath -buildvcs=false -o "$tmpdir/cadence" ./cmd/cadence
 
 echo "[cadence-core] OK"

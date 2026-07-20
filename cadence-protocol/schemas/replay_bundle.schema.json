@@ -1,0 +1,15 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://azzcraft.com/cadence/schemas/replay_bundle.schema.json",
+  "title": "ReplayBundle",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "schemaVersion": { "$ref": "common.schema.json#/$defs/semver" },
+    "replayId": { "type": "string" },
+    "runManifestRef": { "type": "string" },
+    "pipelineResultRef": { "type": "string" },
+    "datasetRef": { "type": "string" }
+  },
+  "required": ["schemaVersion", "replayId", "runManifestRef", "pipelineResultRef", "datasetRef"]
+}

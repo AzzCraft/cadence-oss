@@ -1,0 +1,15 @@
+{
+  "schemaVersion": "1.0.0",
+  "ticket": "WAIVER-789",
+  "scope": "profile",
+  "referenceTime": "2026-04-15T12:00:00Z",
+  "escalationLevel": "none",
+  "requiredChainDepth": 1,
+  "actualChainDepth": 1,
+  "compliant": true,
+  "approvalChain": {
+    "waiverTicket": "WAIVER-789",
+    "depth": 1,
+    "entries": []
+  }
+}

@@ -1,0 +1,6 @@
+{
+  "protocolVersion": "1.0.0",
+  "repoRoot": "/repo",
+  "files": ["main.go"],
+  "mode": "scan"
+}

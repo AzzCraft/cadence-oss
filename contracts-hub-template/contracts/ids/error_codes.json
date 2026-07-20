@@ -1,0 +1,12 @@
+[
+  "ok",
+  "validation.failed",
+  "internal",
+  "unauthorized",
+  "forbidden",
+  "notFound",
+  "conflict",
+  "rateLimited",
+  "timeout",
+  "unavailable"
+]

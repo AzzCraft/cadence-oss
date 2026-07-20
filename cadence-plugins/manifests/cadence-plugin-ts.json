@@ -1,0 +1,25 @@
+{
+  "schemaVersion": "1.0.0",
+  "pluginId": "cadence-plugin-ts",
+  "displayName": "Cadence TypeScript Plugin",
+  "version": "1.0.0",
+  "kind": "linter",
+  "language": "typescript",
+  "protocol": "1.0.0",
+  "entrypoint": "../plugins/ts/index.mjs",
+  "runtime": "node",
+  "capabilities": ["verify", "deep-import-detection"],
+  "sandboxProfile": "readonly-no-network",
+  "permissions": {
+    "network": false,
+    "filesystem": {
+      "read": ["src/**"],
+      "write": ["out/**"]
+    },
+    "envRead": ["PATH", "TMPDIR"]
+  },
+  "compatWindow": {
+    "minProtocol": "1.0.0",
+    "maxProtocol": "1.x"
+  }
+}

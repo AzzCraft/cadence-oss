@@ -1,0 +1,26 @@
+{
+  "schemaVersion": "1.0.0",
+  "runId": "2026-04-08T09:00:00Z/fixture",
+  "createdAt": "2026-04-08T09:00:00Z",
+  "pipeline": { "id": "verify.fixture" },
+  "algorithm": { "version": "git:abc123" },
+  "contracts": { "run.manifest.v1": "1.0.0" },
+  "config": {
+    "profileId": "prod@4",
+    "configId": "cfg_fixture"
+  },
+  "inputRef": {
+    "rawInputId": "raw:fixture",
+    "inputHash": "sha256:1111111111111111111111111111111111111111111111111111111111111111"
+  },
+  "sideEffectsMode": "dryRun",
+  "determinism": { "tier": "tier1", "seed": 42 },
+  "budget": {
+    "scope": "pipeline",
+    "allocated": { "timeMs": 1000 },
+    "consumed": { "timeMs": 100 },
+    "remaining": { "timeMs": 900 },
+    "termination": { "code": "ok" },
+    "children": []
+  }
+}

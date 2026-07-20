@@ -1,0 +1,10 @@
+{
+  "waiverTicket": "WAIVER-APPROVAL-3",
+  "entries": [
+    {
+      "role": "requester",
+      "identity": "owner@example.com"
+    }
+  ],
+  "depth": 1
+}

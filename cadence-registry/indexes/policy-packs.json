@@ -1,0 +1,38 @@
+{
+  "$schema": "../schemas/registry_index.schema.json",
+  "schemaVersion": "1.0.0",
+  "indexId": "policy-packs",
+  "description": "Reviewed Cadence policy packs.",
+  "entries": [
+    {
+      "id": "standard-ui-v140",
+      "kind": "policyPack",
+      "version": "1.4.0",
+      "digest": "sha256:6e35ca36b555514c905f46b2dc41f90193be5f0155bf1b7a83951fd99ad86291",
+      "status": "active",
+      "deprecatedAt": null,
+      "deprecationReason": null,
+      "compatWindow": "current",
+      "ref": "../../cadence-policy-packs/packs/standard-ui-v140/pack.yaml",
+      "trust": {
+        "signer": "cadence-oss-team",
+        "allowlisted": true
+      }
+    },
+    {
+      "id": "headless-v140",
+      "kind": "policyPack",
+      "version": "1.4.0",
+      "digest": "sha256:4e58d1832c1e6ea41a74844f93a6bcc1bacf0b6cf32dcb0cd6c39e1bf8c53b6b",
+      "status": "active",
+      "deprecatedAt": null,
+      "deprecationReason": null,
+      "compatWindow": "current",
+      "ref": "../../cadence-policy-packs/packs/headless-v140/pack.yaml",
+      "trust": {
+        "signer": "cadence-oss-team",
+        "allowlisted": true
+      }
+    }
+  ]
+}
