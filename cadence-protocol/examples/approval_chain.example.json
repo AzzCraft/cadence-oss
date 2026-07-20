@@ -1,0 +1,17 @@
+{
+  "schemaVersion": "1.0.0",
+  "waiverTicket": "WAIVER-APPROVAL-1",
+  "entries": [
+    {
+      "role": "requester",
+      "identity": "alice@example.com",
+      "timestamp": "2026-04-15T12:00:00Z"
+    },
+    {
+      "role": "approver",
+      "identity": "bob@example.com",
+      "timestamp": "2026-04-15T12:05:00Z"
+    }
+  ],
+  "depth": 2
+}

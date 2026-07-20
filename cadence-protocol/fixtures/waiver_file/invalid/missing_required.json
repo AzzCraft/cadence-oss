@@ -1,0 +1,12 @@
+{
+  "schemaVersion": "1.0.0",
+  "waivers": [
+    {
+      "reason": "Approved release override",
+      "ticket": "OPS-124",
+      "owner": "integration-test",
+      "referenceTime": "2026-04-15T00:00:00Z",
+      "signature": "signed-external-approval"
+    }
+  ]
+}

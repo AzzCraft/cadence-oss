@@ -1,0 +1,34 @@
+{
+  "schemaVersion": "0.9.0",
+  "jobId": "job_legacy",
+  "jobType": "verify",
+  "status": "succeeded",
+  "runs": [
+    {
+      "attempt": 1,
+      "manifestRef": {
+        "runId": "2026-04-08T09:00:00Z/legacy",
+        "manifestHash": "sha256:3333333333333333333333333333333333333333333333333333333333333333"
+      },
+      "result": {
+        "schemaVersion": "1.0.0",
+        "runId": "2026-04-08T09:00:00Z/legacy",
+        "pipeline": { "id": "verify.legacy" },
+        "status": "ok",
+        "output": {},
+        "budget": {
+          "scope": "pipeline",
+          "allocated": { "timeMs": 1000 },
+          "consumed": { "timeMs": 100 },
+          "remaining": { "timeMs": 900 },
+          "termination": { "code": "ok" },
+          "children": []
+        },
+        "manifestRef": {
+          "runId": "2026-04-08T09:00:00Z/legacy",
+          "manifestHash": "sha256:3333333333333333333333333333333333333333333333333333333333333333"
+        }
+      }
+    }
+  ]
+}

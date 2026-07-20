@@ -1,0 +1,63 @@
+{
+  "schemaVersion": "1.0.0",
+  "ticket": "WAIVER-123",
+  "scope": "profile",
+  "referenceTime": "2026-04-15T10:00:00Z",
+  "escalationLevel": "tier2",
+  "requiredChainDepth": 4,
+  "actualChainDepth": 4,
+  "compliant": true,
+  "approvalChain": {
+    "waiverTicket": "WAIVER-123",
+    "depth": 4,
+    "entries": [
+      {
+        "role": "requester",
+        "identity": "alice@example.com",
+        "timestamp": "2026-04-15T10:00:00Z"
+      },
+      {
+        "role": "manager",
+        "identity": "manager@example.com",
+        "timestamp": "2026-04-15T10:05:00Z"
+      },
+      {
+        "role": "security",
+        "identity": "security@example.com",
+        "timestamp": "2026-04-15T10:10:00Z"
+      },
+      {
+        "role": "approver",
+        "identity": "bob@example.com",
+        "timestamp": "2026-04-15T10:15:00Z"
+      }
+    ]
+  },
+  "decisions": [
+    {
+      "check": "record",
+      "status": "pass"
+    },
+    {
+      "check": "scope",
+      "status": "pass"
+    },
+    {
+      "check": "duration",
+      "status": "pass"
+    },
+    {
+      "check": "approval-chain",
+      "status": "pass"
+    },
+    {
+      "check": "approval-binding",
+      "status": "pass"
+    },
+    {
+      "check": "escalation",
+      "status": "pass",
+      "message": "approval chain meets escalation requirement"
+    }
+  ]
+}

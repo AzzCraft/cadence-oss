@@ -1,0 +1,34 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://azzcraft.com/cadence/schemas/isolation_probe.schema.json",
+  "title": "IsolationProbe",
+  "description": "Runtime isolation evidence from kernel-level fence detection.",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "schemaVersion": { "type": "string" },
+    "pidNamespaced": { "type": "boolean" },
+    "mountNamespaced": { "type": "boolean" },
+    "netNamespaced": { "type": "boolean" },
+    "seccompActive": { "type": "boolean" },
+    "cgroupFenced": { "type": "boolean" },
+    "cgroupVersion": { "type": "string" },
+    "readonlyRoot": { "type": "boolean" },
+    "namespaceProofs": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "namespace": { "type": "string", "minLength": 1 },
+          "selfDescriptor": { "type": "string" },
+          "initDescriptor": { "type": "string" },
+          "matchesInit": { "type": "boolean" }
+        },
+        "required": ["namespace", "matchesInit"]
+      }
+    },
+    "namespaceProofHash": { "type": "string" }
+  },
+  "required": ["pidNamespaced", "mountNamespaced", "netNamespaced", "seccompActive", "cgroupFenced", "cgroupVersion", "readonlyRoot"]
+}

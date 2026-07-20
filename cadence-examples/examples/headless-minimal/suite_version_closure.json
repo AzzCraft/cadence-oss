@@ -1,0 +1,59 @@
+{
+  "schemaVersion": "1.0.0",
+  "standardVersion": "1.4.0",
+  "standardManifestVersion": "1.4.0",
+  "suiteVersion": "1.0.0",
+  "factoryVersion": "1.0.0",
+  "verifyRuntimeVersion": "1.0.0",
+  "closureUpdatedAt": "2026-07-20T11:20:00Z",
+  "suiteLockRef": {
+    "kind": "file",
+    "uri": "./suite_lock.json",
+    "pinType": "manifest",
+    "pinValue": "suite_lock.json",
+    "floating": false,
+    "notes": "Bundled copy of the published DAS Suite v1.0.0 lock."
+  },
+  "lockRefs": {
+    "suiteToolingLock": {
+      "kind": "file",
+      "uri": "./tooling_lock.json",
+      "pinType": "manifest",
+      "pinValue": "tooling_lock.json",
+      "floating": false
+    }
+  },
+  "refs": {
+    "standard": {
+      "kind": "git",
+      "uri": "https://github.com/AzzCraft/das-standard.git",
+      "pinType": "commit",
+      "pinValue": "ac5a52fe9e8997392b3d21a488097e394d8e3102",
+      "floating": false,
+      "notes": "Published DAS Standard v1.4.0 tag commit."
+    },
+    "suite": {
+      "kind": "file",
+      "uri": "./tooling_lock.json",
+      "pinType": "manifest",
+      "pinValue": "tooling_lock.json",
+      "floating": false
+    },
+    "factory": {
+      "kind": "git",
+      "uri": "https://github.com/AzzCraft/dasops.git",
+      "pinType": "commit",
+      "pinValue": "01f54872349812598190ecf0b28e0dcad2927914",
+      "floating": false,
+      "notes": "Published DASOps v1.0.0 release commit."
+    },
+    "verifyRuntime": {
+      "kind": "git",
+      "uri": "https://github.com/AzzCraft/cadence-oss.git",
+      "pinType": "commit",
+      "pinValue": "e4054537c0962441037dd5403d1a1692434fde73",
+      "floating": false,
+      "notes": "Published Cadence OSS v1.0.0 release commit."
+    }
+  }
+}

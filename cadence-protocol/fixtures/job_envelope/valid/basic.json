@@ -1,0 +1,40 @@
+{
+  "schemaVersion": "1.0.0",
+  "jobId": "job_fixture",
+  "jobType": "verify",
+  "profileId": "default",
+  "sideEffectsMode": "dryRun",
+  "status": "succeeded",
+  "createdAt": "2026-04-08T09:00:00Z",
+  "updatedAt": "2026-04-08T09:02:00Z",
+  "runs": [
+    {
+      "attempt": 1,
+      "startedAt": "2026-04-08T09:00:00Z",
+      "finishedAt": "2026-04-08T09:02:00Z",
+      "manifestRef": {
+        "runId": "2026-04-08T09:00:00Z/fixture",
+        "manifestHash": "sha256:3333333333333333333333333333333333333333333333333333333333333333"
+      },
+      "result": {
+        "schemaVersion": "1.0.0",
+        "runId": "2026-04-08T09:00:00Z/fixture",
+        "pipeline": { "id": "verify.fixture" },
+        "status": "ok",
+        "output": {},
+        "budget": {
+          "scope": "pipeline",
+          "allocated": { "timeMs": 1000 },
+          "consumed": { "timeMs": 100 },
+          "remaining": { "timeMs": 900 },
+          "termination": { "code": "ok" },
+          "children": []
+        },
+        "manifestRef": {
+          "runId": "2026-04-08T09:00:00Z/fixture",
+          "manifestHash": "sha256:3333333333333333333333333333333333333333333333333333333333333333"
+        }
+      }
+    }
+  ]
+}

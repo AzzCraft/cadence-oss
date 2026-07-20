@@ -1,0 +1,36 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://azzcraft.com/cadence/schemas/baseline_snapshot.schema.json",
+  "title": "BaselineSnapshot",
+  "description": "Snapshot of baseline state for diff and ratchet verification",
+  "type": "object",
+  "properties": {
+    "schemaVersion": { "type": "string", "const": "1.0.0" },
+    "snapshotId": { "type": "string" },
+    "timestamp": { "type": "string", "format": "date-time" },
+    "baselineVersion": { "type": "string" },
+    "policyVersion": { "type": "string" },
+    "fingerprints": {
+      "type": "array",
+      "items": { "type": "string" }
+    },
+    "policyPackVersions": {
+      "type": "object",
+      "additionalProperties": { "type": "string" }
+    },
+    "approvalRecords": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "approver": { "type": "string" },
+          "timestamp": { "type": "string", "format": "date-time" },
+          "scope": { "type": "string" }
+        },
+        "required": ["approver", "timestamp"]
+      }
+    }
+  },
+  "required": ["schemaVersion", "snapshotId", "timestamp", "fingerprints"],
+  "additionalProperties": false
+}

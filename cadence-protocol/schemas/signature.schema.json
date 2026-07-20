@@ -1,0 +1,17 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://azzcraft.com/cadence/schemas/signature.schema.json",
+  "title": "Signature",
+  "description": "Canonical v9 name. `signature_envelope` remains a deprecated compatibility alias for one release cycle.",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "schemaVersion": { "$ref": "common.schema.json#/$defs/semver" },
+    "signatureId": { "type": "string" },
+    "algorithm": { "type": "string" },
+    "signer": { "type": "string" },
+    "payloadHash": { "$ref": "common.schema.json#/$defs/sha256" },
+    "signature": { "type": "string" }
+  },
+  "required": ["schemaVersion", "signatureId", "algorithm", "signer", "payloadHash", "signature"]
+}

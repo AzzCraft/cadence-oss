@@ -1,0 +1,10 @@
+{
+  "schemaVersion": 1,
+  "taskId": "DAS-03-020",
+  "pluginId": "cadence-example-plugin",
+  "version": "1.0.0",
+  "entryPoint": "run_example.py",
+  "capabilities": ["readEvidence", "demoVerify"],
+  "description": "OSS example plugin pack for deterministic local verification smoke tests.",
+  "runtime": "python3"
+}

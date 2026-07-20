@@ -1,0 +1,16 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://azzcraft.com/cadence/schemas/replay_package.schema.json",
+  "title": "ReplayPackage",
+  "description": "Canonical v9 name. `replay_bundle` remains a deprecated compatibility alias for one release cycle.",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "schemaVersion": { "$ref": "common.schema.json#/$defs/semver" },
+    "replayId": { "type": "string" },
+    "runManifestRef": { "type": "string" },
+    "pipelineResultRef": { "type": "string" },
+    "datasetRef": { "type": "string" }
+  },
+  "required": ["schemaVersion", "replayId", "runManifestRef", "pipelineResultRef", "datasetRef"]
+}

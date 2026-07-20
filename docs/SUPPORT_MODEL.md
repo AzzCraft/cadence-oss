@@ -1,9 +1,8 @@
 # Support Model
 
-Cadence OSS v1.0.0 supports the offline Cadence Core CLI and the files shipped
-in this source archive. The supported verification commands are documented in
-the root `VERIFY_REQUIREMENTS.md`.
+Cadence OSS v1.1.0 supports the offline Cadence Core CLI and the eight reviewed
+units listed in `RELEASE_UNITS.md`. The supported verification commands are
+documented in the root `VERIFY_REQUIREMENTS.md`.
 
-The release does not include a hosted registry, plugin execution platform,
-policy-pack catalog, sandbox service, or support commitment for unshipped
-Cadence units. Third-party plugin execution remains fail-closed.
+The registry is a shipped local index, not a hosted service. Plugins and new
+units remain opt-in; third-party plugin execution remains fail-closed.

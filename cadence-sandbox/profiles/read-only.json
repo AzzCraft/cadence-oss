@@ -1,0 +1,42 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://azzcraft.com/cadence/sandbox/profiles/read-only.json",
+  "title": "Cadence sandbox profile: read-only filesystem",
+  "task": "DAS-04-011",
+  "schemaVersion": "1.0.0",
+  "profileId": "read-only",
+  "backend": "container-runtime",
+  "profile": "read-only",
+  "description": "Filesystem-readonly sandbox: only writes allowed are to the per-run artifact tmpfs.",
+  "network": {
+    "access": false,
+    "egress": "allow-list",
+    "allowedHosts": [],
+    "allowedPorts": []
+  },
+  "filesystem": {
+    "mode": "container-isolated",
+    "readOnlyInputs": true,
+    "writableOutputDir": "/workspace/.cadence/out",
+    "rootMode": "read-only",
+    "writableMounts": ["/tmp/artifacts/${runId}"],
+    "deniedPaths": ["/proc/self/mem", "/dev/mem"],
+    "tmpfsSizeMB": 256
+  },
+  "resources": {
+    "cpuLimit": 2,
+    "memoryLimitMB": 4096,
+    "pidsLimit": 256,
+    "timeoutSeconds": 600
+  },
+  "timeSource": "injected",
+  "escapeClassification": {
+    "networkViolation": "hard_fail",
+    "filesystemViolation": "hard_fail",
+    "resourceExceeded": "hard_fail"
+  },
+  "process": {
+    "noNewPrivileges": true,
+    "dropCapabilities": ["ALL"]
+  }
+}

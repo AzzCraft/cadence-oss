@@ -1,0 +1,25 @@
+{
+  "schemaVersion": "1.0.0",
+  "pluginId": "cadence-bridge-eslint",
+  "displayName": "Cadence ESLint Bridge",
+  "version": "1.0.0",
+  "kind": "bridge",
+  "language": "typescript",
+  "protocol": "1.0.0",
+  "entrypoint": "index.mjs",
+  "runtime": "node",
+  "capabilities": ["verify", "eslint-delegation"],
+  "sandboxProfile": "readonly-no-network",
+  "permissions": {
+    "network": false,
+    "filesystem": {
+      "read": ["src/**"],
+      "write": ["out/**"]
+    },
+    "envRead": ["PATH", "TMPDIR"]
+  },
+  "compatWindow": {
+    "minProtocol": "1.0.0",
+    "maxProtocol": "1.x"
+  }
+}

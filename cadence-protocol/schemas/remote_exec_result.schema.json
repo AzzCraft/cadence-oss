@@ -1,0 +1,41 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://azzcraft.com/schemas/remote_exec_result.schema.json",
+  "title": "RemoteExecResultEnvelope",
+  "type": "object",
+  "required": [
+    "schemaVersion",
+    "taskId",
+    "status",
+    "resultHash",
+    "artifacts"
+  ],
+  "properties": {
+    "schemaVersion": {
+      "type": "string"
+    },
+    "taskId": {
+      "type": "string"
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "ok",
+        "failed"
+      ]
+    },
+    "resultHash": {
+      "type": "string"
+    },
+    "artifacts": {
+      "type": "array",
+      "items": {
+        "type": "object"
+      }
+    },
+    "signature": {
+      "type": "string"
+    }
+  },
+  "additionalProperties": false
+}

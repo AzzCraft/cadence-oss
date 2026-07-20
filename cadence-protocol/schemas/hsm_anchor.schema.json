@@ -1,0 +1,26 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://azzcraft.com/cadence/schemas/hsm_anchor.schema.json",
+  "title": "HSMAnchor",
+  "description": "Declared active root-anchor evidence for software, HSM, or KMS signing integration.",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "schemaVersion": { "$ref": "common.schema.json#/$defs/semver" },
+    "anchorId": { "type": "string", "minLength": 1 },
+    "provider": { "type": "string", "minLength": 1 },
+    "keyUri": { "type": "string", "minLength": 1 },
+    "attestation": { "type": "string", "minLength": 1 },
+    "hardwareBacked": { "type": "boolean" },
+    "status": { "type": "string", "const": "active" }
+  },
+  "required": [
+    "schemaVersion",
+    "anchorId",
+    "provider",
+    "keyUri",
+    "attestation",
+    "hardwareBacked",
+    "status"
+  ]
+}

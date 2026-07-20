@@ -1,0 +1,25 @@
+{
+  "schemaVersion": "1.0.0",
+  "pluginId": "cadence-plugin-python",
+  "displayName": "Cadence Python Plugin",
+  "version": "1.0.0",
+  "kind": "linter",
+  "language": "python",
+  "protocol": "1.0.0",
+  "entrypoint": "../plugins/python/plugin.py",
+  "runtime": "python3",
+  "capabilities": ["verify", "deep-import-detection"],
+  "sandboxProfile": "readonly-no-network",
+  "permissions": {
+    "network": false,
+    "filesystem": {
+      "read": ["src/**"],
+      "write": ["out/**"]
+    },
+    "envRead": ["PATH", "TMPDIR"]
+  },
+  "compatWindow": {
+    "minProtocol": "1.0.0",
+    "maxProtocol": "1.x"
+  }
+}

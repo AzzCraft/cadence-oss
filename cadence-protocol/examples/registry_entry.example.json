@@ -1,0 +1,11 @@
+{
+  "schemaVersion": "1.0.0",
+  "registryId": "cadence-oss-local",
+  "entries": [
+    {
+      "kind": "policyPack",
+      "id": "standard-ui-v140",
+      "ref": "../cadence-policy-packs/packs/standard-ui-v140/pack.yaml"
+    }
+  ]
+}

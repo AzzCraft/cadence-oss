@@ -1,0 +1,11 @@
+{
+  "schemaVersion": "1.0.0",
+  "bindings": [
+    {
+      "localPath": "data/sample.json",
+      "contractId": "example-contract-v1",
+      "schemaRef": "contracts-hub-template/contracts/schemas/example-contract-v1.json",
+      "validation": "strict"
+    }
+  ]
+}

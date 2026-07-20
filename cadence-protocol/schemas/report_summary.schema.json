@@ -1,0 +1,45 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://azzcraft.com/cadence/schemas/report_summary.schema.json",
+  "title": "ReportSummary",
+  "description": "Schema for cadence verify report output",
+  "type": "object",
+  "properties": {
+    "schemaVersion": { "type": "string", "const": "1.0.0" },
+    "reportId": { "type": "string" },
+    "timestamp": { "type": "string", "format": "date-time" },
+    "summary": {
+      "type": "object",
+      "properties": {
+        "status": { "type": "string", "enum": ["PASS", "FAIL", "WARN"] },
+        "totalViolations": { "type": "integer", "minimum": 0 },
+        "totalWarnings": { "type": "integer", "minimum": 0 },
+        "totalFindings": { "type": "integer", "minimum": 0 }
+      },
+      "required": ["status", "totalViolations"]
+    },
+    "findings": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "ruleId": { "type": "string" },
+          "severity": { "type": "string", "enum": ["critical", "high", "medium", "low", "info"] },
+          "file": { "type": "string" },
+          "message": { "type": "string" }
+        },
+        "required": ["ruleId", "severity", "message"]
+      }
+    },
+    "metrics": {
+      "type": "object",
+      "properties": {
+        "filesScanned": { "type": "integer", "minimum": 0 },
+        "rulesEvaluated": { "type": "integer", "minimum": 0 },
+        "durationMs": { "type": "integer", "minimum": 0 }
+      }
+    }
+  },
+  "required": ["schemaVersion", "reportId", "timestamp", "summary"],
+  "additionalProperties": false
+}

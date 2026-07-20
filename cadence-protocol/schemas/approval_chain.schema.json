@@ -1,0 +1,27 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://azzcraft.com/cadence/schemas/approval_chain.schema.json",
+  "title": "ApprovalChain",
+  "description": "Waiver approval chain capturing requester-to-approver depth.",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "schemaVersion": { "type": "string" },
+    "waiverTicket": { "type": "string" },
+    "entries": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "role": { "type": "string" },
+          "identity": { "type": "string" },
+          "timestamp": { "type": "string", "format": "date-time" }
+        },
+        "required": ["role", "identity", "timestamp"]
+      },
+      "minItems": 2
+    },
+    "depth": { "type": "integer", "minimum": 2 }
+  },
+  "required": ["waiverTicket", "entries", "depth"]
+}

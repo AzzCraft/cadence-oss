@@ -1,0 +1,90 @@
+{
+  "schemaVersion": "1.0.0",
+  "registryId": "cadence-oss-core-default",
+  "entries": [
+    {
+      "kind": "policyPack",
+      "id": "standard-ui-v140",
+      "version": "1.4.0",
+      "status": "active",
+      "digest": "sha256:6e35ca36b555514c905f46b2dc41f90193be5f0155bf1b7a83951fd99ad86291",
+      "deprecatedAt": null,
+      "deprecationReason": null,
+      "compatWindow": "current",
+      "ref": "../cadence-policy-packs/packs/standard-ui-v140/pack.yaml",
+      "trust": {"signer": "cadence-oss-team", "allowlisted": true}
+    },
+    {
+      "kind": "policyPack",
+      "id": "headless-v140",
+      "version": "1.4.0",
+      "status": "active",
+      "digest": "sha256:4e58d1832c1e6ea41a74844f93a6bcc1bacf0b6cf32dcb0cd6c39e1bf8c53b6b",
+      "deprecatedAt": null,
+      "deprecationReason": null,
+      "compatWindow": "current",
+      "ref": "../cadence-policy-packs/packs/headless-v140/pack.yaml",
+      "trust": {"signer": "cadence-oss-team", "allowlisted": true}
+    },
+    {
+      "kind": "runtimeProfile",
+      "id": "strict_offline",
+      "version": "1.0.0",
+      "status": "active",
+      "digest": "sha256:288bbc104c69f7d1edb9a67c48cfd23e7d66f54ca880574ed7f92492621f600c",
+      "deprecatedAt": null,
+      "deprecationReason": null,
+      "compatWindow": "current",
+      "ref": "../cadence-sandbox/runtime_profile.json",
+      "trust": {"signer": "cadence-oss-team", "allowlisted": true}
+    },
+    {
+      "kind": "sandboxProfile",
+      "id": "local_offline",
+      "version": "1.0.0",
+      "status": "active",
+      "digest": "sha256:d763bb1b47c4b87f4af2a14a0fa8aafe977008b8facc8ded676bd90c4e5d1fea",
+      "deprecatedAt": null,
+      "deprecationReason": null,
+      "compatWindow": "current",
+      "ref": "../cadence-sandbox/sandbox_profile.json",
+      "trust": {"signer": "cadence-oss-team", "allowlisted": true}
+    },
+    {
+      "kind": "sandboxProfile",
+      "id": "rootless-dev",
+      "version": "1.0.0",
+      "status": "active",
+      "digest": "sha256:9795147253f0d9ec5a376c508edcfb2bc18da37ad4fdc087b600045499efdc98",
+      "deprecatedAt": null,
+      "deprecationReason": null,
+      "compatWindow": "current",
+      "ref": "../cadence-sandbox/profiles/rootless-dev.json",
+      "trust": {"signer": "cadence-oss-team", "allowlisted": true}
+    },
+    {
+      "kind": "sandboxProfile",
+      "id": "ci-container",
+      "version": "1.0.0",
+      "status": "active",
+      "digest": "sha256:8b89b8690e98651a7e8acc7ce769e1300251f513a14f3c560d88a06cf564e7cb",
+      "deprecatedAt": null,
+      "deprecationReason": null,
+      "compatWindow": "current",
+      "ref": "../cadence-sandbox/profiles/ci-container.json",
+      "trust": {"signer": "cadence-oss-team", "allowlisted": true}
+    },
+    {
+      "kind": "sandboxProfile",
+      "id": "release-microvm",
+      "version": "1.0.0",
+      "status": "active",
+      "digest": "sha256:2c03a8f6f0ff3e6f99c831bb8c6d8f64bf0a5341e298c077f8f7bd585a64f54e",
+      "deprecatedAt": null,
+      "deprecationReason": null,
+      "compatWindow": "current",
+      "ref": "../cadence-sandbox/profiles/release-microvm.json",
+      "trust": {"signer": "cadence-oss-team", "allowlisted": true}
+    }
+  ]
+}

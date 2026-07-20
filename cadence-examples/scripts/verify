@@ -1,0 +1,187 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+cd "$ROOT_DIR"
+
+# Verification may build a local wrapper and evidence. Those outputs are not
+# source artifacts and must not survive a release-gate run.
+cleanup() {
+  rm -rf "$ROOT_DIR/.cadence"
+}
+trap cleanup EXIT
+
+[ -f tooling_lock.json ] || { echo "tooling_lock.json missing"; exit 2; }
+[ -f suite_version_closure.json ] || { echo "suite_version_closure.json missing"; exit 2; }
+[ -f local_extension_manifest.json ] || { echo "local_extension_manifest.json missing"; exit 2; }
+
+# Validate root/example artifacts before running cadence verify.
+python3 - <<'VALIDATE'
+import json, sys
+from pathlib import Path
+
+errors = []
+examples_dir = Path('examples')
+
+def require(condition, message):
+    if not condition:
+        errors.append(message)
+
+def require_string(obj, key, context):
+    value = obj.get(key)
+    if not isinstance(value, str) or not value.strip():
+        errors.append(f"{context}: {key} must be a non-empty string")
+        return None
+    return value
+
+def validate_structured_ref(obj, context):
+    if not isinstance(obj, dict):
+        errors.append(f"{context} must be an object")
+        return
+    allowed = {"kind", "uri", "pinType", "pinValue", "floating", "notes"}
+    extra = sorted(set(obj) - allowed)
+    if extra:
+        errors.append(f"{context} has unknown keys: {', '.join(extra)}")
+    kind = require_string(obj, "kind", context)
+    pin_type = require_string(obj, "pinType", context)
+    require_string(obj, "uri", context)
+    require_string(obj, "pinValue", context)
+    if "floating" in obj and obj["floating"] is not False:
+        errors.append(f"{context}.floating must be false when present")
+    if kind == "git" and pin_type not in {"commit", "tag"}:
+        errors.append(f"{context}.pinType must be commit or tag for git refs")
+    if kind == "container_image" and pin_type != "digest":
+        errors.append(f"{context}.pinType must be digest for container_image refs")
+    if kind == "package" and pin_type != "version":
+        errors.append(f"{context}.pinType must be version for package refs")
+    if kind in {"file", "ci_workflow"} and pin_type not in {"path", "manifest"}:
+        errors.append(f"{context}.pinType must be path or manifest for {kind} refs")
+
+def validate_closure(path, repo_name):
+    try:
+        data = json.loads(path.read_text(encoding='utf-8'))
+    except json.JSONDecodeError as e:
+        errors.append(f"{repo_name}: suite_version_closure.json invalid JSON: {e}")
+        return
+    required = [
+        "schemaVersion",
+        "standardVersion",
+        "standardManifestVersion",
+        "suiteVersion",
+        "factoryVersion",
+        "verifyRuntimeVersion",
+        "closureUpdatedAt",
+        "suiteLockRef",
+        "refs",
+    ]
+    for key in required:
+        require(key in data, f"{repo_name}: suite_version_closure.json missing {key}")
+    if not isinstance(data.get("refs"), dict):
+        errors.append(f"{repo_name}: suite_version_closure.json refs must be an object")
+    else:
+        for ref_name in ("standard", "suite", "factory", "verifyRuntime"):
+            require(ref_name in data["refs"], f"{repo_name}: suite_version_closure.json refs missing {ref_name}")
+            if ref_name in data["refs"]:
+                validate_structured_ref(data["refs"][ref_name], f"{repo_name}: refs.{ref_name}")
+    if "suiteLockRef" in data:
+        validate_structured_ref(data["suiteLockRef"], f"{repo_name}: suiteLockRef")
+    if "lockRefs" in data:
+        lock_refs = data["lockRefs"]
+        if not isinstance(lock_refs, dict):
+            errors.append(f"{repo_name}: lockRefs must be an object")
+        else:
+            for key in ("suiteToolingLock", "repoToolingLock"):
+                if key in lock_refs:
+                    validate_structured_ref(lock_refs[key], f"{repo_name}: lockRefs.{key}")
+
+def validate_tooling_lock(path, repo_name):
+    try:
+        data = json.loads(path.read_text(encoding='utf-8'))
+    except json.JSONDecodeError as e:
+        errors.append(f"{repo_name}: tooling_lock.json invalid JSON: {e}")
+        return
+    required = ["schemaVersion", "standardManifestVersion", "sourceOfTruth", "verifyRuntime", "toolchain"]
+    for key in required:
+        require(key in data, f"{repo_name}: tooling_lock.json missing {key}")
+    for key in ("sourceOfTruth", "verifyRuntime", "suiteVersionClosureRef", "suiteLockRef", "verifyRegistryRef", "standardSnapshotRef"):
+        if key in data:
+            validate_structured_ref(data[key], f"{repo_name}: tooling_lock.{key}")
+    toolchain = data.get("toolchain")
+    if not isinstance(toolchain, list) or not toolchain:
+        errors.append(f"{repo_name}: tooling_lock.json toolchain must be a non-empty array")
+    else:
+        for index, item in enumerate(toolchain):
+            if not isinstance(item, dict):
+                errors.append(f"{repo_name}: tooling_lock.json toolchain[{index}] must be an object")
+                continue
+            require_string(item, "name", f"{repo_name}: tooling_lock.toolchain[{index}]")
+            require_string(item, "version", f"{repo_name}: tooling_lock.toolchain[{index}]")
+
+def validate_local_extension_manifest(path, repo_name):
+    try:
+        data = json.loads(path.read_text(encoding='utf-8'))
+    except json.JSONDecodeError as e:
+        errors.append(f"{repo_name}: local_extension_manifest.json invalid JSON: {e}")
+        return
+    require_string(data, "schemaVersion", f"{repo_name}: local_extension_manifest.json")
+    if not isinstance(data.get("extensions"), list):
+        errors.append(f"{repo_name}: local_extension_manifest.json extensions must be an array")
+
+def validate_cadence_yaml(path, repo_name):
+    top = {}
+    for raw in path.read_text(encoding='utf-8').splitlines():
+        line = raw.strip()
+        if not line or line.startswith("#") or line.startswith("-"):
+            continue
+        if ":" not in line:
+            continue
+        key, value = line.split(":", 1)
+        top[key.strip()] = value.strip().strip("\"'")
+    for key in ("projectId", "mode", "closureRef", "toolingLock", "runtimeRef", "registryRef", "sandboxRef"):
+        require(key in top and top[key], f"{repo_name}: cadence.yaml missing {key}")
+    if top.get("closureRef") != "suite_version_closure.json":
+        errors.append(f"{repo_name}: cadence.yaml closureRef must be suite_version_closure.json")
+    if top.get("toolingLock") != "tooling_lock.json":
+        errors.append(f"{repo_name}: cadence.yaml toolingLock must be tooling_lock.json")
+
+targets = [Path(".")] + sorted(p for p in examples_dir.iterdir() if p.is_dir())
+validated = 0
+for repo in targets:
+    name = "." if repo == Path(".") else repo.name
+    cadence = repo / 'cadence.yaml'
+    cadence_alt = repo / 'cadence.yml'
+    config_path = cadence if cadence.exists() else cadence_alt
+    require(config_path.exists(), f"{name}: missing cadence.yaml")
+    if config_path.exists():
+        validate_cadence_yaml(config_path, name)
+
+    tl = repo / 'tooling_lock.json'
+    require(tl.exists(), f"{name}: missing tooling_lock.json")
+    if tl.exists():
+        validate_tooling_lock(tl, name)
+
+    cl = repo / 'suite_version_closure.json'
+    require(cl.exists(), f"{name}: missing suite_version_closure.json")
+    if cl.exists():
+        validate_closure(cl, name)
+
+    lem = repo / 'local_extension_manifest.json'
+    require(lem.exists(), f"{name}: missing local_extension_manifest.json")
+    if lem.exists():
+        validate_local_extension_manifest(lem, name)
+    validated += 1
+
+if errors:
+    for e in errors:
+        print(f"FAIL: {e}", file=sys.stderr)
+    sys.exit(1)
+
+print(f"OK: validated {validated} cadence repos")
+VALIDATE
+
+# Examples are verified structurally and through the core's safe diagnostic
+# command. `verify` would execute every registry plugin; v1.1 deliberately
+# keeps third-party/plugin execution disabled unless a future isolated runner
+# is explicitly selected by a governed product configuration.
+bash ./cadencew doctor
+echo "OK: examples are structurally valid; plugin execution remains opt-in"

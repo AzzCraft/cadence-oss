@@ -1,0 +1,58 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://azzcraft.com/cadence/schemas/plugin_manifest.schema.json",
+  "title": "Cadence Plugin Manifest",
+  "description": "DAS-04-012 — required structural contract for every plugin manifest.",
+  "type": "object",
+  "required": ["pluginId", "version", "permissions", "input", "output", "sandboxProfile", "runtime"],
+  "additionalProperties": false,
+  "properties": {
+    "pluginId": {"type": "string", "pattern": "^[a-z][a-z0-9._-]{2,63}$"},
+    "version": {"type": "string", "pattern": "^v?\\d+\\.\\d+\\.\\d+(-[a-z0-9.]+)?$"},
+    "description": {"type": "string"},
+    "owner": {"type": "string"},
+    "permissions": {
+      "type": "object",
+      "required": ["network", "filesystem"],
+      "additionalProperties": false,
+      "properties": {
+        "network": {
+          "type": "object",
+          "required": ["egress"],
+          "properties": {
+            "egress": {"type": "string", "enum": ["deny", "allow-list"]},
+            "allowedHosts": {"type": "array", "items": {"type": "string"}}
+          }
+        },
+        "filesystem": {
+          "type": "object",
+          "required": ["mode"],
+          "properties": {
+            "mode": {"type": "string", "enum": ["read-only", "read-write"]},
+            "writablePaths": {"type": "array", "items": {"type": "string"}}
+          }
+        },
+        "secrets": {"type": "array", "items": {"type": "string"}}
+      }
+    },
+    "input": {"type": "object", "required": ["schema"], "properties": {"schema": {"type": "string"}}},
+    "output": {"type": "object", "required": ["schema"], "properties": {"schema": {"type": "string"}}},
+    "sandboxProfile": {"type": "string", "enum": ["no-network", "read-only", "custom"]},
+    "runtime": {
+      "type": "object",
+      "required": ["language", "image"],
+      "properties": {
+        "language": {"type": "string", "enum": ["python", "node", "go"]},
+        "image": {"type": "string"},
+        "imageDigest": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"}
+      }
+    },
+    "compatibility": {
+      "type": "object",
+      "properties": {
+        "cadenceCore": {"type": "string"},
+        "protocol": {"type": "string"}
+      }
+    }
+  }
+}

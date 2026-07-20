@@ -1,0 +1,30 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://azzcraft.com/cadence/schemas/envelope.schema.json",
+  "title": "Envelope",
+  "description": "Canonical v9 envelope object. It accepts the current signature payload shape and optional envelope metadata without requiring new producer fields in this pass.",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "schemaVersion": { "$ref": "common.schema.json#/$defs/semver" },
+    "envelopeId": { "type": "string" },
+    "signatureId": { "type": "string" },
+    "algorithm": { "type": "string" },
+    "signer": { "type": "string" },
+    "payloadHash": { "$ref": "common.schema.json#/$defs/sha256" },
+    "signature": { "type": "string" },
+    "subjects": {
+      "type": "array",
+      "items": {
+        "anyOf": [
+          { "type": "string" },
+          {
+            "type": "object",
+            "additionalProperties": true
+          }
+        ]
+      }
+    }
+  },
+  "required": ["schemaVersion", "signatureId", "algorithm", "signer", "payloadHash", "signature"]
+}

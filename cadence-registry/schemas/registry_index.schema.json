@@ -1,0 +1,83 @@
+{
+  "$schema": "https://cadence-oss.dev/schemas/registry_index.schema.json",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "indexId", "entries"],
+  "properties": {
+    "$schema": {"type": "string"},
+    "schemaVersion": {"type": "string", "minLength": 1},
+    "indexId": {"type": "string", "minLength": 1},
+    "description": {"type": "string"},
+    "entries": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "kind",
+          "version",
+          "status",
+          "digest",
+          "ref",
+          "trust",
+          "deprecatedAt",
+          "deprecationReason",
+          "compatWindow"
+        ],
+        "properties": {
+          "id": {"type": "string", "minLength": 1},
+          "kind": {"type": "string", "enum": ["plugin", "policyPack", "runtimeProfile", "sandboxProfile"]},
+          "version": {"type": "string", "minLength": 1},
+          "digest": {
+            "type": "string",
+            "pattern": "^sha256:[0-9a-f]{64}$"
+          },
+          "status": {"type": "string", "enum": ["active", "deprecated", "removed"]},
+          "deprecatedAt": {"type": ["string", "null"]},
+          "deprecationReason": {"type": ["string", "null"]},
+          "compatWindow": {"type": "string", "minLength": 1},
+          "ref": {"type": "string", "minLength": 1},
+          "trust": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["signer", "allowlisted"],
+            "properties": {
+              "signer": {"type": "string", "minLength": 1},
+              "allowlisted": {"type": "boolean"}
+            }
+          }
+        },
+        "allOf": [
+          {
+            "if": {"properties": {"status": {"const": "active"}}},
+            "then": {
+              "properties": {
+                "deprecatedAt": {"type": "null"},
+                "deprecationReason": {"type": "null"}
+              }
+            }
+          },
+          {
+            "if": {"properties": {"status": {"const": "deprecated"}}},
+            "then": {
+              "properties": {
+                "deprecatedAt": {"type": "string", "minLength": 1},
+                "deprecationReason": {"type": "string", "minLength": 1}
+              }
+            }
+          },
+          {
+            "if": {"properties": {"status": {"const": "removed"}}},
+            "then": {
+              "properties": {
+                "deprecatedAt": {"type": "string", "minLength": 1},
+                "deprecationReason": {"type": "string", "minLength": 1}
+              }
+            }
+          }
+        ]
+      }
+    }
+  }
+}

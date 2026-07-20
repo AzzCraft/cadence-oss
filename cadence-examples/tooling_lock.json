@@ -1,0 +1,59 @@
+{
+  "schemaVersion": "1.0.0",
+  "standardManifestVersion": "1.4.0",
+  "sourceOfTruth": {
+    "kind": "custom",
+    "uri": ".",
+    "pinType": "path",
+    "pinValue": ".",
+    "floating": false
+  },
+  "verifyRuntime": {
+    "kind": "git",
+    "uri": "https://github.com/AzzCraft/cadence-oss.git",
+    "pinType": "commit",
+    "pinValue": "e4054537c0962441037dd5403d1a1692434fde73",
+    "floating": false,
+    "notes": "Published Cadence OSS v1.0.0 release commit."
+  },
+  "suiteVersionClosureRef": {
+    "kind": "file",
+    "uri": "./suite_version_closure.json",
+    "pinType": "manifest",
+    "pinValue": "suite_version_closure.json",
+    "floating": false
+  },
+  "suiteLockRef": {
+    "kind": "file",
+    "uri": "./suite_lock.json",
+    "pinType": "manifest",
+    "pinValue": "suite_lock.json",
+    "floating": false,
+    "notes": "Bundled copy of the published DAS Suite v1.0.0 lock."
+  },
+  "verifyRegistryRef": {
+    "kind": "file",
+      "uri": "../cadence-registry/registry-core.json",
+    "pinType": "manifest",
+      "pinValue": "registry-core.json",
+    "floating": false
+  },
+  "policyPackVersion": "1.4.0",
+  "toolchain": [
+    {
+      "name": "cadence-core",
+      "version": "1.0.0",
+      "manager": "go"
+    },
+    {
+      "name": "go",
+      "version": "1.22.x",
+      "manager": "system"
+    },
+    {
+      "name": "python3",
+      "version": "3.11.x",
+      "manager": "system"
+    }
+  ]
+}

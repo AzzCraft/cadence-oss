@@ -1,5 +1,5 @@
 build:
-	go build ./cmd/cadence
+	go build -buildvcs=false ./cmd/cadence
 
 test:
 	go test ./...

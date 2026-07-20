@@ -1,0 +1,17 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://azzcraft.com/cadence/schemas/waiver_file.schema.json",
+  "title": "WaiverFile",
+  "description": "Persisted container for one or more waiver records selected by ticket at verify time.",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "schemaVersion": { "$ref": "common.schema.json#/$defs/semver" },
+    "waivers": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "waiver.schema.json" }
+    }
+  },
+  "required": ["schemaVersion", "waivers"]
+}

@@ -1,0 +1,83 @@
+{
+  "$schema": "../schemas/registry_index.schema.json",
+  "schemaVersion": "1.0.0",
+  "indexId": "runtime-profiles",
+  "description": "Registered runtime and sandbox profiles.",
+  "entries": [
+    {
+      "id": "strict_offline",
+      "kind": "runtimeProfile",
+      "version": "1.0.0",
+      "digest": "sha256:288bbc104c69f7d1edb9a67c48cfd23e7d66f54ca880574ed7f92492621f600c",
+      "status": "active",
+      "deprecatedAt": null,
+      "deprecationReason": null,
+      "compatWindow": "current",
+      "ref": "../../cadence-sandbox/runtime_profile.json",
+      "trust": {
+        "signer": "cadence-oss-team",
+        "allowlisted": true
+      }
+    },
+    {
+      "id": "local_offline",
+      "kind": "sandboxProfile",
+      "version": "1.0.0",
+      "digest": "sha256:d763bb1b47c4b87f4af2a14a0fa8aafe977008b8facc8ded676bd90c4e5d1fea",
+      "status": "active",
+      "deprecatedAt": null,
+      "deprecationReason": null,
+      "compatWindow": "current",
+      "ref": "../../cadence-sandbox/sandbox_profile.json",
+      "trust": {
+        "signer": "cadence-oss-team",
+        "allowlisted": true
+      }
+    },
+    {
+      "id": "rootless-dev",
+      "kind": "sandboxProfile",
+      "version": "1.0.0",
+      "digest": "sha256:9795147253f0d9ec5a376c508edcfb2bc18da37ad4fdc087b600045499efdc98",
+      "status": "active",
+      "deprecatedAt": null,
+      "deprecationReason": null,
+      "compatWindow": "current",
+      "ref": "../../cadence-sandbox/profiles/rootless-dev.json",
+      "trust": {
+        "signer": "cadence-oss-team",
+        "allowlisted": true
+      }
+    },
+    {
+      "id": "ci-container",
+      "kind": "sandboxProfile",
+      "version": "1.0.0",
+      "digest": "sha256:8b89b8690e98651a7e8acc7ce769e1300251f513a14f3c560d88a06cf564e7cb",
+      "status": "active",
+      "deprecatedAt": null,
+      "deprecationReason": null,
+      "compatWindow": "current",
+      "ref": "../../cadence-sandbox/profiles/ci-container.json",
+      "trust": {
+        "signer": "cadence-oss-team",
+        "allowlisted": true
+      }
+    },
+    {
+      "id": "release-microvm",
+      "kind": "sandboxProfile",
+      "version": "1.0.0",
+      "digest": "sha256:2c03a8f6f0ff3e6f99c831bb8c6d8f64bf0a5341e298c077f8f7bd585a64f54e",
+      "status": "active",
+      "deprecatedAt": null,
+      "deprecationReason": null,
+      "compatWindow": "current",
+      "ref": "../../cadence-sandbox/profiles/release-microvm.json",
+      "trust": {
+        "signer": "cadence-oss-team",
+        "allowlisted": true
+      }
+    }
+  ]
+}

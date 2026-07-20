@@ -1,0 +1,75 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+cd "$ROOT_DIR"
+
+make_temp_dir() {
+  local prefix="$1"
+  local base="${TMPDIR:-/tmp}"
+  local dir=""
+  if dir="$(mktemp -d "${base}/${prefix}.XXXXXX" 2>/dev/null)"; then
+    printf '%s\n' "$dir"
+    return 0
+  fi
+  python3 - "$prefix" "$base" <<'PY'
+import sys
+import tempfile
+
+print(tempfile.mkdtemp(prefix=sys.argv[1] + ".", dir=sys.argv[2]))
+PY
+}
+
+tmpdir="$(make_temp_dir cadence-protocol)"
+trap 'rm -rf "$tmpdir"' EXIT
+
+echo "[cadence-protocol] compatibility matrix verification"
+
+for doc in docs/MIGRATIONS.md docs/VERSIONING.md docs/COMPATIBILITY_MATRIX.md; do
+  if [[ ! -f "$doc" ]]; then
+    echo "FAIL: missing canonical protocol doc: $doc" >&2
+    exit 1
+  fi
+done
+
+# Declared compatibility migration matrix.
+# Each row: migration-kind  input-fixture  validator-function
+MATRIX=(
+  "legacy-run-manifest       fixtures/compat/legacy_run_manifest_v0.json       validate_run_manifest"
+  "legacy-pipeline-result    fixtures/compat/legacy_pipeline_result_v0.json    validate_pipeline_result"
+  "legacy-job-envelope       fixtures/compat/legacy_job_envelope_v0.json       validate_job_envelope"
+  "legacy-evidence-bundle    fixtures/compat/legacy_evidence_bundle_v0.json    validate_evidence_bundle"
+)
+
+pass_count=0
+for row in "${MATRIX[@]}"; do
+  read -r kind input_path validator <<< "$row"
+  if [[ ! -f "$input_path" ]]; then
+    echo "FAIL: missing compat fixture: $input_path" >&2
+    exit 1
+  fi
+  out_name="$(basename "$input_path" .json)_migrated.json"
+  python3 ./tools/migrate.py \
+    --kind "$kind" \
+    --input "$input_path" \
+    --output "$tmpdir/$out_name"
+
+  TMPDIR="$tmpdir" OUT_NAME="$out_name" VALIDATOR="$validator" python3 - <<'PY'
+import json
+import os
+from pathlib import Path
+import tools.validate as V
+
+tmp = Path(os.environ["TMPDIR"])
+out_name = os.environ["OUT_NAME"]
+validator_name = os.environ["VALIDATOR"]
+
+payload = json.loads((tmp / out_name).read_text(encoding="utf-8"))
+fn = getattr(V, validator_name)
+fn(payload)
+print(f"OK: {out_name} migrated and validated via {validator_name}")
+PY
+  pass_count=$((pass_count + 1))
+done
+
+echo "[cadence-protocol] compat OK: $pass_count migrations verified"

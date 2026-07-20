@@ -1,0 +1,22 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://azzcraft.com/cadence/schemas/env_spec.schema.json",
+  "title": "EnvironmentSpec",
+  "description": "Runtime environment specification for deterministic verification",
+  "type": "object",
+  "properties": {
+    "schemaVersion": { "type": "string", "const": "1.0.0" },
+    "os": { "type": "string" },
+    "arch": { "type": "string" },
+    "goVersion": { "type": "string" },
+    "goCompiler": { "type": "string" },
+    "numCPU": { "type": "integer", "minimum": 1 },
+    "cgroupVersion": { "type": "string" },
+    "locale": { "type": "string" },
+    "ulimitNofile": { "type": "string" },
+    "containerImageDigest": { "type": "string" },
+    "resourceProfile": { "type": "string" }
+  },
+  "required": ["os", "arch", "goVersion"],
+  "additionalProperties": false
+}

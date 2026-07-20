@@ -1,0 +1,56 @@
+{
+  "$schema": "https://azzcraft.com/cadence/schemas/error_codes.schema.json",
+  "task": "DAS-04-021",
+  "description": "Stable error codes used across cadence runtime, sandbox, registry and verify. Codes MUST never be reused; deprecated codes are tombstoned with a replacement pointer.",
+  "codes": {
+    "missingInput": {
+      "code": "E-CAD-001",
+      "category": "input",
+      "message": "Required input is missing or unresolvable",
+      "retryable": false
+    },
+    "policyDenied": {
+      "code": "E-CAD-010",
+      "category": "policy",
+      "message": "Policy pack denied the requested action",
+      "retryable": false
+    },
+    "sandboxViolation": {
+      "code": "E-CAD-020",
+      "category": "sandbox",
+      "message": "Plugin attempted an action outside its sandbox profile",
+      "retryable": false
+    },
+    "budgetExceeded": {
+      "code": "E-CAD-030",
+      "category": "budget",
+      "message": "A declared execution budget (timeMs/tokens/externalCalls/bytes/pluginCalls) was exceeded",
+      "retryable": true
+    },
+    "pluginUnavailable": {
+      "code": "E-CAD-040",
+      "category": "registry",
+      "message": "Plugin not found in trust index or has been revoked",
+      "retryable": false
+    },
+    "evidenceCorrupt": {
+      "code": "E-CAD-050",
+      "category": "evidence",
+      "message": "Evidence bundle hash chain or signature verification failed",
+      "retryable": false
+    },
+    "lockMissing": {
+      "code": "E-CAD-060",
+      "category": "lock",
+      "message": "Required tooling lock or suite closure is absent; refusing to run",
+      "retryable": false
+    },
+    "replayMismatch": {
+      "code": "E-CAD-070",
+      "category": "replay",
+      "message": "Replay produced a different result than the original run",
+      "retryable": false
+    }
+  },
+  "deprecated": {}
+}

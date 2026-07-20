@@ -1,0 +1,11 @@
+{
+  "schemaVersion": "1.0.0",
+  "registryId": "cadence-fixture",
+  "entries": [
+    {
+      "kind": "policyPack",
+      "id": "fixture-pack",
+      "ref": "packs/fixture/pack.yaml"
+    }
+  ]
+}

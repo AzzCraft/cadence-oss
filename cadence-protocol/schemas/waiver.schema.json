@@ -1,0 +1,51 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://azzcraft.com/schemas/waiver.schema.json",
+  "title": "Cadence Waiver",
+  "type": "object",
+  "required": [
+    "reason",
+    "ticket",
+    "owner",
+    "approvedBy",
+    "referenceTime",
+    "signature"
+  ],
+  "properties": {
+    "schemaVersion": {
+      "type": "string"
+    },
+    "reason": {
+      "type": "string"
+    },
+    "ticket": {
+      "type": "string"
+    },
+    "owner": {
+      "type": "string"
+    },
+    "approvedBy": {
+      "type": "string"
+    },
+    "createdAt": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "expiresAt": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "referenceTime": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "signature": {
+      "type": "string"
+    },
+    "scope": {
+      "type": "string",
+      "enum": ["check", "policy-pack", "profile"]
+    }
+  },
+  "additionalProperties": false
+}

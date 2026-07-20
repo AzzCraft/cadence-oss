@@ -1,0 +1,8 @@
+{
+  "schemaVersion": "1.0.0",
+  "sandboxId": "local_offline",
+  "backend": "host-local",
+  "filesystem": "workspace-only",
+  "networkAccess": false,
+  "timeSource": "injected"
+}

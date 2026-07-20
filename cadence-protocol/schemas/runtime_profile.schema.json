@@ -1,0 +1,49 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://cadence.azzcraft.com/schemas/runtime_profile.schema.json",
+  "title": "Cadence Runtime Profile",
+  "description": "Defines the runtime environment constraints and capabilities for a cadence pipeline.",
+  "type": "object",
+  "required": ["schemaVersion", "profileId", "runtimeKind"],
+  "additionalProperties": false,
+  "properties": {
+    "schemaVersion": {
+      "type": "string",
+      "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$"
+    },
+    "profileId": {
+      "type": "string",
+      "minLength": 1
+    },
+    "runtimeKind": {
+      "type": "string",
+      "enum": ["local", "container", "remote", "cloud"]
+    },
+    "toolchain": {
+      "type": "object",
+      "properties": {
+        "go": { "type": "string" },
+        "python": { "type": "string" },
+        "node": { "type": "string" }
+      },
+      "additionalProperties": false
+    },
+    "features": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "enum": ["signing", "replay", "sandbox", "plugins", "ui"]
+      },
+      "uniqueItems": true
+    },
+    "parallelism": {
+      "type": "integer",
+      "minimum": 1,
+      "default": 1
+    },
+    "timeoutSeconds": {
+      "type": "integer",
+      "minimum": 0
+    }
+  }
+}

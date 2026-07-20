@@ -1,0 +1,7 @@
+{
+  "schemaVersion": "1.0.0",
+  "replayId": "replay_demo",
+  "runManifestRef": "examples/run_manifest.example.json",
+  "pipelineResultRef": "examples/pipeline_result.example.json",
+  "datasetRef": "examples/dataset_manifest.example.json"
+}

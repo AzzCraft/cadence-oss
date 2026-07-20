@@ -1,0 +1,13 @@
+{
+  "schemaVersion": "1.0.0",
+  "depth": 1,
+  "levels": [
+    {
+      "level": 0,
+      "role": "root-and-leaf",
+      "algorithm": "hmac-sha256",
+      "anchor": "operator-local"
+    }
+  ],
+  "rootAnchor": "operator-local"
+}

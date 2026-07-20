@@ -1,0 +1,9 @@
+{
+  "schemaVersion": "1.0.0",
+  "anchorId": "hsm://tenant/root",
+  "provider": "hsm",
+  "keyUri": "hsm://tenant/root",
+  "attestation": "external-hsm-anchor-active",
+  "hardwareBacked": true,
+  "status": "active"
+}

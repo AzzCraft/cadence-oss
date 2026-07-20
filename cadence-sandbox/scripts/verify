@@ -1,0 +1,67 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+cd "$(dirname "$0")/.."
+
+echo "[cadence-sandbox] verify profiles"
+
+FAIL=0
+
+for doc in docs/SECURITY_MODEL.md docs/PROFILE_MATRIX.md docs/UPGRADE_PATH.md; do
+  if [[ ! -f "$doc" ]]; then
+    echo "  FAIL: missing required doc: $doc"
+    FAIL=1
+  fi
+done
+
+for profile in profiles/*.json; do
+  if ! python3 -c "import json, sys; json.load(open('$profile'))" 2>/dev/null; then
+    echo "  FAIL: $profile is not valid JSON"
+    FAIL=1
+  else
+    # Check required top-level keys
+    MISSING=$(python3 -c "
+import json, sys
+data = json.load(open('$profile'))
+required = ['schemaVersion', 'profileId', 'filesystem', 'network', 'resources', 'timeSource', 'escapeClassification']
+missing = [k for k in required if k not in data]
+if missing:
+    print(' '.join(missing))
+")
+    if [[ -n "$MISSING" ]]; then
+      echo "  FAIL: $profile missing keys: $MISSING"
+      FAIL=1
+    fi
+  fi
+done
+
+# Check root-level profiles are still valid JSON
+for f in sandbox_profile.json runtime_profile.json; do
+  if [[ -f "$f" ]]; then
+    if ! python3 -c "import json; json.load(open('$f'))" 2>/dev/null; then
+      echo "  FAIL: $f is not valid JSON"
+      FAIL=1
+    fi
+  fi
+done
+
+python3 -m unittest discover -s tests -p 'test_*.py'
+
+echo "[cadence-sandbox] consumer smoke"
+(
+  cd ../cadence-core
+  go test ./internal/sandbox -count=1
+  if [[ "${CADENCE_TEST_REAL_CONTAINER_RUNTIME:-0}" == "1" ]]; then
+    go test ./tests/integration -run TestVerifyUsesRealContainerRuntime -count=1
+  fi
+  if [[ "${CADENCE_TEST_REAL_MICROVM_RUNTIME:-0}" == "1" ]]; then
+    go test ./tests/integration -run TestVerifyUsesRealMicrovmRuntime -count=1
+  fi
+)
+
+if [[ "$FAIL" -ne 0 ]]; then
+  echo "[cadence-sandbox] FAIL"
+  exit 1
+fi
+
+echo "[cadence-sandbox] OK"

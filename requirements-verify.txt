@@ -1,0 +1,2 @@
+# Full-gate test dependency. Keep this lock in sync with BUILD_REQUIREMENTS.md.
+pytest==9.0.3
