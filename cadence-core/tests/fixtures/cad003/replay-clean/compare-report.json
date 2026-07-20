@@ -1,0 +1,25 @@
+{
+  "task": "CAD-003",
+  "offline": true,
+  "runManifestRef": "run-manifest.json",
+  "inputCassetteRef": "input-cassette.json",
+  "compare": {
+    "same": true,
+    "diffs": []
+  },
+  "artifacts": [
+    {
+      "path": "run-manifest.json",
+      "hash": "sha256:1111111111111111111111111111111111111111111111111111111111111111"
+    },
+    {
+      "path": "pipeline-result.json",
+      "hash": "sha256:2222222222222222222222222222222222222222222222222222222222222222"
+    },
+    {
+      "path": "input-cassette.json",
+      "hash": "sha256:3333333333333333333333333333333333333333333333333333333333333333"
+    }
+  ],
+  "diagnostics": []
+}

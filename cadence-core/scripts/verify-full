@@ -1,0 +1,34 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+cd "$ROOT_DIR"
+
+export GOPROXY=off
+export GOSUMDB=off
+if [[ -n "${GOFLAGS:-}" ]]; then
+  export GOFLAGS="${GOFLAGS} -mod=vendor"
+else
+  export GOFLAGS="-mod=vendor"
+fi
+
+bash ./scripts/verify
+bash ./scripts/replay --help >/dev/null
+bash ./scripts/sign-evidence --help >/dev/null
+bash ./scripts/verify-signature --help >/dev/null
+
+echo "[cadence-core] complete Go integration suite"
+go test ./tests/integration/ -count=1 -timeout 120s
+
+command -v python3 >/dev/null 2>&1 || { echo "python3 is required for the public test suite" >&2; exit 127; }
+echo "[cadence-core] complete Python suite"
+PYTHONDONTWRITEBYTECODE=1 python3 -m pytest -q -p no:cacheprovider tests
+
+legacy_prefix="unified"
+legacy_pack="${legacy_prefix}-current-baseline"
+if grep -R -n --binary-files=without-match -- "$legacy_pack" . >/dev/null 2>&1; then
+  echo "legacy unified baseline reference remains in cadence-core" >&2
+  exit 1
+fi
+
+echo "[cadence-core] full verification OK"

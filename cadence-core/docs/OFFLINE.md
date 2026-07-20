@@ -1,13 +1,15 @@
 # Offline posture (Core)
 
-Cadence Core is designed to be *runtime offline*:
-- `verify/scan/adopt/report` MUST NOT require network access during execution.
-- Any network usage must be an explicit subcommand (e.g. `fetch`, `fix --endpoint`, `record`), and must be guarded by egress allowlists + audit when enabled.
+Cadence Core v1.0.0 does not require network access for its documented
+`verify`, `scan`, `adopt`, `report`, `lock`, or `doctor` commands. The Go
+verification gate uses the checked-in vendor directory with `GOPROXY=off` and
+`GOSUMDB=off`.
 
-## Modes
-- Strict Offline: no network
-- Air-gapped Intranet: only intranet allowlist
-- Online Cloud: public network / private link
+This source release does not implement or ship cloud, private-link, intranet
+egress-allowlist, registry-mirroring, or Egress Guard modes. Those are not
+security guarantees of v1.0.0.
 
-## Offline attestation (optional)
-If configured, an Egress Guard can enforce deny-egress at the process/container layer and emit an attestation artifact into the Evidence output.
+When Cadence starts a supported sandbox or plugin subprocess, it reduces the
+environment to the declared allowlist and rejects reserved parent environment
+keys. Third-party plugin execution is fail-closed unless an approved isolated
+runner is available.

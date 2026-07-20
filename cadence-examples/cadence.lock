@@ -1,7 +1,0 @@
-cadence_cli:
-  version: "0.7.0-demo"
-  sha256: "sha256:f0aee02f8894909d0892ae78fd567134dff56af2f8685b6997e66477467d2644"
-plugins:
-  - name: "cadence-ui"
-    version: "0.1.0"
-runners: []

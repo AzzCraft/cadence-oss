@@ -1,0 +1,9 @@
+{
+  "task": "CAD-004",
+  "status": "ok",
+  "audit": {
+    "pluginId": "cadence-plugin-python",
+    "profile": "readonly-no-network",
+    "denied": []
+  }
+}

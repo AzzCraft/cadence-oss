@@ -1,0 +1,79 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "cadence-core-config",
+  "title": "cadence.yaml configuration schema",
+  "description": "Schema for the cadence-core configuration file (cadence.yaml or cadence.yml).",
+  "type": "object",
+  "properties": {
+    "projectId": {
+      "type": "string",
+      "description": "Unique project identifier. Defaults to 'unknown'."
+    },
+    "mode": {
+      "type": "string",
+      "enum": ["strict_offline", "relaxed", "ci"],
+      "description": "Execution mode. Defaults to 'strict_offline'."
+    },
+    "closureRef": {
+      "type": "string",
+      "description": "Path to suite version closure file."
+    },
+    "toolingLock": {
+      "type": "string",
+      "description": "Path to tooling lock file. Defaults to 'tooling_lock.json'.",
+      "default": "tooling_lock.json"
+    },
+    "runtimeRef": {
+      "type": "string",
+      "description": "Path to runtime reference configuration."
+    },
+    "registryRef": {
+      "type": "string",
+      "description": "Path to plugin/pack registry index."
+    },
+    "sandboxRef": {
+      "type": "string",
+      "description": "Path to sandbox profile file."
+    },
+    "rootAnchor": {
+      "type": "string",
+      "description": "Declared signing root anchor. Defaults to 'operator-local' and may be overridden by CADENCE_ROOT_ANCHOR."
+    },
+    "policies": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "List of policy pack identifiers to apply."
+    },
+    "ui": {
+      "type": "object",
+      "properties": {
+        "enabled": {
+          "type": "boolean",
+          "description": "Enable UI verification. Defaults to false.",
+          "default": false
+        },
+        "profile": {
+          "type": "string",
+          "description": "UI verification profile. Defaults to 'pr'.",
+          "default": "pr"
+        }
+      },
+      "additionalProperties": false
+    },
+    "baselinePath": {
+      "type": "string",
+      "description": "Path to baseline evidence. Defaults to '.cadence/baseline.json'.",
+      "default": ".cadence/baseline.json"
+    }
+  },
+  "additionalProperties": false,
+  "required": [
+    "projectId",
+    "closureRef",
+    "toolingLock",
+    "runtimeRef",
+    "registryRef",
+    "sandboxRef",
+    "policies"
+  ]
+}

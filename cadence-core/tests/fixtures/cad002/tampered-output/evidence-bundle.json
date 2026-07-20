@@ -1,0 +1,16 @@
+{
+  "task": "CAD-002",
+  "schemaVersion": "1.0.0",
+  "chainRef": "step-hash-chain.json",
+  "artifactPaths": [
+    "step-hash-chain.json"
+  ],
+  "expectedFailure": {
+    "task": "CAD-002",
+    "ok": false,
+    "code": "HASH_CHAIN_TAMPERED",
+    "stepIndex": 1,
+    "evidencePath": "tests/fixtures/cad002/tampered-output/step-hash-chain.json#/steps/1",
+    "message": "CAD-002 evidence hash-chain verification failed: stepIndex=1 evidencePath=tests/fixtures/cad002/tampered-output/step-hash-chain.json#/steps/1"
+  }
+}

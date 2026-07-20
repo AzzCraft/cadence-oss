@@ -1,0 +1,40 @@
+{
+  "task": "CAD-002",
+  "hashAlgorithm": "sha256",
+  "canonicalEncoding": "json/sorted-keys/no-whitespace",
+  "steps": [
+    {
+      "stepIndex": 0,
+      "stepId": "load-input",
+      "inputHash": "sha256:1111111111111111111111111111111111111111111111111111111111111111",
+      "outputHash": "sha256:2222222222222222222222222222222222222222222222222222222222222222",
+      "policyRef": "policy://cadence/base@1",
+      "pluginRef": "plugin://builtin/input-loader@1",
+      "previousHash": "sha256:0000000000000000000000000000000000000000000000000000000000000000",
+      "chainHash": "sha256:7e5713a2b77957e013caeb388f08b38734e153a3b744ef67bf6fe0864e8771ae",
+      "evidencePath": "step-hash-chain.json#/steps/0"
+    },
+    {
+      "stepIndex": 1,
+      "stepId": "run-policy",
+      "inputHash": "sha256:2222222222222222222222222222222222222222222222222222222222222222",
+      "outputHash": "sha256:9999999999999999999999999999999999999999999999999999999999999999",
+      "policyRef": "policy://cadence/no-network@1",
+      "pluginRef": "plugin://builtin/policy-runner@1",
+      "previousHash": "sha256:7e5713a2b77957e013caeb388f08b38734e153a3b744ef67bf6fe0864e8771ae",
+      "chainHash": "sha256:0a96344951498252be5b42a4d8b51c5c95fe705f2cc1aa15eece6204ef0bd94f",
+      "evidencePath": "step-hash-chain.json#/steps/1"
+    },
+    {
+      "stepIndex": 2,
+      "stepId": "emit-result",
+      "inputHash": "sha256:3333333333333333333333333333333333333333333333333333333333333333",
+      "outputHash": "sha256:4444444444444444444444444444444444444444444444444444444444444444",
+      "policyRef": "policy://cadence/evidence@1",
+      "pluginRef": "plugin://builtin/result-writer@1",
+      "previousHash": "sha256:0a96344951498252be5b42a4d8b51c5c95fe705f2cc1aa15eece6204ef0bd94f",
+      "chainHash": "sha256:083ad84c935356f50534fef629af8976eebb26516d5caa70214ae7b29d1a4c95",
+      "evidencePath": "step-hash-chain.json#/steps/2"
+    }
+  ]
+}

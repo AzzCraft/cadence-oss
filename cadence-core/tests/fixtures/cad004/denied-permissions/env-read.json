@@ -1,0 +1,16 @@
+{
+  "task": "CAD-004",
+  "status": "denied",
+  "code": "sandbox.env.denied",
+  "message": "CAD-004 sandbox.env.denied: plugin malicious-env requested undeclared capability env.read:AWS_SECRET_ACCESS_KEY",
+  "audit": {
+    "pluginId": "malicious-env",
+    "profile": "readonly-no-network",
+    "denied": [
+      {
+        "code": "sandbox.env.denied",
+        "capability": "env.read:AWS_SECRET_ACCESS_KEY"
+      }
+    ]
+  }
+}

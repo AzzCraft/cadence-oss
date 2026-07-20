@@ -1,0 +1,164 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+usage() {
+  cat <<'USAGE'
+Usage:
+  CADENCE_SIGNING_KEY=... scripts/sign-evidence --input PATH --output PATH [--signature-id ID] [--signer NAME]
+  CADENCE_SIGNING_KEY=... scripts/sign-evidence --bundle DIR [--signature-id ID] [--signer NAME]
+
+Signs one detached evidence payload or an entire evidence bundle using the
+development-only Cadence HMAC-SHA256 envelope format. The key is read from
+CADENCE_SIGNING_KEY; it is never accepted in command-line arguments.
+USAGE
+}
+
+INPUT=""
+OUTPUT=""
+BUNDLE=""
+SIGNATURE_ID="cadence-signature"
+SIGNER="cadence-core"
+KEY="${CADENCE_SIGNING_KEY:-}"
+
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --input)
+      INPUT="${2:-}"
+      shift 2
+      ;;
+    --output)
+      OUTPUT="${2:-}"
+      shift 2
+      ;;
+    --bundle)
+      BUNDLE="${2:-}"
+      shift 2
+      ;;
+    --signature-id)
+      SIGNATURE_ID="${2:-}"
+      shift 2
+      ;;
+    --signer)
+      SIGNER="${2:-}"
+      shift 2
+      ;;
+    -h|--help)
+      usage
+      exit 0
+      ;;
+    *)
+      echo "Unknown argument: $1" >&2
+      usage
+      exit 2
+      ;;
+  esac
+done
+
+if [[ -z "$KEY" ]]; then
+  usage
+  exit 2
+fi
+
+if [[ -n "$BUNDLE" ]]; then
+  CADENCE_SIGNING_KEY="$KEY" python3 - "$BUNDLE" "$SIGNATURE_ID" "$SIGNER" <<'PY'
+import hashlib
+import hmac
+import json
+import sys
+from pathlib import Path
+
+bundle_dir = Path(sys.argv[1])
+signature_id = sys.argv[2]
+signer = sys.argv[3]
+key = __import__("os").environ["CADENCE_SIGNING_KEY"].encode("utf-8")
+
+signable = [
+    "run-manifest.json",
+    "pipeline-result.json",
+    "job-envelope.json",
+    "input-identity.json",
+    "audit-telemetry.json",
+    "deterministic-evidence.json",
+    "sandbox-result.json",
+    "plugin-results-summary.json",
+    "replay-package.json",
+]
+
+entries = {}
+for name in signable:
+    payload_path = bundle_dir / name
+    if not payload_path.exists():
+        continue
+    payload = payload_path.read_bytes()
+    payload_hash = "sha256:" + hashlib.sha256(payload).hexdigest()
+    signature = hmac.new(key, payload_hash.encode("utf-8"), hashlib.sha256).hexdigest()
+    envelope = {
+        "schemaVersion": "1.0.0",
+        "signatureId": f"{signature_id}/{name}",
+        "algorithm": "hmac-sha256",
+        "signer": signer,
+        "payloadRole": name,
+        "payloadHash": payload_hash,
+        "signature": signature,
+    }
+    detached = bundle_dir / f"{name}.signature.json"
+    detached.write_text(json.dumps(envelope, indent=2) + "\n", encoding="utf-8")
+    if name == "run-manifest.json":
+        (bundle_dir / "manifest-signature.json").write_text(json.dumps(envelope, indent=2) + "\n", encoding="utf-8")
+    entries[name] = payload_hash
+
+combined = hashlib.sha256()
+for name in sorted(entries):
+    combined.update(name.encode("utf-8"))
+    combined.update(b"\x00")
+    combined.update(entries[name].encode("utf-8"))
+    combined.update(b"\n")
+bundle_hash = "sha256:" + combined.hexdigest()
+bundle_signature = hmac.new(key, bundle_hash.encode("utf-8"), hashlib.sha256).hexdigest()
+bundle_payload = {
+    "schemaVersion": "1.0.0",
+    "signatureId": f"{signature_id}/bundle",
+    "algorithm": "hmac-sha256",
+    "signer": signer,
+    "bundleHash": bundle_hash,
+    "entries": entries,
+    "signature": bundle_signature,
+}
+(bundle_dir / "bundle-signature.json").write_text(json.dumps(bundle_payload, indent=2) + "\n", encoding="utf-8")
+print(f"signed bundle: {bundle_dir}")
+PY
+  exit 0
+fi
+
+if [[ -z "$INPUT" || -z "$OUTPUT" ]]; then
+  usage
+  exit 2
+fi
+
+CADENCE_SIGNING_KEY="$KEY" python3 - "$INPUT" "$OUTPUT" "$SIGNATURE_ID" "$SIGNER" <<'PY'
+import hashlib
+import hmac
+import json
+import sys
+from pathlib import Path
+
+input_path = Path(sys.argv[1])
+output_path = Path(sys.argv[2])
+signature_id = sys.argv[3]
+signer = sys.argv[4]
+key = __import__("os").environ["CADENCE_SIGNING_KEY"].encode("utf-8")
+payload = input_path.read_bytes()
+payload_hash = "sha256:" + hashlib.sha256(payload).hexdigest()
+signature = hmac.new(key, payload_hash.encode("utf-8"), hashlib.sha256).hexdigest()
+envelope = {
+    "schemaVersion": "1.0.0",
+    "signatureId": signature_id,
+    "algorithm": "hmac-sha256",
+    "signer": signer,
+    "payloadRole": input_path.name,
+    "payloadHash": payload_hash,
+    "signature": signature,
+}
+output_path.write_text(json.dumps(envelope, indent=2) + "\n", encoding="utf-8")
+print(f"signed: {output_path}")
+PY

@@ -1,0 +1,16 @@
+{
+  "task": "CAD-004",
+  "status": "denied",
+  "code": "sandbox.filesystem.denied",
+  "message": "CAD-004 sandbox.filesystem.denied: plugin malicious-file requested undeclared capability filesystem.write:/repo/src/generated.ts",
+  "audit": {
+    "pluginId": "malicious-file",
+    "profile": "readonly-no-network",
+    "denied": [
+      {
+        "code": "sandbox.filesystem.denied",
+        "capability": "filesystem.write:/repo/src/generated.ts"
+      }
+    ]
+  }
+}

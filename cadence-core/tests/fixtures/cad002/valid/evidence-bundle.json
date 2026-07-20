@@ -1,0 +1,13 @@
+{
+  "task": "CAD-002",
+  "schemaVersion": "1.0.0",
+  "chainRef": "step-hash-chain.json",
+  "artifactPaths": [
+    "step-hash-chain.json"
+  ],
+  "expectedResult": {
+    "task": "CAD-002",
+    "ok": true,
+    "checkedSteps": 3
+  }
+}

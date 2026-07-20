@@ -1,0 +1,30 @@
+{
+  "task": "CAD-003",
+  "offline": true,
+  "runManifestRef": "/home/alice/work/private/repo/.cadence/out/run-manifest.json",
+  "inputCassetteRef": "/Users/bob/Secrets/input-cassette.json",
+  "compare": {
+    "same": false,
+    "diffs": [
+      {
+        "field": "pipelineResult.output.path",
+        "expected": "/home/alice/work/private/repo/output.json",
+        "actual": "C:\\Users\\carol\\repo\\output.json",
+        "reason": "secret-token-abc123 changed replay output"
+      }
+    ]
+  },
+  "artifacts": [
+    {
+      "path": "/home/alice/work/private/repo/.cadence/out/run-manifest.json",
+      "uri": "file:///home/alice/work/private/repo/.cadence/out/run-manifest.json"
+    },
+    {
+      "path": "C:\\Users\\carol\\repo\\token.txt",
+      "uri": "file:///Users/bob/Secrets/input-cassette.json?token=secret-token-abc123&api_key=ghp_private123"
+    }
+  ],
+  "headers": {
+    "Authorization": "Bearer secret-token-abc123"
+  }
+}

@@ -1,0 +1,36 @@
+{
+  "task": "CAD-005",
+  "schemaVersion": "1.0.0",
+  "registryId": "cadence-local-test",
+  "entries": [
+    {
+      "kind": "plugin",
+      "id": "cadence-plugin-python",
+      "version": "1.0.0",
+      "ref": "manifests/cadence-plugin-python.json",
+      "status": "active",
+      "trusted": true,
+      "signer": "azzcraft-release",
+      "channel": "stable",
+      "sha256": "sha256:1111111111111111111111111111111111111111111111111111111111111111"
+    },
+    {
+      "kind": "policyPack",
+      "id": "core-v140-baseline",
+      "version": "1.4.0",
+      "ref": "packs/core-v140-baseline/pack.yaml",
+      "status": "active",
+      "trusted": true,
+      "signer": "azzcraft-release",
+      "channel": "stable",
+      "sha256": "sha256:2222222222222222222222222222222222222222222222222222222222222222"
+    }
+  ],
+  "expectedResolution": {
+    "ok": true,
+    "activeIds": [
+      "cadence-plugin-python",
+      "core-v140-baseline"
+    ]
+  }
+}

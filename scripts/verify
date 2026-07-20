@@ -1,0 +1,61 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+cd "$ROOT_DIR"
+
+MODE="fast"
+case "${1:-}" in
+  ""|--fast|--standalone)
+    ;;
+  --full)
+    MODE="full"
+    ;;
+  *)
+  echo "Usage: scripts/verify [--fast|--full|--standalone]" >&2
+  exit 2
+    ;;
+esac
+if [[ $# -gt 1 ]]; then
+  echo "Usage: scripts/verify [--fast|--full|--standalone]" >&2
+  exit 2
+fi
+command -v go >/dev/null 2>&1 || { echo "Go 1.25.12 or newer is required." >&2; exit 127; }
+MIN_GO="go1.25.12"
+ACTUAL_GO="$(go env GOVERSION)"
+if ! awk -v minimum="${MIN_GO#go}" -v actual="${ACTUAL_GO#go}" 'BEGIN {
+  split(minimum, m, "."); split(actual, a, ".");
+  for (i = 1; i <= 3; i++) {
+    if ((a[i] + 0) > (m[i] + 0)) exit 0;
+    if ((a[i] + 0) < (m[i] + 0)) exit 1;
+  }
+  exit 0;
+}'; then
+  echo "Go 1.25.12 or newer is required; found $ACTUAL_GO." >&2
+  exit 1
+fi
+export GOFLAGS="${GOFLAGS:+$GOFLAGS }-buildvcs=false"
+SOURCE_ID="archive"
+SOURCE_ID="$(git -C "$ROOT_DIR" rev-parse --verify HEAD 2>/dev/null || printf '%s' archive)"
+printf '%s\n' "mode=$MODE cadenceVersion=$(tr -d '[:space:]' < VERSION) dasStandardVersion=1.4.0 source=$SOURCE_ID go=$ACTUAL_GO python=$(python3 --version 2>&1 || printf unavailable)"
+
+if [[ "$MODE" == "full" ]]; then
+  bash ./cadence-core/scripts/verify-full
+else
+  bash ./cadence-core/scripts/verify
+fi
+
+UNFORMATTED=""
+while IFS= read -r -d '' go_file; do
+  formatted_path="$(gofmt -l "$go_file")"
+  if [[ -n "$formatted_path" ]]; then
+    UNFORMATTED="${UNFORMATTED}${formatted_path}\n"
+  fi
+done < <(find ./cadence-core -path './cadence-core/vendor' -prune -o -type f -name '*.go' -print0)
+if [[ -n "$UNFORMATTED" ]]; then
+  echo "first-party Go source is not gofmt-clean" >&2
+  printf '%b' "$UNFORMATTED" >&2
+  exit 1
+fi
+
+echo "[cadence-oss] $MODE verification OK"

@@ -1,0 +1,8 @@
+projectId: fixture-project
+mode: strict_offline
+closureRef: suite_version_closure.json
+toolingLock: tooling_lock.json
+registryRef: registry.json
+sandboxRef: sandbox.json
+policies:
+  - standard-ui-v140

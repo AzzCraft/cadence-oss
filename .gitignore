@@ -9,6 +9,8 @@ node_modules/
 
 # Python
 __pycache__/
+*.pyc
+*.py[cod]
 .venv/
 
 # Build artifacts

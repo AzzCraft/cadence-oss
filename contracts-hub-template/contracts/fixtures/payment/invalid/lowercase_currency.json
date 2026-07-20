@@ -1,8 +1,0 @@
-{
-  "amountCents": 1234,
-  "createdAt": "2026-01-23T10:00:00Z",
-  "currency": "usd",
-  "paymentId": "pay_demo_001",
-  "schemaVersion": "1.0.0",
-  "status": "created"
-}

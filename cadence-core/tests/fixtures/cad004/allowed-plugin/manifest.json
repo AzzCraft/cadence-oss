@@ -1,0 +1,23 @@
+{
+  "task": "CAD-004",
+  "schemaVersion": "1.0.0",
+  "pluginId": "cadence-plugin-python",
+  "entrypoint": "../plugins/python/plugin.py",
+  "runtime": "python3",
+  "sandboxProfile": "readonly-no-network",
+  "permissions": {
+    "network": false,
+    "filesystem": {
+      "read": [
+        "src/**"
+      ],
+      "write": [
+        "out/**"
+      ]
+    },
+    "envRead": [
+      "PATH",
+      "TMPDIR"
+    ]
+  }
+}
