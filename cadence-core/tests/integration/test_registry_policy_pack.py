@@ -4,9 +4,7 @@ import json
 from pathlib import Path
 
 
-ROOT = Path(__file__).resolve().parents[3]
-CORE_ROOT = ROOT / "cadence-core"
-POLICY_PACKS_ROOT = ROOT / "cadence-policy-packs"
+CORE_ROOT = Path(__file__).resolve().parents[2]
 FIXTURES = CORE_ROOT / "tests" / "fixtures" / "cad005"
 
 
@@ -16,17 +14,12 @@ def _load_json(path: Path) -> dict:
 
 def test_cad_005_sources_expose_registry_policy_contract() -> None:
     registry_go = (CORE_ROOT / "internal" / "registry" / "registry.go").read_text(encoding="utf-8")
-    pack_verify = (POLICY_PACKS_ROOT / "scripts" / "verify").read_text(encoding="utf-8")
-
     assert "CAD-005" in registry_go
     assert "type TrustedIndex" in registry_go
     assert "func ResolveTrustedIndex" in registry_go
     assert "registry.revoked" in registry_go
     assert "registry.hash.mismatch" in registry_go
     assert "policy.runtime.incompatible" in registry_go
-    assert "runtimeCompatibility" in pack_verify
-    assert "schemaVersion" in pack_verify
-    assert "channel" in pack_verify
 
 
 def test_cad_005_trusted_registry_fixture_resolves_only_active_trusted_entries() -> None:
@@ -70,5 +63,4 @@ def test_cad_005_revoked_hash_mismatch_and_policy_pack_failures_name_item() -> N
     assert incompatible["expectedFailure"]["item"] == "legacy-v1-pack"
     assert "CAD-005" in incompatible["expectedFailure"]["message"]
 
-    pack_verify = (POLICY_PACKS_ROOT / "scripts" / "verify").read_text(encoding="utf-8")
-    assert "runtimeCompatibility" in pack_verify
+    assert "runtimeCompatibility" in compatible_pack

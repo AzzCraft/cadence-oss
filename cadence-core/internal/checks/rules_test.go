@@ -19,7 +19,7 @@ func writeTestFile(t *testing.T, root, rel, content string) {
 
 func TestRunAllDetectsAWSKey(t *testing.T) {
 	root := t.TempDir()
-	writeTestFile(t, root, "config.py", "AWS_KEY = '" + "AKIA" + "IOSFODNN7EXAMPLE" + "'\n")
+	writeTestFile(t, root, "config.py", "AWS_KEY = '"+"AKIA"+"IOSFODNN7EXAMPLE"+"'\n")
 	violations, err := RunAll(root)
 	if err != nil {
 		t.Fatal(err)
@@ -37,7 +37,7 @@ func TestRunAllDetectsAWSKey(t *testing.T) {
 
 func TestRunAllDetectsGitHubToken(t *testing.T) {
 	root := t.TempDir()
-	writeTestFile(t, root, "ci.sh", "TOKEN=" + "ghp_" + "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" + "\n")
+	writeTestFile(t, root, "ci.sh", "TOKEN="+"ghp_"+"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"+"\n")
 	violations, err := RunAll(root)
 	if err != nil {
 		t.Fatal(err)
@@ -55,7 +55,7 @@ func TestRunAllDetectsGitHubToken(t *testing.T) {
 
 func TestRunAllDetectsPrivateKey(t *testing.T) {
 	root := t.TempDir()
-	writeTestFile(t, root, "key.pem", "-----BEGIN " + "RSA PRIVATE KEY" + "-----\nfake\n-----END " + "RSA PRIVATE KEY" + "-----\n")
+	writeTestFile(t, root, "key.pem", "-----BEGIN "+"RSA PRIVATE KEY"+"-----\nfake\n-----END "+"RSA PRIVATE KEY"+"-----\n")
 	violations, err := RunAll(root)
 	if err != nil {
 		t.Fatal(err)

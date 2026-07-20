@@ -1,45 +1,25 @@
-# Security notes
+# Cadence Core security notes
 
-Cadence Core is designed to run offline and emit deterministic evidence. The maintained security posture for this repo includes:
-- supply chain signing verification for binaries/plugins (e.g. cosign)
-- SBOM generation (CycloneDX/SPDX)
-- secret/PII scrubbing before any artifact egress
-- deterministic hashing & canonical JSON
-- registry mirroring for enterprises (no direct public fetch in restricted networks)
+Cadence Core v1.0.0 is an offline verification runtime with deterministic
+evidence and canonical JSON. The shipped code includes path containment,
+regular-file checks, hash chains, replay-bundle validation, secret-pattern
+checks, policy/registry validation, and fail-closed plugin behavior.
 
-## Threat Model
+The release process generates an SPDX SBOM for the archive and records release
+provenance. Cadence Core does **not** ship a cosign verifier, a registry mirror,
+or an Egress Guard service.
 
-| Threat                          | Mitigation                                              |
-|---------------------------------|---------------------------------------------------------|
-| Tampered evidence               | HMAC-SHA256 signing + hash chain verification           |
-| Replay without re-execution     | Deterministic RunID derived from governed inputs        |
-| Secret leakage in evidence      | Secret scan rules (SEC_*) reject detected credentials   |
-| Key compromise                  | Key hierarchy with rotation-ready structure             |
-| Waiver abuse                    | Scope constraints, max duration, no self-approval       |
-| Sandbox escape                  | Escape classification + runtime isolation probe + namespace proof chain |
-| Non-reproducible runs           | Environment spec captures OS, arch, compiler, cgroup    |
-| Stale dependencies              | Compat-window enforcement via ResolveEntryAt            |
+## Signing
 
-## Secret Scanning Rules
+Governed production evidence uses the Ed25519 signing path in the Go runtime.
+`scripts/sign-evidence` and `scripts/verify-signature` implement a
+development-only HMAC helper for local test fixtures. They read
+`CADENCE_SIGNING_KEY` from the environment and never accept a key as a
+command-line argument; do not use that helper as a production key-management
+system.
 
-The built-in baseline scanner detects:
-- AWS access keys (`AKIA...`)
-- GCP API keys (`AIza...`)
-- GitHub tokens (`ghp_...`, `ghs_...`)
-- Private key material (PEM headers)
-- Hardcoded passwords/secrets/tokens
-- JWT tokens
+## Secret scanning
 
-See `internal/checks/rules.go` for the full rule set.
-
-## Evidence Integrity
-
-Every verify run produces:
-- `input-identity.json` — governed input hash over source tree, config, env-spec
-- `isolation-probe.json` — kernel-level fence detection evidence plus namespace proof descriptors
-- `key-hierarchy.json` — signing key chain-of-trust
-- `job-envelope.json` — HMAC-signed result envelope
-- `sandbox-result.json` — sandbox execution attestation
-
-The hash chain (`internal/signing.Chain`) links steps so tampering with any
-intermediate artifact invalidates the chain.
+The built-in baseline scanner checks common credential and private-key patterns.
+See `internal/checks/rules.go` for the exact current rule set. Report security
+issues through the root repository security policy.

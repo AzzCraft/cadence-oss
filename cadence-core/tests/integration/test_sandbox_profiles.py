@@ -4,9 +4,7 @@ import json
 from pathlib import Path
 
 
-ROOT = Path(__file__).resolve().parents[3]
-CORE_ROOT = ROOT / "cadence-core"
-PLUGINS_ROOT = ROOT / "cadence-plugins"
+CORE_ROOT = Path(__file__).resolve().parents[2]
 FIXTURES = CORE_ROOT / "tests" / "fixtures" / "cad004"
 
 
@@ -17,8 +15,6 @@ def _load_json(path: Path) -> dict:
 def test_cad_004_sources_expose_sandbox_policy_contract() -> None:
     sandbox_go = (CORE_ROOT / "internal" / "sandbox" / "sandbox.go").read_text(encoding="utf-8")
     plugins_go = (CORE_ROOT / "internal" / "plugins" / "plugins.go").read_text(encoding="utf-8")
-    plugin_verify = (PLUGINS_ROOT / "scripts" / "verify").read_text(encoding="utf-8")
-
     assert "CAD-004" in sandbox_go
     assert "type CapabilityPolicy" in sandbox_go
     assert "func DenyUndeclaredCapability" in sandbox_go
@@ -28,7 +24,6 @@ def test_cad_004_sources_expose_sandbox_policy_contract() -> None:
     assert "CAD-004" in plugins_go
     assert "SandboxProfile" in plugins_go
     assert "func BindPluginProfile" in plugins_go
-    assert "sandboxProfile" in plugin_verify
 
 
 def test_cad_004_allowed_plugin_declares_profile_and_permissions() -> None:

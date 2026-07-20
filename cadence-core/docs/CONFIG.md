@@ -39,7 +39,12 @@ See [config.schema.json](../config.schema.json) for the formal JSON Schema defin
 - `rootAnchor` can be overridden at runtime by `CADENCE_ROOT_ANCHOR`; that env var is part of the governed input identity surface.
 - Missing required fields fail configuration loading.
 
-## Example
+## Example shape
+
+The following is an illustrative configuration shape. Every relative path is
+owned by the product repository being verified; Cadence Core does not bundle a
+suite closure, registry, sandbox service, or policy-pack catalog in this
+core-only source archive.
 
 ```yaml
 projectId: my-product
@@ -51,9 +56,12 @@ runtimeRef: runtime.json
 registryRef: registry.json
 rootAnchor: operator-local
 policies:
-  - core-v140-baseline
-  - headless-v140
+  - local-policy
 ui:
   enabled: false
   profile: pr
 ```
+
+For an executable end-to-end example, run the shipped integration suite with
+`bash ../scripts/verify --full`; it creates all required local artifacts and
+invokes the public CLI without a sibling checkout.

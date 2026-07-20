@@ -1,3 +1,7 @@
-Cadence OSS Repo Pack
+Cadence OSS Core
 Copyright (c) 2026 AzzCraft Inc. (重庆艾之舟科技有限公司)
-This repository contains the open Cadence runtime, protocol, plugin, policy-pack, and example surfaces.
+
+This v1.0.0 public source release contains Cadence Core and the root release
+verification/documentation required to build and test it. Protocol, plugin,
+policy-pack, sandbox, registry, contract-hub, and example products are not
+part of this archive.

@@ -219,9 +219,10 @@ class CoreRemediationSpecTests(unittest.TestCase):
         self.assertIn("governed", text.lower())
         self.assertIn("Ed25519", text)
 
-    # --- IP boundary: cadence-oss has IP_BOUNDARY.md ---
-    def test_ip_boundary_exists(self) -> None:
-        self.assertTrue((ROOT.parent / "IP_BOUNDARY.md").exists())
+    # --- Public boundary: the core release ships its own explicit scope docs. ---
+    def test_public_scope_docs_exist(self) -> None:
+        self.assertTrue((ROOT.parent / "docs" / "RELEASE_UNITS.md").exists())
+        self.assertTrue((ROOT.parent / "docs" / "SUPPORT_MODEL.md").exists())
 
     # --- LICENSE: cadence-oss has LICENSE ---
     def test_license_file_exists(self) -> None:

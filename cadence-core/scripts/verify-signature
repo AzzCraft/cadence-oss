@@ -4,12 +4,13 @@ set -euo pipefail
 usage() {
   cat <<'USAGE'
 Usage:
-  scripts/verify-signature --input ENVELOPE [--payload FILE] [--key VALUE]
-  scripts/verify-signature --bundle DIR [--key VALUE]
+  CADENCE_SIGNING_KEY=... scripts/verify-signature --input ENVELOPE [--payload FILE]
+  CADENCE_SIGNING_KEY=... scripts/verify-signature --bundle DIR
 
 Verifies one Cadence HMAC-SHA256 signature envelope or a bundle of detached
 signatures plus bundle-signature.json.
-If --key is omitted, CADENCE_SIGNING_KEY is used.
+The development-only HMAC key is read only from CADENCE_SIGNING_KEY. Do not
+place signing keys in command-line arguments.
 USAGE
 }
 
@@ -32,10 +33,6 @@ while [[ $# -gt 0 ]]; do
       BUNDLE="${2:-}"
       shift 2
       ;;
-    --key)
-      KEY="${2:-}"
-      shift 2
-      ;;
     -h|--help)
       usage
       exit 0
@@ -54,28 +51,56 @@ if [[ -z "$KEY" ]]; then
 fi
 
 if [[ -n "$BUNDLE" ]]; then
-  python3 - "$BUNDLE" "$KEY" <<'PY'
+  CADENCE_SIGNING_KEY="$KEY" python3 - "$BUNDLE" <<'PY'
 import hashlib
 import hmac
 import json
+import stat
 import sys
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 
-bundle_dir = Path(sys.argv[1])
-key = sys.argv[2].encode("utf-8")
+bundle_dir = Path(sys.argv[1]).resolve(strict=True)
+if not bundle_dir.is_dir():
+    raise SystemExit("bundle is not a directory")
+key = __import__("os").environ["CADENCE_SIGNING_KEY"].encode("utf-8")
 
-bundle_sig = json.loads((bundle_dir / "bundle-signature.json").read_text(encoding="utf-8"))
+def safe_read(name):
+    if not isinstance(name, str) or not name or "\\" in name:
+        raise SystemExit(f"unsafe bundle entry: {name!r}")
+    pure = PurePosixPath(name)
+    if pure.is_absolute() or any(part in {"", ".", ".."} for part in pure.parts):
+        raise SystemExit(f"unsafe bundle entry: {name!r}")
+    path = bundle_dir.joinpath(*pure.parts)
+    try:
+        info = path.lstat()
+    except OSError as exc:
+        raise SystemExit(f"missing bundle entry {name}: {exc}") from exc
+    if stat.S_ISLNK(info.st_mode) or not stat.S_ISREG(info.st_mode):
+        raise SystemExit(f"bundle entry is not a regular non-symlink file: {name}")
+    resolved = path.resolve(strict=True)
+    try:
+        resolved.relative_to(bundle_dir)
+    except ValueError as exc:
+        raise SystemExit(f"bundle entry escapes bundle directory: {name}") from exc
+    return resolved.read_bytes()
+
+bundle_sig = json.loads(safe_read("bundle-signature.json"))
 entries = bundle_sig["entries"]
+if not isinstance(entries, dict) or not entries:
+    raise SystemExit("bundle signature has no entries")
 
 for name, expected_hash in sorted(entries.items()):
-    payload = (bundle_dir / name).read_bytes()
+    payload = safe_read(name)
     actual_hash = "sha256:" + hashlib.sha256(payload).hexdigest()
     if actual_hash != expected_hash:
         raise SystemExit(f"payload hash mismatch for {name}: expected {expected_hash}, got {actual_hash}")
-    envelope_path = bundle_dir / f"{name}.signature.json"
-    if not envelope_path.exists() and name == "run-manifest.json":
-        envelope_path = bundle_dir / "manifest-signature.json"
-    envelope = json.loads(envelope_path.read_text(encoding="utf-8"))
+    envelope_name = f"{name}.signature.json"
+    try:
+        envelope = json.loads(safe_read(envelope_name))
+    except SystemExit:
+        if name != "run-manifest.json":
+            raise
+        envelope = json.loads(safe_read("manifest-signature.json"))
     expected_sig = hmac.new(key, actual_hash.encode("utf-8"), hashlib.sha256).hexdigest()
     if envelope["payloadHash"] != actual_hash or envelope["signature"] != expected_sig:
         raise SystemExit(f"detached signature verification failed for {name}")
@@ -102,7 +127,7 @@ if [[ -z "$INPUT" ]]; then
   exit 2
 fi
 
-python3 - "$INPUT" "$PAYLOAD" "$KEY" <<'PY'
+CADENCE_SIGNING_KEY="$KEY" python3 - "$INPUT" "$PAYLOAD" <<'PY'
 import hashlib
 import hmac
 import json
@@ -111,7 +136,7 @@ from pathlib import Path
 
 envelope = json.loads(Path(sys.argv[1]).read_text(encoding="utf-8"))
 payload_path = Path(sys.argv[2]) if sys.argv[2] else None
-key = sys.argv[3].encode("utf-8")
+key = __import__("os").environ["CADENCE_SIGNING_KEY"].encode("utf-8")
 
 payload_hash = envelope["payloadHash"]
 if payload_path is not None:

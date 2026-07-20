@@ -89,7 +89,7 @@ class CoreHermeticConfigLoader420Tests(unittest.TestCase):
             td_path = Path(td)
             binary = td_path / "cadence"
             build_proc = subprocess.run(
-                ["go", "build", "-trimpath", "-mod=vendor", "-o", str(binary), "./cmd/cadence"],
+                ["go", "build", "-trimpath", "-buildvcs=false", "-mod=vendor", "-o", str(binary), "./cmd/cadence"],
                 cwd=CORE,
                 env=env,
                 stdout=subprocess.PIPE,

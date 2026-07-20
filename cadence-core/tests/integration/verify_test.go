@@ -22,8 +22,8 @@ func buildBinary(t *testing.T) string {
 	if runtime.GOOS == "windows" {
 		bin += ".exe"
 	}
-	cmd := exec.Command("go", "build", "-o", bin, "./cmd/cadence")
-	cmd.Dir = filepath.Join(repoRoot(t), "cadence-oss", "cadence-core")
+	cmd := exec.Command("go", "build", "-buildvcs=false", "-o", bin, "./cmd/cadence")
+	cmd.Dir = moduleRoot(t)
 	out, err := cmd.CombinedOutput()
 	if err != nil {
 		t.Fatalf("failed to build cadence binary: %v\n%s", err, out)
@@ -31,16 +31,19 @@ func buildBinary(t *testing.T) string {
 	return bin
 }
 
-// repoRoot returns the workspace root (das-repos-code).
-func repoRoot(t *testing.T) string {
+// moduleRoot returns the cadence-core module root without relying on a
+// workspace layout or checkout directory name.
+func moduleRoot(t *testing.T) string {
 	t.Helper()
-	// Walk up from test file to cadence-core, then to workspace root.
-	dir, err := os.Getwd()
-	if err != nil {
-		t.Fatal(err)
+	_, file, _, ok := runtime.Caller(0)
+	if !ok {
+		t.Fatal("cannot determine integration test source path")
 	}
-	// We're in tests/integration/, go up to cadence-core, then cadence-oss, then workspace root.
-	return filepath.Join(dir, "..", "..", "..", "..")
+	root := filepath.Clean(filepath.Join(filepath.Dir(file), "..", ".."))
+	if _, err := os.Stat(filepath.Join(root, "go.mod")); err != nil {
+		t.Fatalf("cadence-core module root is invalid: %v", err)
+	}
+	return root
 }
 
 // setupTestRepo creates a minimal repo structure with cadence.yaml and supporting files.

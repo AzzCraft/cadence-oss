@@ -25,9 +25,9 @@ const (
 
 // Budget tracks remaining capacity along three axes.
 type Budget struct {
-	mu              sync.Mutex
-	TokensRemaining int64
-	TimeRemaining   time.Duration
+	mu               sync.Mutex
+	TokensRemaining  int64
+	TimeRemaining    time.Duration
 	PluginsRemaining int
 
 	terminated bool

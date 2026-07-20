@@ -1,22 +1,26 @@
-# Verify Requirements — cadence-oss
+# Verify Requirements — Cadence OSS Core v1.0.0
 
 ```bash
-./scripts/verify
+bash ./scripts/verify          # fast, default
+bash ./scripts/verify --full   # complete Go and Python suite
 ```
+
+Both commands work from an arbitrary clone name and from the extracted source
+archive. The verifier prints the selected mode, source identity when available,
+Cadence version, DAS Standard manifest version, and tool versions.
 
 ## Prerequisites
 
-- `go` on PATH (1.25.12+; this is the minimum security-patched baseline)
-- `python3` on PATH (3.10+)
-- `node` on PATH (20+)
-- `bash` on PATH
+- Go 1.25.12 or newer, with the checked-in vendored modules available.
+- Python 3.10 or newer; `pytest` is required only for `--full`.
+- Bash 3.2 or newer.
 
-## What verify checks
+## What is verified
 
-1. cadence-protocol schema validation and compatibility.
-2. cadence-core build, vet, tests.
-3. cadence-plugins validation.
-4. cadence-policy-packs pack integrity.
-5. cadence-examples end-to-end verify.
-6. contracts-hub-template self-consistency.
-7. Root aggregation of all subunit results.
+- fast: offline Go build, vet, unit/integration tests, and first-party Go
+  formatting;
+- full: fast checks plus all shipped Python tests and public replay/signing
+  helper smoke checks.
+
+The v1.0.0 archive does not contain or verify the separate Cadence protocol,
+plugin, policy-pack, sandbox, registry, contract-hub, or examples units.

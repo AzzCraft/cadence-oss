@@ -1,29 +1,31 @@
-# Cadence OSS
+# Cadence OSS Core
 
-Cadence OSS is an offline verification command-line runtime. This first public
-release contains the Go implementation in `cadence-core` and its tests.
+Cadence OSS v1.0.0 is an offline, deterministic verification runtime. This
+public source archive contains only `cadence-core` and the root release files
+needed to build and verify it.
 
-## What is included
-
-- `cadence-core/` — offline Go CLI (`verify`, `scan`, `report`, `lock`, and `doctor`)
-- `cadence-core/internal/` — verification, evidence, replay comparison, and policy implementation
-- `cadence-core/scripts/verify` — complete public-source test, vet, and build gate
-
-
-## Verification
+## Verify the source
 
 ```bash
 bash ./scripts/verify
+bash ./scripts/verify --full
 ```
 
-## Quickstart
+Both commands are standalone: they work from any clone directory and from the
+extracted source archive, without a sibling repository or network access.
 
-Run all public-source checks:
+## Run the CLI
 
 ```bash
-bash ./scripts/verify
+cd cadence-core
+go run -mod=vendor -buildvcs=false ./cmd/cadence --help
 ```
 
-The public v1 runtime does not execute third-party plugins: configured plugin
-execution fails closed until a platform-enforced isolated runner is available.
-Replay comparison requires separate expected and actual bundles.
+`cadence verify` operates on a product repository containing a valid
+`cadence.yaml` and its declared local closure, tooling, runtime, registry, and
+sandbox inputs. The shipped tests construct and exercise a complete example of
+that contract. Third-party plugin execution is fail-closed in v1.0.0.
+
+The broader protocol, plugin, policy-pack, sandbox, registry, contract-hub,
+and examples units are planned separately and are not included or implied by
+this release.

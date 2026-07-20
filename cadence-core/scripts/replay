@@ -42,25 +42,65 @@ fi
 python3 - "$BUNDLE" "$OUT_DIR" <<'PY'
 import hashlib
 import json
-import os
 import stat
 import sys
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 
-bundle_path = Path(sys.argv[1])
-out_dir = Path(sys.argv[2])
+bundle_path = Path(sys.argv[1]).resolve(strict=True)
+out_dir = Path(sys.argv[2]).resolve(strict=True)
+if not out_dir.is_dir():
+    raise SystemExit("out-dir is not a directory")
 bundle = json.loads(bundle_path.read_text(encoding="utf-8"))
 
+if bundle.get("schemaVersion") != "1.0.0":
+    raise SystemExit("unsupported replay bundle schemaVersion")
+if not all(isinstance(bundle.get(key), str) and bundle[key] for key in ("replayId", "runManifestRef", "pipelineResultRef", "bundleHash")):
+    raise SystemExit("replay bundle is missing required identity fields")
+if not isinstance(bundle.get("snapshots"), list) or not bundle["snapshots"]:
+    raise SystemExit("replay bundle has no snapshots")
+
+def is_sha256(value):
+    return isinstance(value, str) and value.startswith("sha256:") and len(value) == 71 and all(c in "0123456789abcdef" for c in value[7:])
+
+def safe_target(root, rel):
+    if not isinstance(rel, str) or not rel or "\\" in rel:
+        raise SystemExit(f"unsafe artifact path: {rel!r}")
+    pure = PurePosixPath(rel)
+    if pure.is_absolute() or any(part in {"", ".", ".."} for part in pure.parts):
+        raise SystemExit(f"unsafe artifact path: {rel!r}")
+    target = root.joinpath(*pure.parts)
+    try:
+        info = target.lstat()
+    except OSError as exc:
+        raise SystemExit(f"missing artifact {rel}: {exc}") from exc
+    if stat.S_ISLNK(info.st_mode) or not stat.S_ISREG(info.st_mode):
+        raise SystemExit(f"artifact is not a regular non-symlink file: {rel}")
+    resolved = target.resolve(strict=True)
+    try:
+        resolved.relative_to(root)
+    except ValueError as exc:
+        raise SystemExit(f"artifact path escapes output directory: {rel}") from exc
+    return resolved, info
+
 combined = hashlib.sha256()
-for snap in bundle.get("snapshots", []):
-    rel = snap["relPath"]
-    target = out_dir / Path(rel)
+seen = set()
+previous = ""
+for snap in bundle["snapshots"]:
+    if not isinstance(snap, dict):
+        raise SystemExit("invalid replay snapshot")
+    rel = snap.get("relPath")
+    if not isinstance(rel, str) or rel in seen or previous >= rel:
+        raise SystemExit(f"duplicate or unsorted artifact path: {rel!r}")
+    seen.add(rel)
+    previous = rel
+    if not isinstance(snap.get("size"), int) or snap["size"] < 0 or not is_sha256(snap.get("fileHash")):
+        raise SystemExit(f"invalid snapshot metadata for {rel!r}")
+    target, info = safe_target(out_dir, rel)
     data = target.read_bytes()
     payload_hash = "sha256:" + hashlib.sha256(data).hexdigest()
     if payload_hash != snap["fileHash"]:
         raise SystemExit(f"hash mismatch for {rel}: expected {snap['fileHash']}, got {payload_hash}")
 
-    info = target.stat()
     mode = format(stat.S_IMODE(info.st_mode), "04o")
     if snap.get("mode") and mode != snap["mode"]:
         raise SystemExit(f"mode mismatch for {rel}: expected {snap['mode']}, got {mode}")
@@ -77,7 +117,7 @@ for snap in bundle.get("snapshots", []):
     combined.update(b"\n")
 
 actual_bundle_hash = "sha256:" + combined.hexdigest()
-if actual_bundle_hash != bundle.get("bundleHash"):
+if not is_sha256(bundle.get("bundleHash")) or actual_bundle_hash != bundle["bundleHash"]:
     raise SystemExit(
         f"bundleHash mismatch: expected {bundle.get('bundleHash')}, got {actual_bundle_hash}"
     )

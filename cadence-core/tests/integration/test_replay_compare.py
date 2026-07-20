@@ -28,8 +28,10 @@ def test_cad_003_sources_expose_replay_compare_contract() -> None:
     assert "PathLeak" in sanitize_go
     assert "SecretLeak" in sanitize_go
     assert "CAD-003" in cli_go
-    assert "--bundle" in cli_go
-    assert "--emit-compare" in cli_go
+    for option in ("--expected", "--actual", "--expected-out", "--actual-out"):
+        assert option in cli_go
+    assert "os.SameFile" in cli_go
+    assert "VerifyBundle" in cli_go
 
 
 def test_cad_003_clean_fixture_is_offline_and_has_relative_artifacts() -> None:
