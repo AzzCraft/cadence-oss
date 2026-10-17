@@ -1,0 +1,21 @@
+{
+  "contractIdentity": "das-version-switch-receipt/v1",
+  "authorityDomain": "fixture-domain",
+  "resourceId": "fixture-target",
+  "resourceInstance": "fixture-instance",
+  "action": "apply",
+  "businessActionId": "fixture-business",
+  "requestDigest": "sha256:1111111111111111111111111111111111111111111111111111111111111111",
+  "planDigest": "sha256:1111111111111111111111111111111111111111111111111111111111111111",
+  "beforeCandidateDigest": "sha256:1111111111111111111111111111111111111111111111111111111111111111",
+  "afterCandidateDigest": "sha256:2222222222222222222222222222222222222222222222222222222222222222",
+  "beforeGeneration": 1,
+  "afterGeneration": 2,
+  "rollbackOf": null,
+  "executingActor": "fixture-service",
+  "authorityEpoch": 1,
+  "committedAt": 100,
+  "committed": true,
+  "authority": false,
+  "qualification": true
+}

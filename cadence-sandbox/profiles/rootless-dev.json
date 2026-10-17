@@ -5,6 +5,7 @@
   "schemaVersion": "1.0.0",
   "profileId": "rootless-dev",
   "backend": "host-local",
+  "allowedEnv": ["PYTHONDONTWRITEBYTECODE"],
   "description": "Development profile — rootless container, workspace-only FS, network disabled.",
   "filesystem": {
     "mode": "workspace-only",

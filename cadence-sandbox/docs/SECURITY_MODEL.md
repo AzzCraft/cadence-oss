@@ -3,7 +3,9 @@
 ## Purpose
 
 The Cadence sandbox isolates verification execution from the host system to
-guarantee deterministic, auditable evidence.
+provide bounded execution contracts. It does not by itself make an execution
+production-attested: a non-host run is accepted only when a guest-generated,
+trusted receipt satisfies cadence-core's required checks.
 
 ## Isolation Layers
 
@@ -14,7 +16,7 @@ guarantee deterministic, auditable evidence.
 | Network | Disabled by default | Prevent non-deterministic external calls |
 | Resources | CPU/memory/pids/timeout limits | Prevent runaway execution |
 | Time | Injected clock source | Prevent wall-clock leakage into deterministic payload |
-| Environment | Allowlisted parent env only | Prevent implicit host env injection into verify subprocesses |
+| Environment | Fixed runtime markers plus profile-declared command keys | Prevent implicit host env injection into an isolated image |
 
 ## Escape Classification
 
@@ -27,7 +29,8 @@ All sandbox violations are classified into:
 
 1. **rootless-dev** — minimal isolation for local development
 2. **ci-container** — container-level isolation for CI pipelines
-3. **release-microvm** — micro-VM isolation for formal release verification
+3. **release-microvm** — disabled compatibility specification; it is not a
+   release profile until a guest-executed adapter and trusted receipt exist
 
 ## Evidence contract
 
@@ -59,7 +62,18 @@ request to the configured runtime adapter:
 - `CADENCE_SANDBOX_MICROVM_ADAPTER` for `microvm-runtime`
 
 The adapter response must include the target command exit/result plus
-machine-checkable runtime proof for seccomp, namespace separation, cgroup
-fencing, and a stable namespace proof hash before the verify path can stay
-green. Missing adapter configuration, adapter execution failure, or insufficient
-proof all fail closed.
+machine-checkable guest evidence for seccomp, namespace separation, cgroup
+fencing, and a stable receipt/proof hash before the verify path can stay green.
+Host-side `/proc` probes after a container has exited are not accepted as guest
+evidence. The shipped `microvm_adapter` is deliberately blocked: invoking a
+hypervisor command line without a booted guest, command transport, and signed
+guest receipt is not microVM execution. Missing adapter configuration, a
+non-digest image, undeclared environment/mount, adapter execution failure, or
+insufficient proof all fail closed.
+
+The container adapter accepts only a digest-pinned `imageRef`, runs as a
+non-root UID with a read-only root, no capabilities, no-new-privileges,
+network disabled, resource limits, a read-only workspace mount, and one
+validated writable output subdirectory. A release descriptor must supply the
+image identity; the source profile intentionally does not fall back to a
+mutable image tag.

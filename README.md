@@ -1,35 +1,46 @@
 # Cadence OSS
 
-Cadence OSS v1.1.0 is a backward-compatible expansion of the v1.0.0 offline,
-deterministic verification runtime. It retains `cadence-core` unchanged as the
-default verifier and additionally ships reviewed protocol, plugin, policy-pack,
-contract-hub, example, sandbox, and registry units.
+Cadence OSS is an offline verification command-line runtime. The current source
+candidate is **1.2.0-beta.1**, with reference support for DAS Standard 1.5.0-beta.1.
+It includes exact contract consumers, applicability resolution and Linux reference
+samples. Final installed beta acceptance and publication remain unfinished.
 
-## Verify the source
+## What is included
+
+- `cadence-core/` — Go CLI, contract checks, applicability resolution, evidence and replay checks
+- `cadence-protocol/` — versioned schemas, fixtures and contract tests
+- `cadence-sandbox/reference/das-v1.5/` — controlled Linux execution reference and installation instructions
+- `cadence-examples/` — minimal HTTP and UI reference samples
+- `scripts/verify` — standalone Go checks and full public-source verification
+
+
+## Verification
 
 ```bash
-bash ./scripts/verify          # v1.0-compatible core verification
-bash ./scripts/verify --full   # complete eight-unit verification
+bash ./scripts/verify
 ```
 
-Both commands are standalone: they work from any clone directory and from the
-extracted source archive, without a sibling repository or network access. The
-default command remains the v1.0 core contract; expanded-unit checks require
-the explicit `--full` opt-in.
+## Quickstart
 
-## Run the CLI
+Build the CLI from this repository:
 
 ```bash
 cd cadence-core
-go run -mod=vendor -buildvcs=false ./cmd/cadence --help
+go build -mod=vendor -o ../cadence ./cmd/cadence
+../cadence version --json
 ```
 
-`cadence verify` operates on a repository containing a valid
-`cadence.yaml` and its declared local closure, tooling, runtime, registry, and
-sandbox inputs. The shipped tests construct and exercise a complete example of
-that contract. Third-party plugin execution is fail-closed by default.
+Run `bash ./scripts/verify --standalone` for the Go checks. The default full
+verification also covers protocol and sandbox tests; actual Linux runtime tests
+need the explicit prerequisites described in the reference installation guide.
+A skipped runtime test does not prove installed isolation.
 
-See [the release-unit inventory](docs/RELEASE_UNITS.md) and
-[the compatibility matrix](docs/COMPATIBILITY_MATRIX.md) before consuming an
-optional unit. Third-party plugins remain fail-closed unless a product
-explicitly opts in through its governed configuration.
+The core CLI does not execute arbitrary third-party plugins. The separate Linux
+reference controller runs only its declared bounded workloads and requires
+installation-side configuration and permissions. Contract checks and a successful
+source test do not authorize an operation or qualify a deployment. Replay
+comparison requires separate expected and actual bundles.
+
+DAS Standard remains independently readable and distributable. These tools check
+machine-verifiable conditions; developers implement changes, and the adopting
+project supplies any required approvals and deployment controls.

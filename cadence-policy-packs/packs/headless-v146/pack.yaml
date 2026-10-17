@@ -1,0 +1,19 @@
+id: headless-v146
+schemaVersion: 1.0.0
+version: 1.4.0
+channel: stable
+runtimeCompatibility:
+  cadenceCore: ">=1.4.0 <1.5.0"
+  protocol: "1.4.x"
+description: "Headless service baseline for non-UI Cadence consumers."
+rules:
+  - ruleId: HEADLESS-RUNNER-PIN
+    severity: P1
+    tier: Tier1
+    params:
+      requireDeterministicRuntime: true
+  - ruleId: EVIDENCE-MANIFEST-REF
+    severity: P0
+    tier: Tier1
+    params:
+      requireManifestRef: true

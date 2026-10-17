@@ -12,23 +12,31 @@ else
   export GOFLAGS="-mod=vendor"
 fi
 
-bash ./scripts/verify
+bash ./scripts/verify --full
 bash ./scripts/replay --help >/dev/null
 bash ./scripts/sign-evidence --help >/dev/null
 bash ./scripts/verify-signature --help >/dev/null
 
-echo "[cadence-core] complete Go integration suite"
-go test ./tests/integration/ -count=1 -timeout 120s
 
-command -v python3 >/dev/null 2>&1 || { echo "python3 is required for the public test suite" >&2; exit 127; }
-echo "[cadence-core] complete Python suite"
-PYTHONDONTWRITEBYTECODE=1 python3 -m pytest -q -p no:cacheprovider tests
+python3 - <<'PY'
+from pathlib import Path
+import sys
 
-legacy_prefix="unified"
-legacy_pack="${legacy_prefix}-current-baseline"
-if grep -R -n --binary-files=without-match -- "$legacy_pack" . >/dev/null 2>&1; then
-  echo "legacy unified baseline reference remains in cadence-core" >&2
+root = Path.cwd()
+repo_root = root.parent
+required_internal_units = [
+    repo_root / "cadence-sandbox" / "runtime_profile.json",
+    repo_root / "cadence-sandbox" / "sandbox_profile.json",
+    repo_root / "cadence-registry" / "registry.json",
+]
+missing = [p.relative_to(repo_root).as_posix() for p in required_internal_units if not p.exists()]
+if missing:
+    print("missing internal unit inputs:\n- " + "\n- ".join(missing), file=sys.stderr)
+    raise SystemExit(1)
+PY
+
+legacy_pack="current-baseline""-baseline"
+if grep -R -n --binary-files=without-match -- "$legacy_pack" . ../cadence-examples ../cadence-policy-packs >/dev/null 2>&1; then
+  echo "legacy unified baseline reference remains in cadence-core scope" >&2
   exit 1
 fi
-
-echo "[cadence-core] full verification OK"

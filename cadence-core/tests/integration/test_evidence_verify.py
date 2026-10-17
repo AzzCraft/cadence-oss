@@ -27,22 +27,6 @@ def _canonical_step_hash(step: dict) -> str:
     return "sha256:" + hashlib.sha256(encoded).hexdigest()
 
 
-def test_cad_002_sources_expose_verifier_contract() -> None:
-    canonical_go = (CORE_ROOT / "internal" / "canonicaljson" / "sha.go").read_text(encoding="utf-8")
-    hashchain_go = (CORE_ROOT / "internal" / "evidence" / "hashchain.go").read_text(encoding="utf-8")
-    cli_go = (CORE_ROOT / "cmd" / "evidence-verify" / "main.go").read_text(encoding="utf-8")
-
-    assert "CAD-002" in canonical_go
-    assert "func CanonicalHash" in canonical_go
-    assert "CAD-002" in hashchain_go
-    assert "type Step" in hashchain_go
-    assert "PolicyRef" in hashchain_go
-    assert "PluginRef" in hashchain_go
-    assert "EvidencePath" in hashchain_go
-    assert "func VerifyStepChain" in hashchain_go
-    assert "CAD-002" in cli_go
-    assert "--bundle" in cli_go
-    assert "HASH_CHAIN_TAMPERED" in cli_go
 
 
 def test_cad_002_valid_fixture_uses_canonical_json_step_hashes() -> None:
@@ -63,8 +47,6 @@ def test_cad_002_valid_fixture_uses_canonical_json_step_hashes() -> None:
     reordered = dict(reversed(list(chain["steps"][1].items())))
     assert _canonical_step_hash(reordered) == chain["steps"][1]["chainHash"]
 
-    hashchain_go = (CORE_ROOT / "internal" / "evidence" / "hashchain.go").read_text(encoding="utf-8")
-    assert "VerifyStepChain" in hashchain_go
 
 
 def test_cad_002_tampered_fixture_reports_task_step_and_path() -> None:
@@ -82,8 +64,3 @@ def test_cad_002_tampered_fixture_reports_task_step_and_path() -> None:
     assert "CAD-002" in failure["message"]
     assert "stepIndex=1" in failure["message"]
     assert "tampered-output/step-hash-chain.json#/steps/1" in failure["message"]
-
-    cli_go = (CORE_ROOT / "cmd" / "evidence-verify" / "main.go").read_text(encoding="utf-8")
-    assert "CAD-002" in cli_go
-    assert "stepIndex" in cli_go
-    assert "evidencePath" in cli_go

@@ -6,7 +6,7 @@ runtimeRef: cadence_lock.json
 registryRef: registry.json
 sandboxRef: sandbox_profile.json
 policies:
-  - core-v140-baseline
+  - core-v146-baseline
 ui:
   enabled: false
   profile: headless

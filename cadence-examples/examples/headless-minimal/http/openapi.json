@@ -1,0 +1,106 @@
+{
+  "openapi": "3.1.1",
+  "info": {
+    "title": "DAS TEST version-reference HTTP surface",
+    "version": "1"
+  },
+  "security": [
+    {
+      "controlBearer": []
+    }
+  ],
+  "components": {
+    "securitySchemes": {
+      "controlBearer": {
+        "type": "http",
+        "scheme": "bearer"
+      }
+    }
+  },
+  "paths": {
+    "/target": {
+      "get": {
+        "operationId": "das.reference.version.read",
+        "parameters": [
+          {
+            "name": "businessActionId",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Current target or original integration receipt; null remains unknown"
+          },
+          "401": {
+            "description": "Current authentication required"
+          },
+          "412": {
+            "description": "Current resource/read precondition rejected"
+          }
+        }
+      }
+    },
+    "/integrations": {
+      "put": {
+        "operationId": "das.reference.version.integrate",
+        "parameters": [
+          {
+            "name": "If-Match",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "https://cadence.das.dev/examples/version-reference/resource_action_intent.schema.json"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Actual native committed integration receipt; independently verify it"
+          },
+          "400": {
+            "description": "Unsupported or invalid input"
+          },
+          "401": {
+            "description": "Current authentication required"
+          },
+          "412": {
+            "description": "Current authorization, evidence, instance, generation or exact condition rejected"
+          },
+          "425": {
+            "description": "Early data unsupported before effect"
+          },
+          "428": {
+            "description": "Exact strong version condition required"
+          },
+          "503": {
+            "description": "Unknown internal outcome; reconcile the original key"
+          }
+        }
+      }
+    }
+  }
+}

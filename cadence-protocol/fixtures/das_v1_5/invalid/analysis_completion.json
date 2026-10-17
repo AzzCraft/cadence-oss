@@ -1,0 +1,34 @@
+{
+  "contractIdentity": "das-analysis-completion/v1",
+  "taskKey": {
+    "authorityDomain": "domain",
+    "projectId": "project",
+    "changeId": "change",
+    "taskId": "task"
+  },
+  "taskRevision": 1,
+  "taskCycle": 1,
+  "obligationDigest": "sha256:1111111111111111111111111111111111111111111111111111111111111111",
+  "parentChange": {
+    "status": "active",
+    "generation": 1,
+    "taskSetDigest": null
+  },
+  "policyDigest": "sha256:1111111111111111111111111111111111111111111111111111111111111111",
+  "sourceCandidateDigest": "sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+  "resourceId": "fixture-target",
+  "resourceInstance": "fixture-instance",
+  "targetGeneration": 2,
+  "businessActionId": "fixture-business",
+  "verificationPlanDigest": "sha256:3333333333333333333333333333333333333333333333333333333333333333",
+  "verificationEvidenceDigest": "sha256:4444444444444444444444444444444444444444444444444444444444444444",
+  "decisionDigest": "sha256:6666666666666666666666666666666666666666666666666666666666666666",
+  "completedAt": 102,
+  "authorityEpoch": 1,
+  "authority": false,
+  "qualification": false,
+  "completionMode": "analysis",
+  "taskBindingDigest": "sha256:1111111111111111111111111111111111111111111111111111111111111111",
+  "requestDigest": "sha256:1111111111111111111111111111111111111111111111111111111111111111",
+  "integrationReceiptDigest": "sha256:1111111111111111111111111111111111111111111111111111111111111111"
+}

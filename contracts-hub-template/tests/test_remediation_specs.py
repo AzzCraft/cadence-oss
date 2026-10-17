@@ -173,7 +173,9 @@ class ContractsHubRemediationSpecTests(unittest.TestCase):
     def test_cht_011_fixture_tree_has_valid_invalid(self) -> None:
         fixtures = ROOT / "contracts" / "fixtures"
         self.assertTrue(fixtures.is_dir(), "contracts/fixtures/ must exist")
-        for contract_dir in fixtures.iterdir():
+        families = [p for p in fixtures.iterdir() if p.is_dir()]
+        self.assertTrue(families, "contracts/fixtures/ is empty")
+        for contract_dir in families:
             if contract_dir.is_dir():
                 with self.subTest(contract=contract_dir.name):
                     self.assertTrue((contract_dir / "valid").is_dir(),

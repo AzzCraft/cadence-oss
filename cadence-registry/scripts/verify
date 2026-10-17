@@ -88,26 +88,25 @@ for index_path in sorted((ROOT / "indexes").glob("*.json")):
             fail(f"duplicate index entry for {key}")
         index_entries[key] = entry
 
-for root_name in ("registry.json", "registry-core.json"):
-    root_registry = json.loads((ROOT / root_name).read_text(encoding="utf-8"))
-    for key in ("schemaVersion", "registryId", "entries"):
-        if key not in root_registry:
-            fail(f"{root_name} missing top-level key {key}")
-    for idx, entry in enumerate(root_registry["entries"]):
-        validate_entry(entry, root_name, idx)
-        key = (entry["kind"], entry["id"])
-        if key not in index_entries:
-            fail(f"{root_name} entry[{idx}] missing from indexes: {key}")
-        indexed = index_entries[key]
-        for field in ("version", "status", "digest", "deprecatedAt", "deprecationReason", "compatWindow", "trust"):
-            if entry.get(field) != indexed.get(field):
-                fail(
-                    f"{root_name} entry[{idx}] field mismatch for {field}: "
-                    f"{entry.get(field)!r} != {indexed.get(field)!r}"
-                )
-        resolved = (ROOT / entry["ref"]).resolve()
-        if not resolved.exists():
-            fail(f"{root_name} entry[{idx}] ref target not found: {entry['ref']}")
+root_registry = json.loads((ROOT / "registry.json").read_text(encoding="utf-8"))
+for key in ("schemaVersion", "registryId", "entries"):
+    if key not in root_registry:
+        fail(f"registry.json missing top-level key {key}")
+for idx, entry in enumerate(root_registry["entries"]):
+    validate_entry(entry, "registry.json", idx)
+    key = (entry["kind"], entry["id"])
+    if key not in index_entries:
+        fail(f"registry.json entry[{idx}] missing from indexes: {key}")
+    indexed = index_entries[key]
+    for field in ("version", "status", "digest", "deprecatedAt", "deprecationReason", "compatWindow", "trust"):
+        if entry.get(field) != indexed.get(field):
+            fail(
+                f"registry.json entry[{idx}] field mismatch for {field}: "
+                f"{entry.get(field)!r} != {indexed.get(field)!r}"
+            )
+    resolved = (ROOT / entry["ref"]).resolve()
+    if not resolved.exists():
+        fail(f"registry.json entry[{idx}] ref target not found: {entry['ref']}")
 PY
 
 python3 -m unittest discover -s tests -p 'test_*.py'

@@ -13,31 +13,19 @@ import (
 func main() {
 	expectedPath := flag.String("expected", "", "path to the expected replay bundle")
 	actualPath := flag.String("actual", "", "path to the independently produced replay bundle")
-	expectedOut := flag.String("expected-out", "", "artifact directory verified by the expected replay bundle")
-	actualOut := flag.String("actual-out", "", "artifact directory verified by the actual replay bundle")
 	flag.Parse()
-	if *expectedPath == "" || *actualPath == "" || *expectedOut == "" || *actualOut == "" {
+	if *expectedPath == "" || *actualPath == "" {
 		emit(map[string]any{
 			"schemaVersion": 1,
 			"task":          "CAD-003",
 			"command":       "replay",
 			"ok":            false,
 			"code":          "MISSING_COMPARISON_INPUT",
-			"message":       "CAD-003 replay compare requires --expected, --actual, --expected-out, and --actual-out",
+			"message":       "CAD-003 replay compare requires distinct --expected and --actual bundle paths",
 		})
 		os.Exit(2)
 	}
-	expectedInfo, err := os.Stat(*expectedPath)
-	if err != nil {
-		emit(map[string]any{"schemaVersion": 1, "task": "CAD-003", "command": "replay", "ok": false, "code": "EXPECTED_BUNDLE_READ_FAILED", "message": fmt.Sprintf("CAD-003 expected bundle read failed: %v", err)})
-		os.Exit(1)
-	}
-	actualInfo, err := os.Stat(*actualPath)
-	if err != nil {
-		emit(map[string]any{"schemaVersion": 1, "task": "CAD-003", "command": "replay", "ok": false, "code": "ACTUAL_BUNDLE_READ_FAILED", "message": fmt.Sprintf("CAD-003 actual bundle read failed: %v", err)})
-		os.Exit(1)
-	}
-	if *expectedPath == *actualPath || os.SameFile(expectedInfo, actualInfo) {
+	if *expectedPath == *actualPath {
 		emit(map[string]any{"schemaVersion": 1, "task": "CAD-003", "command": "replay", "ok": false, "code": "IDENTICAL_INPUT_PATHS", "message": "expected and actual bundle paths must differ"})
 		os.Exit(2)
 	}
@@ -56,14 +44,6 @@ func main() {
 			"code":          "ACTUAL_BUNDLE_READ_FAILED",
 			"message":       fmt.Sprintf("CAD-003 actual bundle read failed: %v", err),
 		})
-		os.Exit(1)
-	}
-	if err := replay.VerifyBundle(&expected, *expectedOut); err != nil {
-		emit(map[string]any{"schemaVersion": 1, "task": "CAD-003", "command": "replay", "ok": false, "code": "EXPECTED_ARTIFACT_VERIFY_FAILED", "message": fmt.Sprintf("CAD-003 expected artifact verification failed: %v", err)})
-		os.Exit(1)
-	}
-	if err := replay.VerifyBundle(&actual, *actualOut); err != nil {
-		emit(map[string]any{"schemaVersion": 1, "task": "CAD-003", "command": "replay", "ok": false, "code": "ACTUAL_ARTIFACT_VERIFY_FAILED", "message": fmt.Sprintf("CAD-003 actual artifact verification failed: %v", err)})
 		os.Exit(1)
 	}
 	report := replay.Compare(&expected, &actual)

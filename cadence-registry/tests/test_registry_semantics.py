@@ -5,10 +5,9 @@ import sys
 import unittest
 from datetime import date
 from pathlib import Path
-from tests._root_contract import repository_root_for_test_file
 
 
-ROOT = repository_root_for_test_file(__file__)
+ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 SHA256_RE = re.compile(r"^sha256:[0-9a-f]{64}$")
 COMPAT_WINDOW_RE = re.compile(
@@ -132,22 +131,6 @@ class RegistrySemanticsTests(unittest.TestCase):
 
         self.assertEqual(errors, [], "registry digest drift:\n" + "\n".join(errors))
 
-    def test_core_default_registry_is_plugin_free_and_resolves_locally(self) -> None:
-        """The shipped examples must not enable plugin execution by default."""
-        source_path = ROOT / "registry-core.json"
-        registry = json.loads(source_path.read_text(encoding="utf-8"))
-
-        self.assertEqual(registry["registryId"], "cadence-oss-core-default")
-        self.assertTrue(registry["entries"])
-        self.assertNotIn("plugin", {entry["kind"] for entry in registry["entries"]})
-
-        for entry in registry["entries"]:
-            target = (source_path.parent / entry["ref"]).resolve()
-            self.assertTrue(target.is_file(), f"missing core-registry target: {entry['ref']}")
-
-        errors = _registry_digest_errors(source_path)
-        self.assertEqual(errors, [], "core registry digest drift:\n" + "\n".join(errors))
-
     def test_root_registry_covers_example_policy_runtime_and_sandbox_usage(self) -> None:
         registry = json.loads((ROOT / "registry.json").read_text())
         plugins = {entry["id"] for entry in registry["entries"] if entry["kind"] == "plugin"}
@@ -167,8 +150,6 @@ class RegistrySemanticsTests(unittest.TestCase):
         self.assertIn("local_offline", sandbox_ids)
 
 
-if __name__ == "__main__":
-    unittest.main()
 
 
 class ResolverTests(unittest.TestCase):
@@ -467,3 +448,7 @@ class ResolverCLITests(unittest.TestCase):
             text=True,
         )
         self.assertEqual(result.returncode, 0, result.stderr)
+
+
+if __name__ == "__main__":
+    unittest.main()

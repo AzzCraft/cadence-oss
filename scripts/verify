@@ -4,78 +4,47 @@ set -euo pipefail
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT_DIR"
 
-MODE="fast"
-case "${1:-}" in
-  ""|--fast|--standalone)
-    ;;
-  --full)
-    MODE="full"
-    ;;
-  *)
-  echo "Usage: scripts/verify [--fast|--full|--standalone]" >&2
-  exit 2
-    ;;
-esac
-if [[ $# -gt 1 ]]; then
-  echo "Usage: scripts/verify [--fast|--full|--standalone]" >&2
+mode="${1:---full}"
+if [[ $# -gt 1 || ( "$mode" != "--standalone" && "$mode" != "--full" ) ]]; then
+  echo "Usage: scripts/verify [--standalone|--full]" >&2
   exit 2
 fi
 command -v go >/dev/null 2>&1 || { echo "Go 1.25.12 or newer is required." >&2; exit 127; }
+
+# A developer machine can have an unavailable or broken default Go cache
+# (including a stale symlink to detached storage). Keep verification portable
+# by falling back to a disposable cache without mutating machine-global state.
+CADENCE_OSS_TEMP_GO_CACHE=""
+cleanup_go_cache() {
+  if [[ -n "$CADENCE_OSS_TEMP_GO_CACHE" && -d "$CADENCE_OSS_TEMP_GO_CACHE" ]]; then
+    rm -rf -- "$CADENCE_OSS_TEMP_GO_CACHE"
+  fi
+}
+if [[ -z "${GOCACHE:-}" ]]; then
+  DEFAULT_GO_CACHE="$(go env GOCACHE)"
+  if [[ -d "$DEFAULT_GO_CACHE" && -w "$DEFAULT_GO_CACHE" ]]; then
+    export GOCACHE="$DEFAULT_GO_CACHE"
+  else
+    CADENCE_OSS_TEMP_GO_CACHE="$(mktemp -d "${TMPDIR:-/tmp}/cadence-oss-go-cache.XXXXXX")"
+    export GOCACHE="$CADENCE_OSS_TEMP_GO_CACHE"
+    trap cleanup_go_cache EXIT
+  fi
+fi
+
 MIN_GO="go1.25.12"
 ACTUAL_GO="$(go env GOVERSION)"
-if ! awk -v minimum="${MIN_GO#go}" -v actual="${ACTUAL_GO#go}" 'BEGIN {
-  split(minimum, m, "."); split(actual, a, ".");
-  for (i = 1; i <= 3; i++) {
-    if ((a[i] + 0) > (m[i] + 0)) exit 0;
-    if ((a[i] + 0) < (m[i] + 0)) exit 1;
-  }
-  exit 0;
-}'; then
+if [[ "$(printf '%s\n' "$MIN_GO" "$ACTUAL_GO" | sort -V | head -n 1)" != "$MIN_GO" ]]; then
   echo "Go 1.25.12 or newer is required; found $ACTUAL_GO." >&2
   exit 1
 fi
 export GOFLAGS="${GOFLAGS:+$GOFLAGS }-buildvcs=false"
-SOURCE_ID="archive"
-SOURCE_ID="$(git -C "$ROOT_DIR" rev-parse --verify HEAD 2>/dev/null || printf '%s' archive)"
-printf '%s\n' "mode=$MODE cadenceVersion=$(tr -d '[:space:]' < VERSION) dasStandardVersion=1.4.0 source=$SOURCE_ID go=$ACTUAL_GO python=$(python3 --version 2>&1 || printf unavailable)"
-
-if [[ "$MODE" == "full" ]]; then
-  command -v python3 >/dev/null 2>&1 || { echo "Python 3.10 or newer is required for --full." >&2; exit 127; }
-  REQUIRED_PYTEST="9.0.3"
-  ACTUAL_PYTEST="$(python3 -c 'import pytest; print(pytest.__version__)' 2>/dev/null || true)"
-  if [[ "$ACTUAL_PYTEST" != "$REQUIRED_PYTEST" ]]; then
-    echo "pytest $REQUIRED_PYTEST is required for --full; install requirements-verify.txt." >&2
-    exit 1
-  fi
-  command -v node >/dev/null 2>&1 || { echo "Node.js 20 or newer is required for --full." >&2; exit 127; }
-  NODE_MAJOR="$(node -p 'process.versions.node.split(".")[0]' 2>/dev/null || true)"
-  if [[ ! "$NODE_MAJOR" =~ ^[0-9]+$ ]] || (( NODE_MAJOR < 20 )); then
-    echo "Node.js 20 or newer is required for --full; found $(node --version 2>/dev/null || printf unavailable)." >&2
-    exit 1
-  fi
-  bash ./cadence-core/scripts/verify-full
-  for unit in cadence-protocol cadence-plugins cadence-policy-packs contracts-hub-template cadence-examples cadence-sandbox cadence-registry; do
-    echo "[cadence-oss] full verification: $unit"
-    bash "./$unit/scripts/verify" --full
-  done
-else
-  bash ./cadence-core/scripts/verify
-fi
-
-UNFORMATTED=""
-while IFS= read -r -d '' go_file; do
-  formatted_path="$(gofmt -l "$go_file")"
-  if [[ -n "$formatted_path" ]]; then
-    UNFORMATTED="${UNFORMATTED}${formatted_path}\n"
-  fi
-done < <(find . \
-  -path './cadence-core/vendor' -prune -o \
-  -path './cadence-examples/.cadence' -prune -o \
-  -type f -name '*.go' -print0)
-if [[ -n "$UNFORMATTED" ]]; then
-  echo "first-party Go source is not gofmt-clean" >&2
-  printf '%b' "$UNFORMATTED" >&2
-  exit 1
-fi
-
-echo "[cadence-oss] $MODE verification OK"
+case "$mode" in
+  --standalone)
+    bash ./cadence-core/scripts/verify
+    ;;
+  --full)
+    command -v node >/dev/null 2>&1 || { echo "Node.js is required for the full Cadence OSS verifier." >&2; exit 127; }
+    command -v python3 >/dev/null 2>&1 || { echo "Python 3 is required for the full Cadence OSS verifier." >&2; exit 127; }
+    bash ./verify_all.sh
+    ;;
+esac

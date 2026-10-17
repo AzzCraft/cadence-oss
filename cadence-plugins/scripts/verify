@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 set -euo pipefail
+export PYTEST_ADDOPTS=
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT_DIR"
@@ -22,37 +23,44 @@ with tempfile.TemporaryDirectory() as d:
     ts = root / 'plugins' / 'ts' / 'index.mjs'
     out = subprocess.check_output(['node', str(ts)], input=(json.dumps(req)+'\n').encode('utf-8'))
     resp = json.loads(out.decode('utf-8'))
-    assert resp.get('violations'), 'ts plugin produced no violations'
-    assert any(v.get('ruleId')=='SDMM_DEEP_IMPORT' for v in resp['violations']), 'ts plugin missing deep import violation'
+    if not (resp.get('violations')):
+        raise SystemExit('ts plugin produced no violations')
+    if not (any((v.get('ruleId') == 'SDMM_DEEP_IMPORT' for v in resp['violations']))):
+        raise SystemExit('ts plugin missing deep import violation')
 
     (repo / 'src' / 'b.py').write_text("from foo.internal import bar\n", encoding='utf-8')
     req2 = {"protocolVersion":"1.0.0","repoRoot":str(repo),"files":["src/b.py"],"mode":"verify"}
     py = root / 'plugins' / 'python' / 'plugin.py'
     out2 = subprocess.check_output(['python3', str(py)], input=(json.dumps(req2)+'\n').encode('utf-8'))
     resp2 = json.loads(out2.decode('utf-8'))
-    assert resp2.get('violations'), 'python plugin produced no violations'
-    assert any(v.get('ruleId')=='SDMM_DEEP_IMPORT' for v in resp2['violations']), 'python plugin missing deep import violation'
+    if not (resp2.get('violations')):
+        raise SystemExit('python plugin produced no violations')
+    if not (any((v.get('ruleId') == 'SDMM_DEEP_IMPORT' for v in resp2['violations']))):
+        raise SystemExit('python plugin missing deep import violation')
 
     eslint = root / 'bridge' / 'eslint' / 'index.mjs'
     (repo / 'src' / 'c.ts').write_text("console.log('x')\n", encoding='utf-8')
     req3 = {"protocolVersion":"1.0.0","repoRoot":str(repo),"files":["src/c.ts"],"mode":"verify"}
     out3 = subprocess.check_output(['node', str(eslint)], input=(json.dumps(req3)+'\n').encode('utf-8'))
     resp3 = json.loads(out3.decode('utf-8'))
-    assert any(v.get('ruleId')=='ESLINT_NO_CONSOLE' for v in resp3['violations']), 'eslint bridge missing no-console violation'
+    if not (any((v.get('ruleId') == 'ESLINT_NO_CONSOLE' for v in resp3['violations']))):
+        raise SystemExit('eslint bridge missing no-console violation')
 
     prettier = root / 'bridge' / 'prettier' / 'index.mjs'
     (repo / 'src' / 'd.ts').write_text("const x = 1;\t", encoding='utf-8')
     req4 = {"protocolVersion":"1.0.0","repoRoot":str(repo),"files":["src/d.ts"],"mode":"verify"}
     out4 = subprocess.check_output(['node', str(prettier)], input=(json.dumps(req4)+'\n').encode('utf-8'))
     resp4 = json.loads(out4.decode('utf-8'))
-    assert any(v.get('ruleId')=='PRETTIER_NO_TABS' for v in resp4['violations']), 'prettier bridge missing tab violation'
+    if not (any((v.get('ruleId') == 'PRETTIER_NO_TABS' for v in resp4['violations']))):
+        raise SystemExit('prettier bridge missing tab violation')
 
     ruff = root / 'bridge' / 'ruff' / 'plugin.py'
     (repo / 'src' / 'e.py').write_text("print('x')\n", encoding='utf-8')
     req5 = {"protocolVersion":"1.0.0","repoRoot":str(repo),"files":["src/e.py"],"mode":"verify"}
     out5 = subprocess.check_output(['python3', str(ruff)], input=(json.dumps(req5)+'\n').encode('utf-8'))
     resp5 = json.loads(out5.decode('utf-8'))
-    assert any(v.get('ruleId')=='RUFF_T201' for v in resp5['violations']), 'ruff bridge missing print violation'
+    if not (any((v.get('ruleId') == 'RUFF_T201' for v in resp5['violations']))):
+        raise SystemExit('ruff bridge missing print violation')
 
 print('OK: plugins produce deterministic violations')
 PY
@@ -67,8 +75,17 @@ if not manifests_dir.is_dir():
     raise SystemExit('manifests/ directory not found')
 
 required_keys = ['schemaVersion', 'pluginId', 'version', 'kind', 'protocol', 'entrypoint', 'runtime', 'compatWindow', 'sandboxProfile', 'permissions']
-for m in sorted(manifests_dir.glob('*.json')):
+manifests = sorted(manifests_dir.glob('*.json'))
+if not manifests:
+    raise SystemExit('no plugin manifests')
+for m in manifests:
     data = json.loads(m.read_text())
+    if not isinstance(data, dict):
+        raise SystemExit(f'{m.name}: manifest must be a mapping')
+    if not isinstance(data.get('pluginId'), str) or not data['pluginId']:
+        raise SystemExit(f'{m.name}: pluginId must be a non-empty string')
+    if not isinstance(data.get('capabilities'), list) or not data['capabilities']:
+        raise SystemExit(f'{m.name}: capabilities must be a non-empty list')
     missing = [k for k in required_keys if k not in data]
     if missing:
         raise SystemExit(f'{m.name}: missing keys: {missing}')
@@ -86,5 +103,7 @@ for m in sorted(manifests_dir.glob('*.json')):
 
 print('OK: all manifests valid')
 PYMANIFEST
+
+python3 -B -m pytest -q -p no:cacheprovider tests
 
 echo "[cadence-plugins] OK"

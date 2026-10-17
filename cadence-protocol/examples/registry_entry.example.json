@@ -4,8 +4,8 @@
   "entries": [
     {
       "kind": "policyPack",
-      "id": "standard-ui-v140",
-      "ref": "../cadence-policy-packs/packs/standard-ui-v140/pack.yaml"
+      "id": "standard-ui-v146",
+      "ref": "../cadence-policy-packs/packs/standard-ui-v146/pack.yaml"
     }
   ]
 }

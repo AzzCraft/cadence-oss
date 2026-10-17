@@ -1,0 +1,2 @@
+# New JCS contracts; historical stdlib-only validators remain independently usable.
+rfc8785==0.1.4

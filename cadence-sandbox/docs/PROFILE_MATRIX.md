@@ -9,12 +9,14 @@ is allowed to consume.
 | --- | --- | --- | --- | --- | --- | --- |
 | `rootless-dev` | `host-local` | `workspace-only` | off | `injected` | local development and active-workspace rehearsal | no |
 | `ci-container` | `container-runtime` | `container-isolated` | off | `injected` | CI and merge-to-main verification | yes |
-| `release-microvm` | `microvm-runtime` | `microvm-isolated` | off | `injected` | pre-release and forensic verification | yes |
+| `release-microvm` | `microvm-runtime` | `microvm-isolated` | off | `injected` | disabled compatibility specification | no |
 
 Runtime adapter discovery for the canonical non-host profiles:
 
 - `ci-container` requires `CADENCE_SANDBOX_CONTAINER_ADAPTER`
-- `release-microvm` requires `CADENCE_SANDBOX_MICROVM_ADAPTER`
+- `release-microvm` requires `CADENCE_SANDBOX_MICROVM_ADAPTER`, but is not
+  eligible for a release until the adapter executes the requested command in
+  the guest and returns a trusted guest receipt.
 
 ## Compatibility aliases
 
@@ -33,12 +35,13 @@ IDs above.
 
 - `rootless-dev` may exist for convenience, but it is not the formal release
   verification profile.
-- `ci-container` and `release-microvm` must keep network disabled, read-only
+- `ci-container` and the disabled `release-microvm` specification must keep network disabled, read-only
   inputs, explicit writable output directories, and bounded resources.
 - Non-host backends fail closed if those constraints are missing from the
   profile contract.
-- Non-host backends also fail closed if runtime attestation cannot prove the
-  required seccomp, namespace, cgroup, and namespace-proof-hash checks.
+- Non-host backends also fail closed if guest runtime attestation cannot prove
+  the required seccomp, namespace, cgroup, and receipt/proof checks. A
+  post-exit host probe is not proof of the guest execution.
 - Non-host backends must execute through their configured runtime adapter; the
   host launcher path is only valid for `rootless-dev` / `host-local`.
 - `cadence-core` consumer tests and `cadence-sandbox/scripts/verify` must stay

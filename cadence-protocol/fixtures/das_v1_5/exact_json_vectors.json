@@ -1,0 +1,162 @@
+{
+  "schemaVersion": "1.0.0",
+  "identity": "das-json-jcs/v1",
+  "cases": [
+    {
+      "id": "object-order",
+      "input": "{\"b\":2,\"a\":1}",
+      "canonical": "{\"a\":1,\"b\":2}",
+      "reject": false
+    },
+    {
+      "id": "empty-key",
+      "input": "{\"\": \"value\"}",
+      "canonical": "{\"\":\"value\"}",
+      "reject": false
+    },
+    {
+      "id": "case-distinct",
+      "input": "{\"a\":1,\"A\":2}",
+      "canonical": "{\"A\":2,\"a\":1}",
+      "reject": false
+    },
+    {
+      "id": "unicode-order",
+      "input": "{\"דּ\":1,\"😀\":2,\"€\":3,\"ö\":4,\"\\r\":5,\"1\":6,\"\\u0080\":7}",
+      "canonical": "{\"\\r\":5,\"1\":6,\"\":7,\"ö\":4,\"€\":3,\"😀\":2,\"דּ\":1}",
+      "reject": false
+    },
+    {
+      "id": "unicode-not-normalized",
+      "input": "{\"é\":\"é\"}",
+      "canonical": "{\"é\":\"é\"}",
+      "reject": false
+    },
+    {
+      "id": "legal-replacement-scalar",
+      "input": "\"�\"",
+      "canonical": "\"�\"",
+      "reject": false
+    },
+    {
+      "id": "surrogate-pair",
+      "input": "\"\\ud83d\\ude00\"",
+      "canonical": "\"😀\"",
+      "reject": false
+    },
+    {
+      "id": "html-and-line-separator",
+      "input": "\"<>&  \"",
+      "canonical": "\"<>&  \"",
+      "reject": false
+    },
+    {
+      "id": "numbers",
+      "input": "[333333333.33333329,1E30,4.50,2e-3,1e-27]",
+      "canonical": "[333333333.3333333,1e+30,4.5,0.002,1e-27]",
+      "reject": false
+    },
+    {
+      "id": "negative-zero",
+      "input": "[-0,-0.0]",
+      "canonical": "[0,0]",
+      "reject": false
+    },
+    {
+      "id": "control-escapes",
+      "input": "\"\\u000f\\b\\t\\n\\f\\r\\\"\\\\/\"",
+      "canonical": "\"\\u000f\\b\\t\\n\\f\\r\\\"\\\\/\"",
+      "reject": false
+    },
+    {
+      "id": "array-order",
+      "input": "[{\"b\":1,\"a\":2},null,true,false]",
+      "canonical": "[{\"a\":2,\"b\":1},null,true,false]",
+      "reject": false
+    },
+    {
+      "id": "duplicate",
+      "input": "{\"a\":1,\"a\":2}",
+      "canonical": "",
+      "reject": true
+    },
+    {
+      "id": "escaped-duplicate",
+      "input": "{\"a\":1,\"\\u0061\":2}",
+      "canonical": "",
+      "reject": true
+    },
+    {
+      "id": "nested-duplicate",
+      "input": "{\"o\":{\"a\":1,\"a\":2}}",
+      "canonical": "",
+      "reject": true
+    },
+    {
+      "id": "lone-high",
+      "input": "\"\\ud800\"",
+      "canonical": "",
+      "reject": true
+    },
+    {
+      "id": "lone-low",
+      "input": "\"\\udfff\"",
+      "canonical": "",
+      "reject": true
+    },
+    {
+      "id": "wrong-pair",
+      "input": "\"\\ud800\\u0041\"",
+      "canonical": "",
+      "reject": true
+    },
+    {
+      "id": "truncated-pair",
+      "input": "\"\\ud800\\u\"",
+      "canonical": "",
+      "reject": true
+    },
+    {
+      "id": "extra-value",
+      "input": "{} {}",
+      "canonical": "",
+      "reject": true
+    },
+    {
+      "id": "nan",
+      "input": "NaN",
+      "canonical": "",
+      "reject": true
+    },
+    {
+      "id": "infinite",
+      "input": "1e10000",
+      "canonical": "",
+      "reject": true
+    },
+    {
+      "id": "unsafe-int",
+      "input": "9007199254740993",
+      "canonical": "",
+      "reject": true
+    },
+    {
+      "id": "leading-zero",
+      "input": "01",
+      "canonical": "",
+      "reject": true
+    },
+    {
+      "id": "invalid-escape",
+      "input": "\"\\q\"",
+      "canonical": "",
+      "reject": true
+    },
+    {
+      "id": "trailing-comma",
+      "input": "[1,]",
+      "canonical": "",
+      "reject": true
+    }
+  ]
+}

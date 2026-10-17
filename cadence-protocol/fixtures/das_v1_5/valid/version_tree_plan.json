@@ -1,0 +1,33 @@
+{
+  "contractIdentity": "das-version-tree-plan/v1",
+  "taskKey": {
+    "authorityDomain": "domain",
+    "projectId": "project",
+    "changeId": "change",
+    "taskId": "task"
+  },
+  "taskRevision": 1,
+  "taskCycle": 1,
+  "resourceId": "fixture-target",
+  "resourceInstance": "fixture-instance",
+  "expectedGeneration": 1,
+  "beforeCandidateDigest": "sha256:1111111111111111111111111111111111111111111111111111111111111111",
+  "afterCandidateDigest": "sha256:2222222222222222222222222222222222222222222222222222222222222222",
+  "policyDigest": "sha256:1111111111111111111111111111111111111111111111111111111111111111",
+  "toolDigest": "sha256:1111111111111111111111111111111111111111111111111111111111111111",
+  "rollbackOf": null,
+  "changes": [
+    {
+      "path": "tree/README.md",
+      "owner": "fixture-owner",
+      "originDigest": "sha256:1111111111111111111111111111111111111111111111111111111111111111",
+      "preimage": null,
+      "postimage": {
+        "mode": "100644",
+        "size": 8,
+        "contentSha256": "sha256:e80b71cd14d3cbd65f4173abcbfcf01a545dbca32a72d575108b553a648cc96f"
+      },
+      "deletionReason": null
+    }
+  ]
+}

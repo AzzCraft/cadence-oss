@@ -2,6 +2,7 @@
   "schemaVersion": "1.0.0",
   "sandboxId": "local_offline",
   "backend": "host-local",
+  "allowedEnv": ["PYTHONDONTWRITEBYTECODE"],
   "filesystem": "workspace-only",
   "networkAccess": false,
   "timeSource": "injected"

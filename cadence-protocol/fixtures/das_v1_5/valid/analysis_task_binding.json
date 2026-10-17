@@ -1,0 +1,15 @@
+{
+  "contractIdentity": "das-analysis-task-binding/v1",
+  "taskKey": {
+    "authorityDomain": "domain",
+    "projectId": "project",
+    "changeId": "change",
+    "taskId": "task"
+  },
+  "taskRevision": 1,
+  "taskCycle": 1,
+  "obligationDigest": "sha256:1111111111111111111111111111111111111111111111111111111111111111",
+  "policyDigest": "sha256:1111111111111111111111111111111111111111111111111111111111111111",
+  "completionMode": "analysis",
+  "verificationScopeDigest": "sha256:1111111111111111111111111111111111111111111111111111111111111111"
+}

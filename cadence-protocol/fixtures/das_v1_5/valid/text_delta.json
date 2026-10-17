@@ -1,0 +1,18 @@
+{
+  "taskKey": {
+    "authorityDomain": "authority",
+    "projectId": "project",
+    "changeId": "change",
+    "taskId": "T-1"
+  },
+  "taskRevision": 1,
+  "taskCycle": 1,
+  "streamId": "stream:1",
+  "candidateDigest": "sha256:0000000000000000000000000000000000000000000000000000000000000000",
+  "contractIdentity": "das-text-delta/v1",
+  "laneId": "a",
+  "seq": 0,
+  "path": "/output/a~1b",
+  "op": "append",
+  "text": " +"
+}

@@ -8,7 +8,6 @@
 - `indexes/policy-packs.json`
 - `indexes/runtime-profiles.json`
 - `registry.json` (root consumer index used by `cadence-core`)
-- `registry-core.json` (core-only root index used by shipped examples)
 
 The schema lives at `schemas/registry_index.schema.json`.
 
@@ -43,11 +42,11 @@ Compat window format is constrained to one of:
 
 `scripts/verify` enforces:
 
-- JSON validity for all indexes and both consumer registries.
+- JSON validity for all indexes and root registry.
 - Full required-key and shape checks for each entry.
 - Trust/digest/deprecation/compat metadata semantics.
 - Ref target existence checks.
-- Root-registry parity with indexed entries for consumed metadata fields.
+- Root `registry.json` parity with indexed entries for consumed metadata fields.
 - Unit tests in `tests/test_registry_semantics.py`.
 
 `cadence-core` consumers must also enforce the same compat-window and

@@ -1,37 +1,22 @@
-# Verify Requirements — Cadence OSS v1.1.0
+# Verify Requirements — cadence-oss
 
 ```bash
-bash ./scripts/verify          # fast, default
-bash ./scripts/verify --full   # complete eight-unit public bundle
+./scripts/verify
 ```
-
-Both commands work from an arbitrary clone name and from the extracted source
-archive. The verifier prints the selected mode, source identity when available,
-Cadence version, DAS Standard manifest version, and tool versions.
 
 ## Prerequisites
 
-- Go 1.25.12 or newer, with the checked-in vendored modules available.
-- Python 3.10 or newer; `pytest` is required for the full gate.
-- Node.js 20 or newer for the TypeScript plugin fixture checks in the full
-  gate.
-- Bash 3.2 or newer.
+- `go` on PATH (1.25.12+; this is the minimum security-patched baseline)
+- `python3` on PATH (3.10+)
+- `node` on PATH (20+)
+- `bash` on PATH
 
-## What is verified
+## What verify checks
 
-- fast: the v1.0-compatible Cadence Core offline build, vet,
-  unit/integration tests, and first-party Go formatting;
-- full: fast checks, the complete Cadence Core suite, and the protocol,
-  plugins, policy packs, contract-hub template, examples, sandbox, and
-  registry unit verifiers.
-
-Once prerequisites are installed, both modes are offline and work from an
-extracted source archive. Plugin execution remains opt-in: the full gate
-validates shipped plugin contracts but does not enable third-party plugins in
-the default runtime.
-
-Install the pinned full-gate Python dependency before running the full gate:
-
-```bash
-python3 -m pip install -r requirements-verify.txt
-```
+1. cadence-protocol schema validation and compatibility.
+2. cadence-core build, vet, tests.
+3. cadence-plugins validation.
+4. cadence-policy-packs pack integrity.
+5. cadence-examples end-to-end verify.
+6. contracts-hub-template self-consistency.
+7. Root aggregation of all subunit results.

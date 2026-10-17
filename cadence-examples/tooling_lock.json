@@ -10,11 +10,10 @@
   },
   "verifyRuntime": {
     "kind": "git",
-    "uri": "https://github.com/AzzCraft/cadence-oss.git",
+    "uri": "..",
     "pinType": "commit",
-    "pinValue": "e4054537c0962441037dd5403d1a1692434fde73",
-    "floating": false,
-    "notes": "Published Cadence OSS v1.0.0 release commit."
+    "pinValue": "7d77e98331cc9c03c4e9ee9e31e69a7ab96afe9b",
+    "floating": false
   },
   "suiteVersionClosureRef": {
     "kind": "file",
@@ -25,17 +24,16 @@
   },
   "suiteLockRef": {
     "kind": "file",
-    "uri": "./suite_lock.json",
+    "uri": "../../das-suite/suite_lock.json",
     "pinType": "manifest",
     "pinValue": "suite_lock.json",
-    "floating": false,
-    "notes": "Bundled copy of the published DAS Suite v1.0.0 lock."
+    "floating": false
   },
   "verifyRegistryRef": {
     "kind": "file",
-      "uri": "../cadence-registry/registry-core.json",
+    "uri": "../cadence-registry/registry.json",
     "pinType": "manifest",
-      "pinValue": "registry-core.json",
+    "pinValue": "registry.json",
     "floating": false
   },
   "policyPackVersion": "1.4.0",

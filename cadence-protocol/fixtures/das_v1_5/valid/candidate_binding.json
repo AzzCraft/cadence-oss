@@ -1,0 +1,50 @@
+{
+  "contractIdentity": "das-candidate-binding/v1",
+  "taskKey": {
+    "authorityDomain": "domain",
+    "projectId": "project",
+    "changeId": "change",
+    "taskId": "task"
+  },
+  "taskRevision": 1,
+  "taskCycle": 1,
+  "obligationDigest": "sha256:1111111111111111111111111111111111111111111111111111111111111111",
+  "policyDigest": "sha256:1111111111111111111111111111111111111111111111111111111111111111",
+  "source": {
+    "kind": "git",
+    "objectFormat": "sha1",
+    "commitOid": "92dce17ea432431c8c9e38d33fff8b6bd66e1d3f",
+    "treeOid": "6bed97b29d7ae123b3ce184b31250e01fce99eca",
+    "commitContentSha256": "sha256:1d358f2c90d083a08366276bc257c722eb025970d3401e105d1013041d304f45",
+    "view": "complete-committed-tree"
+  },
+  "archive": {
+    "encoding": "tar-ustar",
+    "rawSha256": "sha256:0d9e308245ca90a53cab5cb592621ada9f9097218551063d411a4b12da4fae48",
+    "decodedSha256": "sha256:0d9e308245ca90a53cab5cb592621ada9f9097218551063d411a4b12da4fae48"
+  },
+  "files": [
+    {
+      "path": "README.md",
+      "mode": "100644",
+      "size": 8,
+      "blobOid": "ee8c1ee49b4799bbd170233915a897c19e3b55e1",
+      "contentSha256": "sha256:e80b71cd14d3cbd65f4173abcbfcf01a545dbca32a72d575108b553a648cc96f"
+    },
+    {
+      "path": "src/run.py",
+      "mode": "100755",
+      "size": 15,
+      "blobOid": "8359f36d5d180a3b20eda8028feea72e79073399",
+      "contentSha256": "sha256:cacc1be6ecf7cc298062508aa058c2b03a31000b1c466f492087ac350466fd18"
+    },
+    {
+      "path": "tests/test_source.txt",
+      "mode": "100644",
+      "size": 7,
+      "blobOid": "7780991965c38230a2c13eb82c91ca61f962def1",
+      "contentSha256": "sha256:c554d69a662f0c1b0667ffdcb8894a5419b45bd4bfea03456539afb29b5d234f"
+    }
+  ],
+  "externalMaterials": []
+}

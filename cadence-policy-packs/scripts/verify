@@ -4,30 +4,41 @@ set -euo pipefail
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT_DIR"
 
-echo "[cadence-policy-packs] validate pack.yaml (lightweight)"
-PACKS=(
-  "packs/core-v140-baseline/pack.yaml"
-  "packs/headless-v140/pack.yaml"
-  "packs/standard-ui-v140/pack.yaml"
-  "packs/hfvi-v140/pack.yaml"
-)
+export PYTHONDONTWRITEBYTECODE=1
+export PYTEST_ADDOPTS=
+echo "[cadence-policy-packs] validate declared packs"
+python3 - <<'PYVALIDATE'
+from pathlib import Path
+try:
+    import yaml
+except ImportError as exc:
+    raise SystemExit("install cadence-oss/requirements-verify.txt before verification (PyYAML required)") from exc
 
-for PACK in "${PACKS[@]}"; do
-  [ -f "$PACK" ] || { echo "missing $PACK"; exit 2; }
-  grep -qE '^id:' "$PACK" || { echo "$PACK missing id"; exit 2; }
-  grep -qE '^schemaVersion:' "$PACK" || { echo "$PACK missing schemaVersion"; exit 2; }
-  grep -qE '^version:' "$PACK" || { echo "$PACK missing version"; exit 2; }
-  grep -qE '^channel:' "$PACK" || { echo "$PACK missing channel"; exit 2; }
-  grep -qE '^runtimeCompatibility:' "$PACK" || { echo "$PACK missing runtimeCompatibility"; exit 2; }
-  grep -qE '^  cadenceCore:' "$PACK" || { echo "$PACK missing runtimeCompatibility.cadenceCore"; exit 2; }
-  grep -qE '^  protocol:' "$PACK" || { echo "$PACK missing runtimeCompatibility.protocol"; exit 2; }
-  grep -qE '^  dasStandard:' "$PACK" || { echo "$PACK missing runtimeCompatibility.dasStandard"; exit 2; }
-  grep -qE '^rules:' "$PACK" || { echo "$PACK missing rules"; exit 2; }
-done
+required = {'core-v146-baseline', 'headless-v146', 'standard-ui-v146', 'hfvi-v146'}
+files = sorted(Path('packs').rglob('pack.yaml'))
+if not files or not required <= {p.parent.name for p in files}:
+    raise SystemExit('required policy packs are missing')
+for path in files:
+    data = yaml.safe_load(path.read_text())
+    if not isinstance(data, dict):
+        raise SystemExit(f'{path}: pack must be a mapping')
+    for key in ('id', 'schemaVersion', 'version', 'channel'):
+        if not isinstance(data.get(key), str) or not data[key]:
+            raise SystemExit(f'{path}: {key} must be a non-empty string')
+    runtime = data.get('runtimeCompatibility')
+    if not isinstance(runtime, dict) or any(not isinstance(runtime.get(k), str) or not runtime[k] for k in ('cadenceCore', 'protocol')):
+        raise SystemExit(f'{path}: runtime compatibility is missing')
+    if not isinstance(data.get('rules'), list) or not data['rules']:
+        raise SystemExit(f'{path}: rules must be a non-empty list')
+print(f'OK: {len(files)} policy packs validated')
+PYVALIDATE
 
-if grep -R -n -E --binary-files=without-match 'v146|1\\.4\\.6' packs >/dev/null 2>&1; then
-  echo "mistaken v1.4.6 policy identifier or version remains under packs/" >&2
+legacy_pack="current-baseline""-baseline"
+if grep -R -n --binary-files=without-match -- "$legacy_pack" packs >/dev/null 2>&1; then
+  echo "legacy unified baseline reference remains under packs/" >&2
   exit 1
 fi
+
+python3 -B -m pytest -q -p no:cacheprovider tests
 
 echo "[cadence-policy-packs] OK"

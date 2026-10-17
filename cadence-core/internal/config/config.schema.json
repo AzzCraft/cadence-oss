@@ -44,6 +44,12 @@
       "items": { "type": "string" },
       "description": "List of policy pack identifiers to apply."
     },
+    "plugins": {
+      "type": "array",
+      "items": { "type": "string", "minLength": 1 },
+      "uniqueItems": true,
+      "description": "Explicit plugin identifiers to execute. Omit or use an empty list to verify without plugin execution."
+    },
     "ui": {
       "type": "object",
       "properties": {

@@ -10,7 +10,6 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
-	"regexp"
 	"runtime"
 	"sort"
 	"strings"
@@ -37,6 +36,12 @@ func main() {
 
 	cmd := os.Args[1]
 	switch cmd {
+	case "version":
+		versionCmd(os.Args[2:])
+	case "contracts":
+		contractsCmd(os.Args[2:])
+	case "resolve":
+		resolveCmd(os.Args[2:])
 	case "verify":
 		verifyCmd(os.Args[2:])
 	case "scan":
@@ -68,6 +73,14 @@ Usage:
   cadence report [--format html|md]
   cadence lock [--check]
   cadence doctor
+  cadence version [--json]
+  cadence contracts canonicalize --identity das-json-jcs/v1 < input.json
+  cadence resolve --preview < proposal.json
+  cadence contracts validate --identity <integration-contract> < object.json
+  cadence contracts check-action --probe < supplied-context.json
+  cadence contracts check-authorization --probe < supplied-context.json
+  cadence contracts http-inventory --probe < locked-originals.json
+  cadence contracts check-http-coverage --probe < supplied-coverage.json
 
 Cadence Core is an offline deterministic runtime for local and CI verification.
 The default checks are intentionally conservative and auditable.
@@ -171,7 +184,7 @@ func verifyCmd(args []string) {
 	dependencyWarnings = append(dependencyWarnings, sandboxResolution.Warnings...)
 	registryDependencies = append(registryDependencies, describeRegistryDependency(sandboxResolution))
 
-	pluginResolutions, pluginManifests, err := resolveVerifyPlugins(registryPath, registryConfig, started)
+	pluginResolutions, pluginManifests, err := resolveVerifyPlugins(registryPath, registryConfig, cfg.Plugins, started)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "verify failed: plugin registry invalid: %v\n", err)
 		os.Exit(1)
@@ -623,7 +636,7 @@ func verifyCmd(args []string) {
 		Correlation: corr,
 		Pipeline:    evidence.Pipeline{ID: "cadence.verify"},
 		Algorithm: evidence.Algorithm{
-			Version: "cadence-core@1.0.0",
+			Version: "cadence-core@" + releaseVersion(),
 			Build:   "release",
 		},
 		Contracts: map[string]string{
@@ -1582,20 +1595,22 @@ func describeDependencyDigests(dependencies []registry.Resolution) []identityDig
 	return out
 }
 
-func resolveVerifyPlugins(registryPath string, reg registry.Registry, referenceTime time.Time) ([]registry.Resolution, []plugins.Manifest, error) {
-	entries := registry.LookupByKind(reg, "plugin")
-	sort.Slice(entries, func(i, j int) bool { return entries[i].ID < entries[j].ID })
-
-	resolutions := make([]registry.Resolution, 0, len(entries))
-	manifests := make([]plugins.Manifest, 0, len(entries))
-	for _, entry := range entries {
-		resolution, err := registry.ResolveEntryAt(registryPath, reg, "plugin", entry.ID, referenceTime)
+func resolveVerifyPlugins(registryPath string, reg registry.Registry, requestedIDs []string, referenceTime time.Time) ([]registry.Resolution, []plugins.Manifest, error) {
+	// Registry membership is discovery metadata, not a blanket execution
+	// grant.  This keeps public verification usable while plugin execution is
+	// fail-closed pending an enforcing isolated plugin runner.
+	pluginIDs := append([]string{}, requestedIDs...)
+	sort.Strings(pluginIDs)
+	resolutions := make([]registry.Resolution, 0, len(pluginIDs))
+	manifests := make([]plugins.Manifest, 0, len(pluginIDs))
+	for _, pluginID := range pluginIDs {
+		resolution, err := registry.ResolveEntryAt(registryPath, reg, "plugin", pluginID, referenceTime)
 		if err != nil {
 			return nil, nil, err
 		}
 		manifest, err := plugins.Load(resolution.ResolvedRef)
 		if err != nil {
-			return nil, nil, fmt.Errorf("plugin %s manifest invalid: %w", entry.ID, err)
+			return nil, nil, fmt.Errorf("plugin %s manifest invalid: %w", pluginID, err)
 		}
 		resolutions = append(resolutions, resolution)
 		manifests = append(manifests, manifest)
@@ -1920,7 +1935,15 @@ func gitHeadOrEmpty(repoRoot string) string {
 }
 
 func computeSelfBinaryHashOrEmpty() string {
-	p := os.Args[0]
+	// argv[0] can be relative, supplied by a caller, or resolve to another file
+	// after chdir. Hash the executable the OS identifies for this process.
+	p, err := os.Executable()
+	if err != nil {
+		return ""
+	}
+	if runtime.GOOS == "linux" {
+		p = "/proc/self/exe"
+	}
 	b, err := os.ReadFile(p)
 	if err != nil {
 		return ""
@@ -2500,7 +2523,7 @@ func reportCmd(args []string) {
 	_ = json.Unmarshal(b, &obj)
 	fmt.Println("Cadence Report")
 	fmt.Println("=============")
-	fmt.Printf("Input: %s\n\n", *in)
+	fmt.Printf("Input: %q\n\n", *in)
 	pretty, _ := json.MarshalIndent(obj, "", "  ")
 	fmt.Println(string(pretty))
 }
@@ -2523,8 +2546,8 @@ func lockCmd(args []string) {
 			fmt.Fprintf(os.Stderr, "lock check failed: missing cadence_cli.version in %s\n", lockPath)
 			os.Exit(1)
 		}
-		if !regexp.MustCompile(`^\d+\.\d+\.\d+(-[A-Za-z0-9\.]+)?$`).MatchString(ver) {
-			fmt.Fprintf(os.Stderr, "lock check failed: cadence_cli.version not semver-ish: %q\n", ver)
+		if ver != releaseVersion() {
+			fmt.Fprintln(os.Stderr, "lock check failed: version differs from the current executable")
 			os.Exit(1)
 		}
 		wantSha := extractYAMLScalar(string(b), "cadence_cli.sha256")
@@ -2545,7 +2568,7 @@ func lockCmd(args []string) {
 
 	// Generate a minimal lock file. Additional plugin and runner pins can be layered on top by callers.
 	sha := computeSelfBinaryHashOrEmpty()
-	body := fmt.Sprintf("cadence_cli:\n  version: %q\n  sha256: %q\nplugins: []\nrunners: []\n", "1.0.0", sha)
+	body := fmt.Sprintf("cadence_cli:\n  version: %q\n  sha256: %q\nplugins: []\nrunners: []\n", releaseVersion(), sha)
 	if err := os.WriteFile(lockPath, []byte(body), 0o644); err != nil {
 		fmt.Fprintf(os.Stderr, "lock write failed: %v\n", err)
 		os.Exit(1)

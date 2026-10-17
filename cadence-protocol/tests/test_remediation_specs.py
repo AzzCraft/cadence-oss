@@ -73,7 +73,9 @@ class ProtocolRemediationSpecTests(unittest.TestCase):
         schemas = ROOT / "schemas"
         if not schemas.is_dir():
             self.fail("schemas/ directory missing")
-        for f in schemas.glob("*.schema.json"):
+        files = list(schemas.glob("*.schema.json"))
+        self.assertTrue(files, "schemas are empty")
+        for f in files:
             with self.subTest(schema=f.name):
                 data = json.loads(f.read_text(encoding="utf-8"))
                 self.assertIsInstance(data, dict)
@@ -86,18 +88,20 @@ class ProtocolRemediationSpecTests(unittest.TestCase):
 
     def test_proto_009_all_example_files_are_valid_json(self) -> None:
         examples = ROOT / "examples"
-        if not examples.is_dir():
-            self.skipTest("examples/ directory missing")
-        for f in examples.glob("*.example.json"):
+        self.assertTrue(examples.is_dir(), "examples/ directory missing")
+        files = list(examples.glob("*.example.json"))
+        self.assertTrue(files, "examples are empty")
+        for f in files:
             with self.subTest(example=f.name):
                 data = json.loads(f.read_text(encoding="utf-8"))
                 self.assertIsInstance(data, dict)
 
     def test_proto_009_no_placeholder_in_schemas(self) -> None:
         schemas = ROOT / "schemas"
-        if not schemas.is_dir():
-            self.skipTest("schemas/ directory missing")
-        for f in schemas.glob("*.schema.json"):
+        self.assertTrue(schemas.is_dir(), "schemas/ directory missing")
+        files = list(schemas.glob("*.schema.json"))
+        self.assertTrue(files, "schemas are empty")
+        for f in files:
             text = f.read_text(encoding="utf-8")
             with self.subTest(schema=f.name):
                 self.assertNotIn("TODO", text)

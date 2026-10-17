@@ -3,16 +3,15 @@
   "standardVersion": "1.4.0",
   "standardManifestVersion": "1.4.0",
   "suiteVersion": "1.0.0",
-  "factoryVersion": "1.0.0",
-  "verifyRuntimeVersion": "1.0.0",
-  "closureUpdatedAt": "2026-07-20T11:20:00Z",
+  "factoryVersion": "496247c",
+  "verifyRuntimeVersion": "7d77e98",
+  "closureUpdatedAt": "2026-04-11T00:00:00Z",
   "suiteLockRef": {
     "kind": "file",
-    "uri": "./suite_lock.json",
+    "uri": "../../../../das-suite/suite_lock.json",
     "pinType": "manifest",
     "pinValue": "suite_lock.json",
-    "floating": false,
-    "notes": "Bundled copy of the published DAS Suite v1.0.0 lock."
+    "floating": false
   },
   "lockRefs": {
     "suiteToolingLock": {
@@ -26,34 +25,35 @@
   "refs": {
     "standard": {
       "kind": "git",
-      "uri": "https://github.com/AzzCraft/das-standard.git",
+      "uri": "../../../../das-standard",
       "pinType": "commit",
-      "pinValue": "ac5a52fe9e8997392b3d21a488097e394d8e3102",
+      "pinValue": "64bf7c0279ea2299efc2fcf7625b3211fea38958",
       "floating": false,
-      "notes": "Published DAS Standard v1.4.0 tag commit."
+      "notes": "workspace-local example ref"
     },
     "suite": {
-      "kind": "file",
-      "uri": "./tooling_lock.json",
-      "pinType": "manifest",
-      "pinValue": "tooling_lock.json",
-      "floating": false
+      "kind": "git",
+      "uri": "../../../../das-suite",
+      "pinType": "commit",
+      "pinValue": "7a4265db54930014d3cf759bf37058c585fc9bda",
+      "floating": false,
+      "notes": "workspace-local example ref"
     },
     "factory": {
       "kind": "git",
-      "uri": "https://github.com/AzzCraft/dasops.git",
+      "uri": "../../../../dasops",
       "pinType": "commit",
-      "pinValue": "01f54872349812598190ecf0b28e0dcad2927914",
+      "pinValue": "496247c19465da60e8ddd739e00e7458b1f1fefc",
       "floating": false,
-      "notes": "Published DASOps v1.0.0 release commit."
+      "notes": "workspace-local example ref"
     },
     "verifyRuntime": {
       "kind": "git",
-      "uri": "https://github.com/AzzCraft/cadence-oss.git",
+      "uri": "../../..",
       "pinType": "commit",
-      "pinValue": "e4054537c0962441037dd5403d1a1692434fde73",
+      "pinValue": "7d77e98331cc9c03c4e9ee9e31e69a7ab96afe9b",
       "floating": false,
-      "notes": "Published Cadence OSS v1.0.0 release commit."
+      "notes": "workspace-local example ref"
     }
   }
 }

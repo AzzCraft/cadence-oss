@@ -4,12 +4,12 @@ set -euo pipefail
 usage() {
   cat <<'USAGE'
 Usage:
-  CADENCE_SIGNING_KEY=... scripts/sign-evidence --input PATH --output PATH [--signature-id ID] [--signer NAME]
-  CADENCE_SIGNING_KEY=... scripts/sign-evidence --bundle DIR [--signature-id ID] [--signer NAME]
+  scripts/sign-evidence --input PATH --output PATH [--signature-id ID] [--signer NAME] [--key VALUE]
+  scripts/sign-evidence --bundle DIR [--signature-id ID] [--signer NAME] [--key VALUE]
 
 Signs one detached evidence payload or an entire evidence bundle using the
-development-only Cadence HMAC-SHA256 envelope format. The key is read from
-CADENCE_SIGNING_KEY; it is never accepted in command-line arguments.
+Cadence HMAC-SHA256 envelope format.
+If --key is omitted, CADENCE_SIGNING_KEY is used.
 USAGE
 }
 
@@ -42,6 +42,10 @@ while [[ $# -gt 0 ]]; do
       SIGNER="${2:-}"
       shift 2
       ;;
+    --key)
+      KEY="${2:-}"
+      shift 2
+      ;;
     -h|--help)
       usage
       exit 0
@@ -60,7 +64,7 @@ if [[ -z "$KEY" ]]; then
 fi
 
 if [[ -n "$BUNDLE" ]]; then
-  CADENCE_SIGNING_KEY="$KEY" python3 - "$BUNDLE" "$SIGNATURE_ID" "$SIGNER" <<'PY'
+  python3 - "$BUNDLE" "$SIGNATURE_ID" "$SIGNER" "$KEY" <<'PY'
 import hashlib
 import hmac
 import json
@@ -70,7 +74,7 @@ from pathlib import Path
 bundle_dir = Path(sys.argv[1])
 signature_id = sys.argv[2]
 signer = sys.argv[3]
-key = __import__("os").environ["CADENCE_SIGNING_KEY"].encode("utf-8")
+key = sys.argv[4].encode("utf-8")
 
 signable = [
     "run-manifest.json",
@@ -135,7 +139,7 @@ if [[ -z "$INPUT" || -z "$OUTPUT" ]]; then
   exit 2
 fi
 
-CADENCE_SIGNING_KEY="$KEY" python3 - "$INPUT" "$OUTPUT" "$SIGNATURE_ID" "$SIGNER" <<'PY'
+python3 - "$INPUT" "$OUTPUT" "$SIGNATURE_ID" "$SIGNER" "$KEY" <<'PY'
 import hashlib
 import hmac
 import json
@@ -146,7 +150,7 @@ input_path = Path(sys.argv[1])
 output_path = Path(sys.argv[2])
 signature_id = sys.argv[3]
 signer = sys.argv[4]
-key = __import__("os").environ["CADENCE_SIGNING_KEY"].encode("utf-8")
+key = sys.argv[5].encode("utf-8")
 payload = input_path.read_bytes()
 payload_hash = "sha256:" + hashlib.sha256(payload).hexdigest()
 signature = hmac.new(key, payload_hash.encode("utf-8"), hashlib.sha256).hexdigest()
