@@ -1,0 +1,49 @@
+{
+  "contractIdentity": "das-analysis-verification-evidence/v1",
+  "issuer": "TEST-issuer",
+  "audience": "TEST-consumer",
+  "evidenceId": "TEST-evidence",
+  "verificationPlanDigest": "sha256:1111111111111111111111111111111111111111111111111111111111111111",
+  "bindings": {
+    "taskKey": {
+      "authorityDomain": "TEST-domain",
+      "projectId": "project",
+      "changeId": "change",
+      "taskId": "task"
+    },
+    "taskRevision": 1,
+    "taskCycle": 1,
+    "resourceId": "target",
+    "resourceInstance": "instance",
+    "targetGeneration": 1,
+    "obligationDigest": "sha256:1111111111111111111111111111111111111111111111111111111111111111",
+    "sourceCandidateDigest": "sha256:1111111111111111111111111111111111111111111111111111111111111111",
+    "baselineCandidateDigest": "sha256:1111111111111111111111111111111111111111111111111111111111111111",
+    "policyDigest": "sha256:1111111111111111111111111111111111111111111111111111111111111111",
+    "toolDigest": "sha256:1111111111111111111111111111111111111111111111111111111111111111",
+    "standardDigest": "sha256:1111111111111111111111111111111111111111111111111111111111111111",
+    "bundleDigest": "sha256:1111111111111111111111111111111111111111111111111111111111111111",
+    "factsDigest": "sha256:1111111111111111111111111111111111111111111111111111111111111111",
+    "acceptanceDigest": "sha256:1111111111111111111111111111111111111111111111111111111111111111",
+    "environmentDigest": "sha256:1111111111111111111111111111111111111111111111111111111111111111",
+    "lineageDigest": "sha256:1111111111111111111111111111111111111111111111111111111111111111",
+    "completionMode": "analysis",
+    "taskBindingDigest": "sha256:1111111111111111111111111111111111111111111111111111111111111111"
+  },
+  "authorityEpoch": 1,
+  "notBefore": "2026-10-06T00:00:00Z",
+  "expiresAt": "2026-10-06T00:10:00Z",
+  "results": [
+    {
+      "slotId": "required",
+      "runId": "TEST-run",
+      "attempt": 1,
+      "reportDigest": "sha256:1111111111111111111111111111111111111111111111111111111111111111",
+      "reportGateIndex": 0,
+      "artifactDigests": {
+        "original-output": "sha256:1111111111111111111111111111111111111111111111111111111111111111"
+      }
+    }
+  ],
+  "unapprovedField": true
+}

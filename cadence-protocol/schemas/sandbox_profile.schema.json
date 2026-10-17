@@ -36,6 +36,14 @@
         "minLength": 1
       }
     },
+    "allowedEnv": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "pattern": "^[A-Z][A-Z0-9_]*$"
+      }
+    },
     "limits": {
       "type": "object",
       "properties": {

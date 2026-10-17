@@ -1,15 +1,24 @@
 # Offline posture (Core)
 
-Cadence Core v1.0.0 does not require network access for its documented
-`verify`, `scan`, `adopt`, `report`, `lock`, or `doctor` commands. The Go
-verification gate uses the checked-in vendor directory with `GOPROXY=off` and
-`GOSUMDB=off`.
+Cadence Core is designed to be *runtime offline*:
+- `verify/scan/adopt/report` MUST NOT require network access during execution.
+- Any network usage must be an explicit subcommand (e.g. `fetch`, `fix --endpoint`, `record`), and must be guarded by egress allowlists + audit when enabled.
 
-This source release does not implement or ship cloud, private-link, intranet
-egress-allowlist, registry-mirroring, or Egress Guard modes. Those are not
-security guarantees of v1.0.0.
+## Modes
+- Strict Offline: no network
+- Air-gapped Intranet: only intranet allowlist
+- Online Cloud: public network / private link
 
-When Cadence starts a supported sandbox or plugin subprocess, it reduces the
-environment to the declared allowlist and rejects reserved parent environment
-keys. Third-party plugin execution is fail-closed unless an approved isolated
-runner is available.
+## Offline attestation (optional)
+If configured, an Egress Guard can enforce deny-egress at the process/container layer and emit an attestation artifact into the Evidence output.
+
+## Subprocess environment policy
+
+Cadence subprocesses do not inherit the full parent environment.
+
+- Sandbox launcher env is reduced to an allowlisted parent-key set plus
+  explicit `CADENCE_SANDBOX_*` markers.
+- Plugin subprocess env is reduced to manifest allowlists plus explicit
+  `CADENCE_PLUGIN_*` markers.
+- Parent env keys with reserved `CADENCE_SANDBOX_` or `CADENCE_PLUGIN_`
+  prefixes are rejected before verify runs.

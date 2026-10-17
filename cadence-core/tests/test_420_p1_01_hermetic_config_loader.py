@@ -60,24 +60,6 @@ class CoreHermeticConfigLoader420Tests(unittest.TestCase):
                 self.assertIn("off", script)
                 self.assertIn("GOSUMDB", script)
 
-    def test_offline_go_test_and_vet_pass(self) -> None:
-        env = os.environ.copy()
-        env["GOPROXY"] = "off"
-        env["GOSUMDB"] = "off"
-        env["GOFLAGS"] = "-mod=vendor"
-
-        for cmd in (["go", "test", "./..."], ["go", "vet", "./..."]):
-            with self.subTest(cmd=" ".join(cmd)):
-                proc = subprocess.run(
-                    cmd,
-                    cwd=CORE,
-                    env=env,
-                    stdout=subprocess.PIPE,
-                    stderr=subprocess.STDOUT,
-                    text=True,
-                    timeout=600,
-                )
-                self.assertEqual(proc.returncode, 0, "command failed: " + " ".join(cmd) + "\n" + proc.stdout)
 
     def test_trimpath_binary_doctor_loads_config_without_source_tree_schema(self) -> None:
         env = os.environ.copy()

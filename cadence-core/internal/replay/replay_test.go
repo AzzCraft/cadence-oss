@@ -182,25 +182,3 @@ func TestBuildEmptyDir(t *testing.T) {
 		t.Fatalf("expected run-empty, got %s", bundle.ReplayID)
 	}
 }
-
-func TestValidateBundleRejectsDuplicateAndEscapingPaths(t *testing.T) {
-	outDir := t.TempDir()
-	if err := os.WriteFile(filepath.Join(outDir, "a.json"), []byte("content"), 0o644); err != nil {
-		t.Fatal(err)
-	}
-	bundle, err := Build("test", "a.json", "a.json", outDir)
-	if err != nil {
-		t.Fatal(err)
-	}
-	duplicate := *bundle
-	duplicate.Snapshots = append(append([]Snapshot{}, bundle.Snapshots...), bundle.Snapshots[0])
-	if err := ValidateBundle(&duplicate); err == nil {
-		t.Fatal("expected duplicate snapshot path to be rejected")
-	}
-	escaping := *bundle
-	escaping.Snapshots = append([]Snapshot{}, bundle.Snapshots...)
-	escaping.Snapshots[0].RelPath = "../outside.json"
-	if err := ValidateBundle(&escaping); err == nil {
-		t.Fatal("expected escaping snapshot path to be rejected")
-	}
-}

@@ -32,10 +32,12 @@ class AdapterRequest:
     workDir: str
     env: dict[str, str] = field(default_factory=dict)
     filesystem: str = ""
+    imageRef: str = ""
     networkAccess: bool = False
     readOnlyInputs: bool = False
     writableOutputDir: str = ""
     allowedMounts: list[str] = field(default_factory=list)
+    allowedEnv: list[str] = field(default_factory=list)
     resourceLimits: dict[str, Any] | None = None
     requiredChecks: list[str] = field(default_factory=list)
     requiredParentEnvKeys: list[str] = field(default_factory=list)
@@ -49,10 +51,12 @@ class AdapterRequest:
             workDir=data.get("workDir", ""),
             env=data.get("env") or {},
             filesystem=data.get("filesystem", ""),
+            imageRef=data.get("imageRef", ""),
             networkAccess=data.get("networkAccess", False),
             readOnlyInputs=data.get("readOnlyInputs", False),
             writableOutputDir=data.get("writableOutputDir", ""),
             allowedMounts=data.get("allowedMounts") or [],
+            allowedEnv=data.get("allowedEnv") or [],
             resourceLimits=data.get("resourceLimits"),
             requiredChecks=data.get("requiredChecks") or [],
             requiredParentEnvKeys=data.get("requiredParentEnvKeys") or [],

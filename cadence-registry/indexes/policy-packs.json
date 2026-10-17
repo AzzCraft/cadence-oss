@@ -2,33 +2,33 @@
   "$schema": "../schemas/registry_index.schema.json",
   "schemaVersion": "1.0.0",
   "indexId": "policy-packs",
-  "description": "Reviewed Cadence policy packs.",
+  "description": "Registered Cadence policy packs (open-source and pro families).",
   "entries": [
     {
-      "id": "standard-ui-v140",
+      "id": "standard-ui-v146",
       "kind": "policyPack",
       "version": "1.4.0",
-      "digest": "sha256:6e35ca36b555514c905f46b2dc41f90193be5f0155bf1b7a83951fd99ad86291",
+      "digest": "sha256:26d32b34099e794338a4d63c05b65dcd30b7dd77a8a8019885a5e7ea67338be4",
       "status": "active",
       "deprecatedAt": null,
       "deprecationReason": null,
       "compatWindow": "current",
-      "ref": "../../cadence-policy-packs/packs/standard-ui-v140/pack.yaml",
+      "ref": "../../cadence-policy-packs/packs/standard-ui-v146/pack.yaml",
       "trust": {
         "signer": "cadence-oss-team",
         "allowlisted": true
       }
     },
     {
-      "id": "headless-v140",
+      "id": "headless-v146",
       "kind": "policyPack",
       "version": "1.4.0",
-      "digest": "sha256:4e58d1832c1e6ea41a74844f93a6bcc1bacf0b6cf32dcb0cd6c39e1bf8c53b6b",
+      "digest": "sha256:484d315400a7d00ed38ab09677ca27b4191a08c09713fb2168dbc86b9b0d9b7d",
       "status": "active",
       "deprecatedAt": null,
       "deprecationReason": null,
       "compatWindow": "current",
-      "ref": "../../cadence-policy-packs/packs/headless-v140/pack.yaml",
+      "ref": "../../cadence-policy-packs/packs/headless-v146/pack.yaml",
       "trust": {
         "signer": "cadence-oss-team",
         "allowlisted": true

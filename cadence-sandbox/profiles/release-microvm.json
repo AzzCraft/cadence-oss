@@ -5,7 +5,8 @@
   "schemaVersion": "1.0.0",
   "profileId": "release-microvm",
   "backend": "microvm-runtime",
-  "description": "Release profile — micro-VM isolated, strict resource limits, full audit hooks.",
+  "allowedEnv": ["PYTHONDONTWRITEBYTECODE"],
+  "description": "Disabled compatibility specification. It must not be selected for release until the microVM adapter executes the requested command in the guest and returns a trusted guest receipt.",
   "filesystem": {
     "mode": "microvm-isolated",
     "readOnlyInputs": true,

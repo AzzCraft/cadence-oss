@@ -1,2 +1,6 @@
-# Full-gate test dependency. Keep this lock in sync with BUILD_REQUIREMENTS.md.
+pip-audit==2.10.1
+bandit==1.9.4
+jsonschema==4.26.0
 pytest==9.0.3
+rfc8785==0.1.4
+PyYAML==6.0.3

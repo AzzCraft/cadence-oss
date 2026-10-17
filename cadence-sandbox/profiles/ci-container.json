@@ -5,11 +5,12 @@
   "schemaVersion": "1.0.0",
   "profileId": "ci-container",
   "backend": "container-runtime",
+  "allowedEnv": ["PYTHONDONTWRITEBYTECODE"],
   "description": "CI profile — container-isolated, read-only inputs, network disabled, resource bounded.",
   "filesystem": {
     "mode": "container-isolated",
     "readOnlyInputs": true,
-    "writableOutputDir": "/workspace/.cadence/out"
+    "writableOutputDir": ".cadence/out"
   },
   "network": {
     "access": false

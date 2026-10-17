@@ -1,0 +1,611 @@
+{
+  "schemaVersion": "1.0.0",
+  "transportIdentity": "das-text-jsonl/v1",
+  "cases": [
+    {
+      "id": "escaped-slash",
+      "initial": {
+        "output": {
+          "a/b": "start"
+        }
+      },
+      "records": [
+        {
+          "taskKey": {
+            "authorityDomain": "authority",
+            "projectId": "project",
+            "changeId": "change",
+            "taskId": "T-1"
+          },
+          "taskRevision": 1,
+          "taskCycle": 1,
+          "streamId": "stream:1",
+          "candidateDigest": "sha256:0000000000000000000000000000000000000000000000000000000000000000",
+          "contractIdentity": "das-text-delta/v1",
+          "laneId": "a",
+          "seq": 0,
+          "path": "/output/a~1b",
+          "op": "append",
+          "text": " +"
+        },
+        {
+          "taskKey": {
+            "authorityDomain": "authority",
+            "projectId": "project",
+            "changeId": "change",
+            "taskId": "T-1"
+          },
+          "taskRevision": 1,
+          "taskCycle": 1,
+          "streamId": "stream:1",
+          "candidateDigest": "sha256:0000000000000000000000000000000000000000000000000000000000000000",
+          "contractIdentity": "das-text-delta/v1",
+          "laneId": "a",
+          "seq": 0,
+          "path": "/output/a~1b",
+          "op": "append",
+          "text": " +"
+        },
+        {
+          "taskKey": {
+            "authorityDomain": "authority",
+            "projectId": "project",
+            "changeId": "change",
+            "taskId": "T-1"
+          },
+          "taskRevision": 1,
+          "taskCycle": 1,
+          "streamId": "stream:1",
+          "candidateDigest": "sha256:0000000000000000000000000000000000000000000000000000000000000000",
+          "contractIdentity": "das-text-delta-end/v1",
+          "laneWatermarks": [
+            {
+              "laneId": "a",
+              "seq": 0
+            }
+          ],
+          "finalDigest": "sha256:1541257d2af9bb25e77987c19f5de94f1e09cd38e72039f0188a0553e7b477a2"
+        }
+      ],
+      "final": {
+        "output": {
+          "a/b": "start +"
+        }
+      },
+      "reject": false
+    },
+    {
+      "id": "one-decode",
+      "initial": {
+        "output": {
+          "~1": "start"
+        }
+      },
+      "records": [
+        {
+          "taskKey": {
+            "authorityDomain": "authority",
+            "projectId": "project",
+            "changeId": "change",
+            "taskId": "T-1"
+          },
+          "taskRevision": 1,
+          "taskCycle": 1,
+          "streamId": "stream:1",
+          "candidateDigest": "sha256:0000000000000000000000000000000000000000000000000000000000000000",
+          "contractIdentity": "das-text-delta/v1",
+          "laneId": "a",
+          "seq": 0,
+          "path": "/output/~01",
+          "op": "append",
+          "text": " +"
+        },
+        {
+          "taskKey": {
+            "authorityDomain": "authority",
+            "projectId": "project",
+            "changeId": "change",
+            "taskId": "T-1"
+          },
+          "taskRevision": 1,
+          "taskCycle": 1,
+          "streamId": "stream:1",
+          "candidateDigest": "sha256:0000000000000000000000000000000000000000000000000000000000000000",
+          "contractIdentity": "das-text-delta/v1",
+          "laneId": "a",
+          "seq": 0,
+          "path": "/output/~01",
+          "op": "append",
+          "text": " +"
+        },
+        {
+          "taskKey": {
+            "authorityDomain": "authority",
+            "projectId": "project",
+            "changeId": "change",
+            "taskId": "T-1"
+          },
+          "taskRevision": 1,
+          "taskCycle": 1,
+          "streamId": "stream:1",
+          "candidateDigest": "sha256:0000000000000000000000000000000000000000000000000000000000000000",
+          "contractIdentity": "das-text-delta-end/v1",
+          "laneWatermarks": [
+            {
+              "laneId": "a",
+              "seq": 0
+            }
+          ],
+          "finalDigest": "sha256:0e57342d31f3d497ef667b234012cb82f418b7e3b124c04add9ca0c97a9f2f06"
+        }
+      ],
+      "final": {
+        "output": {
+          "~1": "start +"
+        }
+      },
+      "reject": false
+    },
+    {
+      "id": "empty-key",
+      "initial": {
+        "output": {
+          "": "start"
+        }
+      },
+      "records": [
+        {
+          "taskKey": {
+            "authorityDomain": "authority",
+            "projectId": "project",
+            "changeId": "change",
+            "taskId": "T-1"
+          },
+          "taskRevision": 1,
+          "taskCycle": 1,
+          "streamId": "stream:1",
+          "candidateDigest": "sha256:0000000000000000000000000000000000000000000000000000000000000000",
+          "contractIdentity": "das-text-delta/v1",
+          "laneId": "a",
+          "seq": 0,
+          "path": "/output/",
+          "op": "append",
+          "text": " +"
+        },
+        {
+          "taskKey": {
+            "authorityDomain": "authority",
+            "projectId": "project",
+            "changeId": "change",
+            "taskId": "T-1"
+          },
+          "taskRevision": 1,
+          "taskCycle": 1,
+          "streamId": "stream:1",
+          "candidateDigest": "sha256:0000000000000000000000000000000000000000000000000000000000000000",
+          "contractIdentity": "das-text-delta/v1",
+          "laneId": "a",
+          "seq": 0,
+          "path": "/output/",
+          "op": "append",
+          "text": " +"
+        },
+        {
+          "taskKey": {
+            "authorityDomain": "authority",
+            "projectId": "project",
+            "changeId": "change",
+            "taskId": "T-1"
+          },
+          "taskRevision": 1,
+          "taskCycle": 1,
+          "streamId": "stream:1",
+          "candidateDigest": "sha256:0000000000000000000000000000000000000000000000000000000000000000",
+          "contractIdentity": "das-text-delta-end/v1",
+          "laneWatermarks": [
+            {
+              "laneId": "a",
+              "seq": 0
+            }
+          ],
+          "finalDigest": "sha256:9b534a237db1e36747e25c1855b4db7b390bc03c946b3ec577cf4d6226577f39"
+        }
+      ],
+      "final": {
+        "output": {
+          "": "start +"
+        }
+      },
+      "reject": false
+    },
+    {
+      "id": "object-numeric-key",
+      "initial": {
+        "output": {
+          "01": "start"
+        }
+      },
+      "records": [
+        {
+          "taskKey": {
+            "authorityDomain": "authority",
+            "projectId": "project",
+            "changeId": "change",
+            "taskId": "T-1"
+          },
+          "taskRevision": 1,
+          "taskCycle": 1,
+          "streamId": "stream:1",
+          "candidateDigest": "sha256:0000000000000000000000000000000000000000000000000000000000000000",
+          "contractIdentity": "das-text-delta/v1",
+          "laneId": "a",
+          "seq": 0,
+          "path": "/output/01",
+          "op": "append",
+          "text": " +"
+        },
+        {
+          "taskKey": {
+            "authorityDomain": "authority",
+            "projectId": "project",
+            "changeId": "change",
+            "taskId": "T-1"
+          },
+          "taskRevision": 1,
+          "taskCycle": 1,
+          "streamId": "stream:1",
+          "candidateDigest": "sha256:0000000000000000000000000000000000000000000000000000000000000000",
+          "contractIdentity": "das-text-delta/v1",
+          "laneId": "a",
+          "seq": 0,
+          "path": "/output/01",
+          "op": "append",
+          "text": " +"
+        },
+        {
+          "taskKey": {
+            "authorityDomain": "authority",
+            "projectId": "project",
+            "changeId": "change",
+            "taskId": "T-1"
+          },
+          "taskRevision": 1,
+          "taskCycle": 1,
+          "streamId": "stream:1",
+          "candidateDigest": "sha256:0000000000000000000000000000000000000000000000000000000000000000",
+          "contractIdentity": "das-text-delta-end/v1",
+          "laneWatermarks": [
+            {
+              "laneId": "a",
+              "seq": 0
+            }
+          ],
+          "finalDigest": "sha256:c1d2e7a63c0ad2ed0f49430999b247b4250422e496e200d5c3f2b361b6eec03d"
+        }
+      ],
+      "final": {
+        "output": {
+          "01": "start +"
+        }
+      },
+      "reject": false
+    },
+    {
+      "id": "ordinary-own-key",
+      "initial": {
+        "output": {
+          "__proto__": "start"
+        }
+      },
+      "records": [
+        {
+          "taskKey": {
+            "authorityDomain": "authority",
+            "projectId": "project",
+            "changeId": "change",
+            "taskId": "T-1"
+          },
+          "taskRevision": 1,
+          "taskCycle": 1,
+          "streamId": "stream:1",
+          "candidateDigest": "sha256:0000000000000000000000000000000000000000000000000000000000000000",
+          "contractIdentity": "das-text-delta/v1",
+          "laneId": "a",
+          "seq": 0,
+          "path": "/output/__proto__",
+          "op": "append",
+          "text": " +"
+        },
+        {
+          "taskKey": {
+            "authorityDomain": "authority",
+            "projectId": "project",
+            "changeId": "change",
+            "taskId": "T-1"
+          },
+          "taskRevision": 1,
+          "taskCycle": 1,
+          "streamId": "stream:1",
+          "candidateDigest": "sha256:0000000000000000000000000000000000000000000000000000000000000000",
+          "contractIdentity": "das-text-delta/v1",
+          "laneId": "a",
+          "seq": 0,
+          "path": "/output/__proto__",
+          "op": "append",
+          "text": " +"
+        },
+        {
+          "taskKey": {
+            "authorityDomain": "authority",
+            "projectId": "project",
+            "changeId": "change",
+            "taskId": "T-1"
+          },
+          "taskRevision": 1,
+          "taskCycle": 1,
+          "streamId": "stream:1",
+          "candidateDigest": "sha256:0000000000000000000000000000000000000000000000000000000000000000",
+          "contractIdentity": "das-text-delta-end/v1",
+          "laneWatermarks": [
+            {
+              "laneId": "a",
+              "seq": 0
+            }
+          ],
+          "finalDigest": "sha256:e5068e60ec82b926f63282dd24c71170223ccb7c092a6b9d02e7107d1107ec5f"
+        }
+      ],
+      "final": {
+        "output": {
+          "__proto__": "start +"
+        }
+      },
+      "reject": false
+    },
+    {
+      "id": "wrong-prefix",
+      "initial": {
+        "output": {
+          "text": "start",
+          "array": [
+            "0",
+            "1"
+          ]
+        },
+        "outputX": "outside"
+      },
+      "records": [
+        {
+          "taskKey": {
+            "authorityDomain": "authority",
+            "projectId": "project",
+            "changeId": "change",
+            "taskId": "T-1"
+          },
+          "taskRevision": 1,
+          "taskCycle": 1,
+          "streamId": "stream:1",
+          "candidateDigest": "sha256:0000000000000000000000000000000000000000000000000000000000000000",
+          "contractIdentity": "das-text-delta/v1",
+          "laneId": "a",
+          "seq": 0,
+          "path": "/outputX",
+          "op": "append",
+          "text": " +"
+        }
+      ],
+      "final": {},
+      "reject": true
+    },
+    {
+      "id": "array-leading-zero",
+      "initial": {
+        "output": {
+          "text": "start",
+          "array": [
+            "0",
+            "1"
+          ]
+        },
+        "outputX": "outside"
+      },
+      "records": [
+        {
+          "taskKey": {
+            "authorityDomain": "authority",
+            "projectId": "project",
+            "changeId": "change",
+            "taskId": "T-1"
+          },
+          "taskRevision": 1,
+          "taskCycle": 1,
+          "streamId": "stream:1",
+          "candidateDigest": "sha256:0000000000000000000000000000000000000000000000000000000000000000",
+          "contractIdentity": "das-text-delta/v1",
+          "laneId": "a",
+          "seq": 0,
+          "path": "/output/array/01",
+          "op": "append",
+          "text": " +"
+        }
+      ],
+      "final": {},
+      "reject": true
+    },
+    {
+      "id": "array-append",
+      "initial": {
+        "output": {
+          "text": "start",
+          "array": [
+            "0",
+            "1"
+          ]
+        },
+        "outputX": "outside"
+      },
+      "records": [
+        {
+          "taskKey": {
+            "authorityDomain": "authority",
+            "projectId": "project",
+            "changeId": "change",
+            "taskId": "T-1"
+          },
+          "taskRevision": 1,
+          "taskCycle": 1,
+          "streamId": "stream:1",
+          "candidateDigest": "sha256:0000000000000000000000000000000000000000000000000000000000000000",
+          "contractIdentity": "das-text-delta/v1",
+          "laneId": "a",
+          "seq": 0,
+          "path": "/output/array/-",
+          "op": "append",
+          "text": " +"
+        }
+      ],
+      "final": {},
+      "reject": true
+    },
+    {
+      "id": "invalid-escape",
+      "initial": {
+        "output": {
+          "text": "start",
+          "array": [
+            "0",
+            "1"
+          ]
+        },
+        "outputX": "outside"
+      },
+      "records": [
+        {
+          "taskKey": {
+            "authorityDomain": "authority",
+            "projectId": "project",
+            "changeId": "change",
+            "taskId": "T-1"
+          },
+          "taskRevision": 1,
+          "taskCycle": 1,
+          "streamId": "stream:1",
+          "candidateDigest": "sha256:0000000000000000000000000000000000000000000000000000000000000000",
+          "contractIdentity": "das-text-delta/v1",
+          "laneId": "a",
+          "seq": 0,
+          "path": "/output/~2",
+          "op": "append",
+          "text": " +"
+        }
+      ],
+      "final": {},
+      "reject": true
+    },
+    {
+      "id": "missing-node",
+      "initial": {
+        "output": {
+          "text": "start",
+          "array": [
+            "0",
+            "1"
+          ]
+        },
+        "outputX": "outside"
+      },
+      "records": [
+        {
+          "taskKey": {
+            "authorityDomain": "authority",
+            "projectId": "project",
+            "changeId": "change",
+            "taskId": "T-1"
+          },
+          "taskRevision": 1,
+          "taskCycle": 1,
+          "streamId": "stream:1",
+          "candidateDigest": "sha256:0000000000000000000000000000000000000000000000000000000000000000",
+          "contractIdentity": "das-text-delta/v1",
+          "laneId": "a",
+          "seq": 0,
+          "path": "/output/missing",
+          "op": "append",
+          "text": " +"
+        }
+      ],
+      "final": {},
+      "reject": true
+    },
+    {
+      "id": "root-replacement",
+      "initial": {
+        "output": {
+          "text": "start",
+          "array": [
+            "0",
+            "1"
+          ]
+        },
+        "outputX": "outside"
+      },
+      "records": [
+        {
+          "taskKey": {
+            "authorityDomain": "authority",
+            "projectId": "project",
+            "changeId": "change",
+            "taskId": "T-1"
+          },
+          "taskRevision": 1,
+          "taskCycle": 1,
+          "streamId": "stream:1",
+          "candidateDigest": "sha256:0000000000000000000000000000000000000000000000000000000000000000",
+          "contractIdentity": "das-text-delta/v1",
+          "laneId": "a",
+          "seq": 0,
+          "path": "",
+          "op": "append",
+          "text": " +"
+        }
+      ],
+      "final": {},
+      "reject": true
+    },
+    {
+      "id": "uri-fragment",
+      "initial": {
+        "output": {
+          "text": "start",
+          "array": [
+            "0",
+            "1"
+          ]
+        },
+        "outputX": "outside"
+      },
+      "records": [
+        {
+          "taskKey": {
+            "authorityDomain": "authority",
+            "projectId": "project",
+            "changeId": "change",
+            "taskId": "T-1"
+          },
+          "taskRevision": 1,
+          "taskCycle": 1,
+          "streamId": "stream:1",
+          "candidateDigest": "sha256:0000000000000000000000000000000000000000000000000000000000000000",
+          "contractIdentity": "das-text-delta/v1",
+          "laneId": "a",
+          "seq": 0,
+          "path": "#/output/text",
+          "op": "append",
+          "text": " +"
+        }
+      ],
+      "final": {},
+      "reject": true
+    }
+  ]
+}

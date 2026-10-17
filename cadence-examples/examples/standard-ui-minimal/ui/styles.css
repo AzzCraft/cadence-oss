@@ -1,0 +1,13 @@
+:root { --action-color: #1455a0; --space: 1rem; --text-color: #172b4d; }
+body { font: 1rem/1.5 system-ui, sans-serif; color: var(--text-color); margin: 0 auto; max-width: 70rem; padding: var(--space); }
+main { display: grid; grid-template-columns: 10rem minmax(0,1fr); gap: var(--space); }
+nav, .actions { display: flex; gap: .5rem; flex-wrap: wrap; align-content: start; }
+nav { flex-direction: column; }
+button { background: var(--action-color); color: white; padding: .65rem; border: 0; border-radius: .25rem; font: inherit; cursor: pointer; }
+button:disabled { opacity: .55; cursor: default; }
+button:focus-visible, textarea:focus-visible, pre:focus-visible { outline: 3px solid #b86b00; outline-offset: 3px; }
+textarea { box-sizing: border-box; width: 100%; font: inherit; margin: .5rem 0; }
+pre { white-space: pre-wrap; overflow: auto; max-height: 20rem; padding: var(--space); border: 1px solid #9ba9bc; overflow-wrap: anywhere; }
+dialog { max-width: 30rem; border: 1px solid #9ba9bc; border-radius: .3rem; }
+dialog::backdrop { background: #172b4d80; }
+@media(max-width:40rem) { main { grid-template-columns: 1fr; } nav { flex-direction: row; } }

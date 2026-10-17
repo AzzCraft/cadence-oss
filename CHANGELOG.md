@@ -1,26 +1,17 @@
 # Changelog
 
-## v1.1.0
+## v1.2.0-beta.1 — Unreleased
 
-Backward-compatible bundle expansion.
+- Add the DAS Standard 1.5 reference contracts, exact JSON/current-signature
+  consumers, shared module resolver, and Linux/HTTP/UI source reference samples.
+- Expose the existing HTTP coverage checker through `contracts check-http-coverage
+  --probe`, comparing a separate baseline and observed routes without granting authority.
+- Embed the component release version in the executable and its generated locks.
+  This source candidate has not passed final installed beta acceptance or shipped.
 
-- Retains the v1.0.0 Cadence Core CLI, configuration, output schemas, default
-  verification behavior, and fail-closed plugin policy.
-- Adds reviewed protocol, plugin, policy-pack, contract-hub template, example,
-  sandbox, and registry units behind explicit all-unit verification.
-- Makes direct core and example-wrapper builds portable outside a Git checkout.
-- Corrects policy-pack identifiers and distinguishes DAS Standard compatibility
-  from Cadence Core and protocol compatibility.
+## v1.0.0 - Current
 
-## v1.0.0
-
-Initial public Cadence Core release.
-
-- Offline Go CLI for verification, scanning, reporting, locking, and doctor
-  operations.
-- Deterministic evidence, replay-bundle verification, containment checks, and
-  fail-closed third-party plugin behavior.
-- Standalone fast/full source verification with vendored Go dependencies.
-- This release intentionally contains Cadence Core only. Historical unversioned
-  repository material outside the core boundary is not a supported v1.0.0
-  surface.
+- Imported `cadence-oss` into the DAS Tools control workspace as a fresh child Git
+  repository.
+- Removed stale DAS identity history from current-facing child content. Historical
+  release context remains parent-audit-only.

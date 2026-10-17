@@ -15,7 +15,7 @@ class PolicyPacksRemediationSpecTests(unittest.TestCase):
 
     def test_packs_011_expected_families_exist(self) -> None:
         packs = ROOT / "packs"
-        expected = ["core-v140-baseline", "headless-v140", "hfvi-v140", "standard-ui-v140"]
+        expected = ["core-v146-baseline", "headless-v146", "hfvi-v146", "standard-ui-v146"]
         for pack in expected:
             with self.subTest(pack=pack):
                 self.assertTrue((packs / pack).is_dir(), f"missing pack family: {pack}")
@@ -43,7 +43,9 @@ class PolicyPacksRemediationSpecTests(unittest.TestCase):
 
     def test_packs_011_each_pack_has_policy_file(self) -> None:
         packs = ROOT / "packs"
-        for pack_dir in packs.iterdir():
+        directories = [p for p in packs.iterdir() if p.is_dir()]
+        self.assertTrue(directories, "no policy pack directories")
+        for pack_dir in directories:
             if pack_dir.is_dir():
                 with self.subTest(pack=pack_dir.name):
                     files = list(pack_dir.rglob("*.yaml")) + list(pack_dir.rglob("*.json"))
@@ -51,7 +53,9 @@ class PolicyPacksRemediationSpecTests(unittest.TestCase):
 
     def test_packs_011_no_v17_naming(self) -> None:
         packs = ROOT / "packs"
-        for pack_dir in packs.iterdir():
+        directories = [p for p in packs.iterdir() if p.is_dir()]
+        self.assertTrue(directories, "no policy pack directories")
+        for pack_dir in directories:
             if pack_dir.is_dir():
                 with self.subTest(pack=pack_dir.name):
                     self.assertNotIn("v17", pack_dir.name)

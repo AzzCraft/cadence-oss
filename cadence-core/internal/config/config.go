@@ -6,12 +6,14 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"regexp"
 	"strings"
 	"time"
 
+	"github.com/AzzCraft/cadence-oss/cadence-core/internal/exactjson"
 	"github.com/santhosh-tekuri/jsonschema/v5"
 	"gopkg.in/yaml.v3"
 )
@@ -46,6 +48,10 @@ type Config struct {
 	RootAnchor  string
 
 	Policies []string
+	// Plugins is an explicit execution allowlist.  A registry advertises
+	// available plugin manifests; it does not grant permission to execute
+	// every registered plugin in each repository.
+	Plugins []string
 
 	UIEnabled bool
 	UIProfile string
@@ -63,6 +69,7 @@ type configDocument struct {
 	SandboxRef   string           `json:"sandboxRef"`
 	RootAnchor   string           `json:"rootAnchor"`
 	Policies     []string         `json:"policies"`
+	Plugins      []string         `json:"plugins"`
 	UI           *uiConfigSection `json:"ui"`
 	BaselinePath string           `json:"baselinePath"`
 }
@@ -105,7 +112,12 @@ func Load(repoRoot string) (Config, error) {
 		return cfg, errors.New("missing cadence.yaml (or cadence.yml)")
 	}
 
-	data, err := os.ReadFile(path)
+	file, err := os.Open(path)
+	if err != nil {
+		return cfg, err
+	}
+	data, err := io.ReadAll(io.LimitReader(file, exactjson.MaxBytes+1))
+	file.Close()
 	if err != nil {
 		return cfg, err
 	}
@@ -140,6 +152,7 @@ func Load(repoRoot string) (Config, error) {
 		cfg.BaselinePath = doc.BaselinePath
 	}
 	cfg.Policies = doc.Policies
+	cfg.Plugins = doc.Plugins
 	if doc.UI != nil {
 		cfg.UIEnabled = doc.UI.Enabled
 		if doc.UI.Profile != "" {
@@ -213,44 +226,91 @@ func LoadStrict(repoRoot string) (Config, error) {
 }
 
 func decodeCadenceConfigDocument(data []byte) (map[string]any, error) {
-	var raw map[string]any
+	if len(data) > exactjson.MaxBytes {
+		return nil, errors.New("cadence.yaml exceeds configuration byte limit")
+	}
+	var document yaml.Node
 	dec := yaml.NewDecoder(bytes.NewReader(data))
-	if err := dec.Decode(&raw); err != nil {
+	if err := dec.Decode(&document); err != nil {
 		return nil, fmt.Errorf("cadence.yaml is not valid YAML: %w", err)
 	}
-	if raw == nil {
-		raw = map[string]any{}
+	var extra yaml.Node
+	if err := dec.Decode(&extra); err != io.EOF {
+		return nil, errors.New("cadence.yaml requires exactly one YAML document")
 	}
-	normalized, ok := normalizeYAMLValue(raw).(map[string]any)
-	if !ok {
-		return nil, errors.New("cadence.yaml must decode to an object")
+	if len(document.Content) != 1 || document.Content[0].Kind != yaml.MappingNode {
+		return nil, errors.New("cadence.yaml must be a mapping")
 	}
-	return normalized, nil
+	remaining := exactjson.MaxNodes
+	if err := checkYAMLSource(document.Content[0], 0, &remaining, map[*yaml.Node]bool{}); err != nil {
+		return nil, err
+	}
+	var raw map[string]any
+	if err := document.Decode(&raw); err != nil {
+		return nil, fmt.Errorf("cadence.yaml cannot be mapped: %w", err)
+	}
+	return raw, nil
 }
 
-func normalizeYAMLValue(value any) any {
-	switch v := value.(type) {
-	case map[string]any:
-		out := make(map[string]any, len(v))
-		for key, item := range v {
-			out[key] = normalizeYAMLValue(item)
-		}
-		return out
-	case map[any]any:
-		out := make(map[string]any, len(v))
-		for key, item := range v {
-			out[fmt.Sprint(key)] = normalizeYAMLValue(item)
-		}
-		return out
-	case []any:
-		out := make([]any, len(v))
-		for i, item := range v {
-			out[i] = normalizeYAMLValue(item)
-		}
-		return out
-	default:
-		return value
+// Check original nodes before native construction can lose tags or key types.
+// The legacy yaml.v3 alias/merge mapping remains supported, within the same
+// operation's bounds; it cannot extend the JSON-only protected wire contracts.
+func checkYAMLSource(node *yaml.Node, depth int, remaining *int, active map[*yaml.Node]bool) error {
+	if node == nil || depth > exactjson.MaxDepth || *remaining <= 0 || active[node] {
+		return errors.New("cadence.yaml exceeds node/depth limits or contains a cyclic alias")
 	}
+	*remaining--
+	active[node] = true
+	defer delete(active, node)
+	if node.Kind == yaml.AliasNode {
+		return checkYAMLSource(node.Alias, depth+1, remaining, active)
+	}
+	switch node.Kind {
+	case yaml.MappingNode:
+		if node.Tag != "!!map" || len(node.Content)%2 != 0 {
+			return errors.New("cadence.yaml has an unsupported mapping tag")
+		}
+		seen := map[string]bool{}
+		for index := 0; index < len(node.Content); index += 2 {
+			key := node.Content[index]
+			merge := key.Kind == yaml.ScalarNode && key.Tag == "!!merge" && key.Value == "<<"
+			if merge {
+				*remaining--
+			} else {
+				if err := checkYAMLSource(key, depth+1, remaining, active); err != nil {
+					return err
+				}
+				for key.Kind == yaml.AliasNode {
+					key = key.Alias
+				}
+			}
+			if key.Kind != yaml.ScalarNode || (!merge && key.Tag != "!!str") || seen[key.Value] {
+				return errors.New("cadence.yaml requires unique string keys or one explicit legacy merge")
+			}
+			seen[key.Value] = true
+			if err := checkYAMLSource(node.Content[index+1], depth+1, remaining, active); err != nil {
+				return err
+			}
+		}
+	case yaml.SequenceNode:
+		if node.Tag != "!!seq" {
+			return errors.New("cadence.yaml has an unsupported sequence tag")
+		}
+		for _, child := range node.Content {
+			if err := checkYAMLSource(child, depth+1, remaining, active); err != nil {
+				return err
+			}
+		}
+	case yaml.ScalarNode:
+		switch node.Tag {
+		case "!!str", "!!bool", "!!int", "!!float", "!!null":
+		default:
+			return errors.New("cadence.yaml has an unapproved scalar tag; quote string values explicitly")
+		}
+	default:
+		return errors.New("cadence.yaml has an unsupported node")
+	}
+	return nil
 }
 
 func configDocumentFromMap(raw map[string]any) (configDocument, error) {

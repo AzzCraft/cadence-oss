@@ -1,0 +1,57 @@
+{
+  "contractIdentity": "das-analysis-verification-plan/v1",
+  "planId": "TEST-plan",
+  "bindings": {
+    "taskKey": {
+      "authorityDomain": "TEST-domain",
+      "projectId": "project",
+      "changeId": "change",
+      "taskId": "task"
+    },
+    "taskRevision": 1,
+    "taskCycle": 1,
+    "resourceId": "target",
+    "resourceInstance": "instance",
+    "targetGeneration": 1,
+    "obligationDigest": "sha256:1111111111111111111111111111111111111111111111111111111111111111",
+    "sourceCandidateDigest": "sha256:1111111111111111111111111111111111111111111111111111111111111111",
+    "baselineCandidateDigest": "sha256:1111111111111111111111111111111111111111111111111111111111111111",
+    "policyDigest": "sha256:1111111111111111111111111111111111111111111111111111111111111111",
+    "toolDigest": "sha256:1111111111111111111111111111111111111111111111111111111111111111",
+    "standardDigest": "sha256:1111111111111111111111111111111111111111111111111111111111111111",
+    "bundleDigest": "sha256:1111111111111111111111111111111111111111111111111111111111111111",
+    "factsDigest": "sha256:1111111111111111111111111111111111111111111111111111111111111111",
+    "acceptanceDigest": "sha256:1111111111111111111111111111111111111111111111111111111111111111",
+    "environmentDigest": "sha256:1111111111111111111111111111111111111111111111111111111111111111",
+    "lineageDigest": "sha256:1111111111111111111111111111111111111111111111111111111111111111",
+    "completionMode": "analysis",
+    "taskBindingDigest": "sha256:1111111111111111111111111111111111111111111111111111111111111111"
+  },
+  "actions": [
+    "complete"
+  ],
+  "slots": [
+    {
+      "slotId": "required",
+      "gateId": "TEST-driver-check",
+      "assertionIds": [
+        "TEST-assertion"
+      ],
+      "configDigest": "sha256:1111111111111111111111111111111111111111111111111111111111111111",
+      "shard": "whole",
+      "requiredForActions": [
+        "complete"
+      ],
+      "artifactIds": [
+        "original-output"
+      ],
+      "minIndependentRuns": 1,
+      "maxAttempts": 1,
+      "observationSafeForActions": []
+    }
+  ],
+  "aggregation": "all-attempts-pass-no-reuse/v1",
+  "requireOverallSuccessForActions": [
+    "complete"
+  ]
+}

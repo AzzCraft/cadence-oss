@@ -1,8 +1,7 @@
 # Support Model
 
-Cadence OSS v1.1.0 supports the offline Cadence Core CLI and the eight reviewed
-units listed in `RELEASE_UNITS.md`. The supported verification commands are
-documented in the root `VERIFY_REQUIREMENTS.md`.
+Cadence OSS is the open runtime and protocol foundation.
 
-The registry is a shipped local index, not a hosted service. Plugins and new
-units remain opt-in; third-party plugin execution remains fail-closed.
+- `cadence-protocol`, `cadence-core`, `cadence-plugins`, and `cadence-policy-packs` are maintained as governed open units.
+- `contracts-hub-template` and `cadence-examples` are reference consumers and must remain runnable.
+- Root orchestration bugs are treated as release blockers because they affect every downstream adopter.

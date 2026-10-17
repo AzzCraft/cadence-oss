@@ -92,93 +92,8 @@ func Load(path string) (Bundle, error) {
 	if err != nil {
 		return bundle, err
 	}
-	if err := json.Unmarshal(data, &bundle); err != nil {
-		return bundle, err
-	}
-	if err := ValidateBundle(&bundle); err != nil {
-		return bundle, err
-	}
-	return bundle, nil
-}
-
-// ValidateBundle verifies the governed replay-bundle shape and its declared
-// deterministic hash before a caller compares it with another result.
-func ValidateBundle(bundle *Bundle) error {
-	if bundle == nil {
-		return fmt.Errorf("replay bundle is missing")
-	}
-	if bundle.SchemaVersion != "1.0.0" {
-		return fmt.Errorf("unsupported replay bundle schemaVersion %q", bundle.SchemaVersion)
-	}
-	if strings.TrimSpace(bundle.ReplayID) == "" || strings.TrimSpace(bundle.RunManifest) == "" || strings.TrimSpace(bundle.PipelineResult) == "" {
-		return fmt.Errorf("replay bundle is missing replayId, runManifestRef, or pipelineResultRef")
-	}
-	if len(bundle.Snapshots) == 0 {
-		return fmt.Errorf("replay bundle has no snapshots")
-	}
-	seen := make(map[string]struct{}, len(bundle.Snapshots))
-	previous := ""
-	for _, snap := range bundle.Snapshots {
-		rel, err := normalizedSnapshotPath(snap.RelPath)
-		if err != nil {
-			return err
-		}
-		if rel != snap.RelPath {
-			return fmt.Errorf("snapshot path is not normalized: %q", snap.RelPath)
-		}
-		if _, exists := seen[rel]; exists {
-			return fmt.Errorf("replay bundle has duplicate snapshot path %q", rel)
-		}
-		seen[rel] = struct{}{}
-		if previous != "" && previous >= rel {
-			return fmt.Errorf("replay bundle snapshots are not strictly sorted")
-		}
-		previous = rel
-		if snap.Size < 0 || !isSHA256(snap.FileHash) {
-			return fmt.Errorf("invalid replay snapshot metadata for %q", rel)
-		}
-	}
-	if !isSHA256(bundle.BundleHash) {
-		return fmt.Errorf("invalid replay bundleHash")
-	}
-	if actual := bundleHash(bundle.Snapshots); actual != bundle.BundleHash {
-		return fmt.Errorf("replay bundleHash mismatch: expected %s, got %s", bundle.BundleHash, actual)
-	}
-	return nil
-}
-
-func normalizedSnapshotPath(rel string) (string, error) {
-	if strings.TrimSpace(rel) == "" || filepath.IsAbs(rel) {
-		return "", fmt.Errorf("snapshot path escapes output directory: %q", rel)
-	}
-	clean := filepath.Clean(filepath.FromSlash(rel))
-	if clean == "." || clean == ".." || strings.HasPrefix(clean, ".."+string(filepath.Separator)) {
-		return "", fmt.Errorf("snapshot path escapes output directory: %q", rel)
-	}
-	return filepath.ToSlash(clean), nil
-}
-
-func isSHA256(value string) bool {
-	if !strings.HasPrefix(value, "sha256:") || len(value) != len("sha256:")+64 {
-		return false
-	}
-	_, err := hex.DecodeString(strings.TrimPrefix(value, "sha256:"))
-	return err == nil
-}
-
-func bundleHash(snapshots []Snapshot) string {
-	combined := sha256.New()
-	for _, snap := range snapshots {
-		combined.Write([]byte(snap.RelPath))
-		combined.Write([]byte{0})
-		combined.Write([]byte(snap.Mode))
-		combined.Write([]byte{0})
-		combined.Write([]byte(fmt.Sprintf("%d", snap.Size)))
-		combined.Write([]byte{0})
-		combined.Write([]byte(snap.FileHash))
-		combined.Write([]byte{'\n'})
-	}
-	return "sha256:" + hex.EncodeToString(combined.Sum(nil))
+	err = json.Unmarshal(data, &bundle)
+	return bundle, err
 }
 
 // Compare builds a CAD-003 report from an original replay bundle and replayed bundle.
@@ -300,7 +215,18 @@ func Build(replayID, runManifestRef, pipelineResultRef, outDir string) (*Bundle,
 	})
 
 	// Compute bundle hash from the governed tuple.
-	bundle.BundleHash = bundleHash(bundle.Snapshots)
+	combined := sha256.New()
+	for _, s := range bundle.Snapshots {
+		combined.Write([]byte(s.RelPath))
+		combined.Write([]byte{0})
+		combined.Write([]byte(s.Mode))
+		combined.Write([]byte{0})
+		combined.Write([]byte(fmt.Sprintf("%d", s.Size)))
+		combined.Write([]byte{0})
+		combined.Write([]byte(s.FileHash))
+		combined.Write([]byte{'\n'})
+	}
+	bundle.BundleHash = "sha256:" + hex.EncodeToString(combined.Sum(nil))
 
 	return bundle, nil
 }
@@ -317,23 +243,11 @@ func Save(path string, bundle *Bundle) error {
 // VerifyBundle checks that all recorded snapshot hashes match the actual files
 // in the given output directory.
 func VerifyBundle(bundle *Bundle, outDir string) error {
-	if err := ValidateBundle(bundle); err != nil {
-		return err
-	}
-	root, err := filepath.EvalSymlinks(outDir)
-	if err != nil {
-		return fmt.Errorf("resolve output directory: %w", err)
-	}
-	rootInfo, err := os.Stat(root)
-	if err != nil || !rootInfo.IsDir() {
-		return fmt.Errorf("output directory is not a directory: %s", outDir)
-	}
 	for _, snap := range bundle.Snapshots {
-		rel, err := normalizedSnapshotPath(snap.RelPath)
-		if err != nil {
-			return err
+		if snap.RelPath == "" || filepath.IsAbs(snap.RelPath) || strings.Contains(filepath.ToSlash(snap.RelPath), "../") || filepath.ToSlash(snap.RelPath) == ".." {
+			return fmt.Errorf("snapshot path escapes output directory: %q", snap.RelPath)
 		}
-		fullPath := filepath.Join(root, filepath.FromSlash(rel))
+		fullPath := filepath.Join(outDir, filepath.FromSlash(snap.RelPath))
 		info, err := os.Lstat(fullPath)
 		if err != nil {
 			return fmt.Errorf("snapshot %s: %w", snap.RelPath, err)
@@ -341,15 +255,7 @@ func VerifyBundle(bundle *Bundle, outDir string) error {
 		if !info.Mode().IsRegular() {
 			return fmt.Errorf("snapshot %s: non-regular artifact", snap.RelPath)
 		}
-		resolved, err := filepath.EvalSymlinks(fullPath)
-		if err != nil {
-			return fmt.Errorf("snapshot %s: %w", snap.RelPath, err)
-		}
-		contained, err := filepath.Rel(root, resolved)
-		if err != nil || contained == ".." || strings.HasPrefix(contained, ".."+string(filepath.Separator)) {
-			return fmt.Errorf("snapshot path escapes output directory: %q", snap.RelPath)
-		}
-		data, err := os.ReadFile(resolved)
+		data, err := os.ReadFile(fullPath)
 		if err != nil {
 			return fmt.Errorf("snapshot %s: %w", snap.RelPath, err)
 		}

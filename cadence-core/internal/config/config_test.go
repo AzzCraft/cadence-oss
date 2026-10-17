@@ -2,10 +2,13 @@ package config
 
 import (
 	"encoding/json"
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/AzzCraft/cadence-oss/cadence-core/internal/exactjson"
 )
 
 func writeFile(t *testing.T, path string, body string) {
@@ -93,6 +96,63 @@ func TestLoadRequiresExplicitRefs(t *testing.T) {
 	_, err := Load(root)
 	if err == nil || !(strings.Contains(err.Error(), "missing") || strings.Contains(err.Error(), "does not resolve")) {
 		t.Fatalf("expected missing ref error, got %v", err)
+	}
+}
+
+func TestCadenceYAMLSourceAmbiguitiesRejectBeforeConstruction(t *testing.T) {
+	for name, data := range map[string]string{
+		"extra-document":       "projectId: demo\n---\nmode: ci\n",
+		"empty-extra-document": "projectId: demo\n---\n",
+		"timestamp":            "baselinePath: 2026-10-12\n",
+		"unknown-tag":          "mode: !unapproved ci\n",
+		"duplicate-key":        "mode: relaxed\nmode: strict_offline\n",
+		"numeric-key":          "ui: {1: true, \"1\": false}\n",
+		"boolean-key":          "ui: {true: true, \"true\": false}\n",
+		"cyclic-alias":         "ui: &cycle {profile: *cycle}\n",
+		"nonobject":            "- projectId: demo\n",
+	} {
+		t.Run(name, func(t *testing.T) {
+			if _, err := decodeCadenceConfigDocument([]byte(data)); err == nil {
+				t.Fatal("ambiguous source silently constructed", name)
+			}
+		})
+	}
+}
+
+func TestCadenceYAMLLegacyReferencesAndQuotedValuesPreserveMeaning(t *testing.T) {
+	data := "projectId: &mode mode\n*mode : strict_offline\nruntimeRef: &runtime runtime.json\nsandboxRef: *runtime\n" +
+		"rootAnchor: \"2026-10-12\"\nbaselinePath: \"on\"\n" +
+		"ui:\n  <<: &defaults {enabled: true, profile: pr}\n  enabled: false\n"
+	doc, err := decodeCadenceConfigDocument([]byte(data))
+	if err != nil || doc["projectId"] != "mode" || doc["mode"] != "strict_offline" || doc["runtimeRef"] != "runtime.json" || doc["sandboxRef"] != "runtime.json" ||
+		doc["rootAnchor"] != "2026-10-12" || doc["baselinePath"] != "on" {
+		t.Fatal("lawful historical alias/quoted values changed", doc, err)
+	}
+	ui := doc["ui"].(map[string]any)
+	if ui["enabled"] != false || ui["profile"] != "pr" {
+		t.Fatal("explicit legacy merge/override changed", ui)
+	}
+}
+
+func TestCadenceYAMLBytesDepthAndExpandedAliasesAreBounded(t *testing.T) {
+	if _, err := decodeCadenceConfigDocument([]byte(strings.Repeat(" ", exactjson.MaxBytes+1))); err == nil || !strings.Contains(err.Error(), "byte limit") {
+		t.Fatal("oversized config was parsed", err)
+	}
+	root := t.TempDir()
+	writeFile(t, filepath.Join(root, "cadence.yaml"), strings.Repeat(" ", exactjson.MaxBytes+1))
+	if _, err := Load(root); err == nil || !strings.Contains(err.Error(), "byte limit") {
+		t.Fatal("file reader bypassed byte limit", err)
+	}
+	deep := "ui: " + strings.Repeat("[", exactjson.MaxDepth+1) + "x" + strings.Repeat("]", exactjson.MaxDepth+1)
+	if _, err := decodeCadenceConfigDocument([]byte(deep)); err == nil || !strings.Contains(err.Error(), "node/depth") {
+		t.Fatal("deep source was constructed", err)
+	}
+	data := "v0: &v0 [x, x, x, x, x, x, x, x, x, x]\n"
+	for level := 1; level <= 6; level++ {
+		data += fmt.Sprintf("v%d: &v%d [%s]\n", level, level, strings.TrimSuffix(strings.Repeat(fmt.Sprintf("*v%d, ", level-1), 10), ", "))
+	}
+	if _, err := decodeCadenceConfigDocument([]byte(data)); err == nil || !strings.Contains(err.Error(), "node/depth") {
+		t.Fatal("expanded aliases reset node budget", err)
 	}
 }
 
@@ -212,6 +272,8 @@ func TestLoadAcceptsExplicitCadenceInputs(t *testing.T) {
 		"rootAnchor: hsm://tenant/root\n"+
 		"policies:\n"+
 		"  - standard-ui-v140\n"+
+		"plugins:\n"+
+		"  - cadence-plugin-python\n"+
 		"ui:\n"+
 		"  enabled: true\n"+
 		"  profile: pr\n")
@@ -222,6 +284,9 @@ func TestLoadAcceptsExplicitCadenceInputs(t *testing.T) {
 	}
 	if cfg.ToolingLock != "tooling_lock.json" || len(cfg.Policies) != 1 {
 		t.Fatalf("unexpected config: %+v", cfg)
+	}
+	if len(cfg.Plugins) != 1 || cfg.Plugins[0] != "cadence-plugin-python" {
+		t.Fatalf("expected explicit plugin allowlist, got %+v", cfg.Plugins)
 	}
 	if cfg.RootAnchor != "hsm://tenant/root" {
 		t.Fatalf("expected configured root anchor, got %+v", cfg)

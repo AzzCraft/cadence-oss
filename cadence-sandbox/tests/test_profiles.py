@@ -4,12 +4,18 @@ import sys
 import tempfile
 import unittest
 from pathlib import Path
-from tests._root_contract import repository_root_for_test_file
 from unittest import mock
 
 
-ROOT = repository_root_for_test_file(__file__)
+ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
+PINNED_IMAGE = "registry.example/cadence-sandbox@sha256:" + "a" * 64
+CONTAINER_LIMITS = {
+    "cpuLimit": 2,
+    "memoryLimitMB": 256,
+    "pidsLimit": 64,
+    "timeoutSeconds": 10,
+}
 
 
 class SandboxProfileTests(unittest.TestCase):
@@ -30,6 +36,7 @@ class SandboxProfileTests(unittest.TestCase):
                 {"workspace-only", "container-isolated", "microvm-isolated"},
             )
             self.assertFalse(payload["network"]["access"])
+            self.assertEqual(payload["allowedEnv"], ["PYTHONDONTWRITEBYTECODE"])
             self.assertIn(payload["timeSource"], {"injected", "epoch-frozen"})
             self.assertGreater(payload["resources"]["timeoutSeconds"], 0)
             self.assertIn("writableOutputDir", payload["filesystem"])
@@ -38,6 +45,7 @@ class SandboxProfileTests(unittest.TestCase):
         sandbox_profile = json.loads((ROOT / "sandbox_profile.json").read_text())
         self.assertEqual(sandbox_profile["sandboxId"], "local_offline")
         self.assertEqual(sandbox_profile["backend"], "host-local")
+        self.assertEqual(sandbox_profile["allowedEnv"], ["PYTHONDONTWRITEBYTECODE"])
         self.assertEqual(sandbox_profile["filesystem"], "workspace-only")
         self.assertFalse(sandbox_profile["networkAccess"])
 
@@ -69,8 +77,6 @@ class SandboxProfileTests(unittest.TestCase):
             self.assertEqual(latest["summary"]["status"], "pass")
 
 
-if __name__ == "__main__":
-    unittest.main()
 
 
 class RuntimeAdapterProtocolTests(unittest.TestCase):
@@ -219,35 +225,73 @@ class ContainerAdapterTests(unittest.TestCase):
         self.assertTrue(any("writableOutputDir" in f for f in failures))
 
     def test_container_adapter_execute_succeeds(self) -> None:
+        """The real adapter constructs controls and propagates engine failures."""
         from runtime.adapter import AdapterRequest
         from runtime.container_adapter import ContainerAdapter
 
-        adapter = ContainerAdapter()
-        req = AdapterRequest(
-            backend="container-runtime",
-            command=["echo", "hello"],
-            workDir="/tmp",
-            readOnlyInputs=True,
-            writableOutputDir="/tmp/out",
-            resourceLimits={"timeoutSeconds": 10},
+        for code, stdout, stderr in ((0, "hello\n", ""), (125, "", "daemon failed")):
+            with self.subTest(exit_code=code), tempfile.TemporaryDirectory() as work:
+                req = AdapterRequest(
+                    backend="container-runtime", command=["echo", "hello"],
+                    workDir=work, readOnlyInputs=True, writableOutputDir="out",
+                    imageRef=PINNED_IMAGE, resourceLimits=CONTAINER_LIMITS,
+                )
+                with (
+                    mock.patch("runtime.container_adapter._detect_container_runtime", return_value="docker"),
+                    mock.patch("runtime.container_adapter.execute_subprocess",
+                               side_effect=[(code, stdout, stderr), (0, "Docker version 25.0.0", "")]) as run,
+                ):
+                    resp = ContainerAdapter().execute(req)
+                self.assertEqual((resp.exitCode, resp.stdout, resp.stderr), (code, stdout, stderr))
+                argv = run.call_args_list[0].args[0]
+                self.assertEqual(argv[:3], ["docker", "run", "--rm"])
+                for flag, value in (("--network", "none"), ("--user", "65532:65532"),
+                                    ("--cap-drop", "ALL"), ("--security-opt", "no-new-privileges:true")):
+                    self.assertEqual(argv[argv.index(flag) + 1], value)
+                self.assertIn("--read-only", argv)
+                self.assertEqual(argv[-3:], [PINNED_IMAGE, "echo", "hello"])
+                mounts = [argv[i + 1] for i, v in enumerate(argv) if v == "--mount"]
+                self.assertEqual(mounts, [f"type=bind,src={Path(work).resolve()},dst=/workspace,readonly",
+                                         f"type=bind,src={Path(work).resolve() / 'out'},dst=/workspace/.cadence/out"])
+                self.assertFalse(resp.observedChecks, "mocked engine is not attestation")
+
+    def test_container_adapter_rejects_unpinned_image_and_incomplete_limits(self) -> None:
+        from runtime.adapter import AdapterRequest
+        from runtime.container_adapter import ContainerAdapter
+
+        failures = ContainerAdapter().validate_request(
+            AdapterRequest(
+                backend="container-runtime",
+                command=["echo", "hello"],
+                workDir="/tmp",
+                readOnlyInputs=True,
+                writableOutputDir="out",
+                imageRef="cadence-sandbox:latest",
+                resourceLimits={"timeoutSeconds": 10},
+            )
         )
-        with (
-            mock.patch("runtime.container_adapter._detect_container_runtime", return_value="docker"),
-            mock.patch(
-                "runtime.container_adapter.execute_subprocess",
-                side_effect=[(0, "hello\n", ""), (0, "Docker version 25.0.0\n", "")],
-            ) as run,
-        ):
-            resp = adapter.execute(req)
-        self.assertEqual(resp.exitCode, 0)
-        self.assertIn("hello", resp.stdout)
-        self.assertIsInstance(resp.observedChecks, list)
-        self.assertIsInstance(resp.backendEvidence, dict)
-        self.assertEqual(resp.backendEvidence["adapterType"], "container")
-        self.assertEqual(resp.backendEvidence["engine"], "docker")
-        self.assertEqual(resp.backendEvidence["imageRef"], "cadence-sandbox:latest")
-        self.assertIn("containerId", resp.backendEvidence)
-        self.assertIn("--network", run.call_args_list[0].args[0])
+        self.assertTrue(any("digest-pinned" in failure for failure in failures))
+        self.assertTrue(any("cpuLimit" in failure for failure in failures))
+
+    def test_container_adapter_rejects_undeclared_environment_and_extra_mount(self) -> None:
+        from runtime.adapter import AdapterRequest
+        from runtime.container_adapter import ContainerAdapter
+
+        failures = ContainerAdapter().validate_request(
+            AdapterRequest(
+                backend="container-runtime",
+                command=["echo", "hello"],
+                workDir="/tmp",
+                readOnlyInputs=True,
+                writableOutputDir="out",
+                imageRef=PINNED_IMAGE,
+                resourceLimits=CONTAINER_LIMITS,
+                env={"SECRET": "not-allowed"},
+                allowedMounts=["/host"],
+            )
+        )
+        self.assertTrue(any("undeclared environment" in failure for failure in failures))
+        self.assertTrue(any("arbitrary allowedMounts" in failure for failure in failures))
 
     def test_container_adapter_fails_closed_on_missing_command(self) -> None:
         from runtime.adapter import AdapterRequest
@@ -289,7 +333,7 @@ class MicrovmAdapterTests(unittest.TestCase):
         failures = adapter.validate_request(req)
         self.assertTrue(any("backend mismatch" in f for f in failures))
 
-    def test_microvm_adapter_execute_succeeds(self) -> None:
+    def test_microvm_adapter_blocks_without_guest_execution_protocol(self) -> None:
         from runtime.adapter import AdapterRequest
         from runtime.microvm_adapter import MicrovmAdapter
 
@@ -302,20 +346,18 @@ class MicrovmAdapterTests(unittest.TestCase):
             writableOutputDir="/tmp/out",
             resourceLimits={"timeoutSeconds": 10},
         )
-        with (
-            mock.patch("runtime.microvm_adapter._detect_microvm_runtime", return_value="qemu-system-x86_64"),
-            mock.patch(
-                "runtime.microvm_adapter.execute_subprocess",
-                side_effect=[(0, "microvm-test\n", ""), (0, "QEMU emulator version 8.0.0\n", "")],
-            ),
-        ):
-            resp = adapter.execute(req)
-        self.assertEqual(resp.exitCode, 0)
-        self.assertIn("microvm-test", resp.stdout)
+        resp = adapter.execute(req)
+        self.assertNotEqual(resp.exitCode, 0)
+        self.assertEqual(resp.stdout, "")
+        self.assertTrue(resp.failureReasons)
         self.assertEqual(resp.backendEvidence["adapterType"], "microvm")
-        self.assertEqual(resp.backendEvidence["hypervisor"], "qemu-system-x86_64")
-        self.assertIn("vmId", resp.backendEvidence)
-        self.assertIn("rootfsDigest", resp.backendEvidence)
+        self.assertFalse(resp.backendEvidence["guestExecution"])
+        self.assertFalse(resp.backendEvidence["guestReceiptVerified"])
+        self.assertFalse(resp.backendEvidence["releaseEvidenceEligible"])
+        self.assertEqual(resp.backendEvidence["attestationStatus"], "blocked-guest-receipt-required")
+        self.assertIn("guestCommandSha256", resp.backendEvidence["requiredGuestReceiptFields"])
+        self.assertEqual(resp.observedChecks, [])
+        self.assertEqual(resp.namespaceProofs, [])
 
     def test_microvm_adapter_fails_closed_on_network_access(self) -> None:
         from runtime.adapter import AdapterRequest
@@ -346,8 +388,9 @@ class AdapterProtocolIntegrationTests(unittest.TestCase):
             "command": ["echo", "protocol-test"],
             "workDir": "/tmp",
             "readOnlyInputs": True,
-            "writableOutputDir": "/tmp/out",
-            "resourceLimits": {"timeoutSeconds": 10},
+            "writableOutputDir": "out",
+            "imageRef": PINNED_IMAGE,
+            "resourceLimits": CONTAINER_LIMITS,
             "requiredChecks": [],
         }).encode()
 
@@ -413,3 +456,7 @@ class AdapterProtocolIntegrationTests(unittest.TestCase):
         response = json.loads(output)
         self.assertEqual(response["exitCode"], 1)
         self.assertTrue(any("backend mismatch" in r for r in response["failureReasons"]))
+
+
+if __name__ == "__main__":
+    unittest.main()

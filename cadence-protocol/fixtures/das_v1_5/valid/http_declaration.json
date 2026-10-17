@@ -1,0 +1,16 @@
+{
+  "contractIdentity": "das-http-declaration/v1",
+  "scope": "TEST-version-reference-http",
+  "sourceDirection": "openapi-first",
+  "rootURI": "https://cadence.das.dev/examples/version-reference/openapi.json",
+  "sources": [
+    {
+      "uri": "https://cadence.das.dev/examples/version-reference/openapi.json",
+      "sha256": "sha256:95991a33dad22b5a17401f8a2415754ff15ed11c4d4516006a0b8b95b59c3552"
+    },
+    {
+      "uri": "https://cadence.das.dev/examples/version-reference/resource_action_intent.schema.json",
+      "sha256": "sha256:5904b489dc34366d11e07d3c4ccc5cc521fe9e59fd6d1c8e8ac077a7ebfefbd4"
+    }
+  ]
+}

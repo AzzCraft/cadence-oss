@@ -4,8 +4,20 @@ set -euo pipefail
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT_DIR"
 export PYTHONDONTWRITEBYTECODE=1
+export PYTEST_ADDOPTS=
 
-echo "[cadence-protocol] validate schemas (lightweight, stdlib-only) + validate examples + validate fixtures"
+python3 - <<'DEP'
+import importlib.metadata
+for package in ('jsonschema', 'pytest', 'rfc8785'):
+    try:
+        version = importlib.metadata.version(package)
+    except importlib.metadata.PackageNotFoundError:
+        raise SystemExit('install cadence-protocol/requirements-verify.txt before verification')
+    if package == 'rfc8785' and version != '0.1.4':
+        raise SystemExit('the exact contract codec requires rfc8785==0.1.4')
+DEP
+
+echo "[cadence-protocol] validate schemas + examples + fixtures"
 python3 - <<'PY'
 import json
 from pathlib import Path
@@ -51,8 +63,9 @@ if missing_docs:
     raise SystemExit("FAIL: missing protocol docs:\n- " + "\n- ".join(missing_docs))
 
 # --- Schema structural checks ---
-schema_files = sorted(schemas_dir.glob('*.schema.json'))
-assert schema_files, 'no schema files'
+schema_files = sorted(schemas_dir.rglob('*.schema.json'))
+if not (schema_files):
+    raise SystemExit('no schema files')
 for p in schema_files:
     data = json.loads(p.read_text(encoding='utf-8'))
     for k in ('$schema', '$id', 'title'):
@@ -207,3 +220,5 @@ print('[cadence-protocol] OK')
 PY
 
 bash ./scripts/verify-compat
+
+python3 -m pytest -p no:cacheprovider -q tests

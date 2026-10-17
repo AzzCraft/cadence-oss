@@ -1,10 +1,16 @@
 # Root Verify Policy
 
-`scripts/verify` is the canonical standalone verifier. Its default is `fast`
-and preserves the v1.0 Cadence Core verification contract. `--full` adds the
-complete core suite and each of the seven optional public units.
+The root `cadence-oss` verifier is orchestration only.
 
-The root verifier must not require a sibling repository, a checkout basename,
-Git metadata or network access. Fast mode does not require an optional Cadence
-unit. It reports the
-verification mode and release identity information needed to audit a result.
+Rules:
+
+- It may call subunit verifiers inside the current repo.
+- It must not traverse to any sibling repository.
+- It must not assume nested `cadence-oss/cadence-oss/*` paths.
+- It must fail if legacy baseline or legacy enterprise naming references remain under this repo.
+
+The public full verifier also runs the explicitly selected root cross-unit and
+verify-mode checks. Their four test/helper files are part of the beta public
+source closure. Root internal remediation remains in `scripts/verify-root`;
+that entry and its internal-only inputs are not required by public verification.
+Missing public test files fail verification rather than silently skipping it.

@@ -6,6 +6,7 @@
   "schemaVersion": "1.0.0",
   "profileId": "no-network",
   "backend": "container-runtime",
+  "allowedEnv": ["PYTHONDONTWRITEBYTECODE"],
   "profile": "no-network",
   "description": "Default plugin sandbox profile with all egress denied. Plugins must explicitly opt in via manifest permissions to receive any network access.",
   "network": {
@@ -19,7 +20,7 @@
   "filesystem": {
     "mode": "container-isolated",
     "readOnlyInputs": true,
-    "writableOutputDir": "/workspace/.cadence/out",
+    "writableOutputDir": ".cadence/out",
     "rootMode": "read-only",
     "writableMounts": ["/tmp/artifacts"],
     "deniedPaths": ["/etc", "/var", "/root", "/home"]

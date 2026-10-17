@@ -1,6 +1,6 @@
 # cadence-registry
 
-Reviewed registry metadata and trust indexes consumed by `cadence-core`.
+Internal registry metadata and trust index consumed by `cadence-core`.
 
 This directory represents the local registry unit for plugin, policy pack, and
 runtime/sandbox profile discovery within `cadence-oss`.
@@ -8,8 +8,7 @@ runtime/sandbox profile discovery within `cadence-oss`.
 ## Structure
 
 ```
-registry.json                — Full reviewed registry, including opt-in plugins
-registry-core.json           — Core-only default registry used by shipped examples
+registry.json                — Canonical consumer registry (consumed by cadence-core)
 indexes/
   plugins.json               — Registered plugins
   policy-packs.json          — Registered policy packs
@@ -19,7 +18,7 @@ schemas/
 docs/
   TRUST_MODEL.md             — Trust levels, digest pinning, deprecation
 scripts/
-  verify                     — Index and both consumer-registry validation
+  verify                     — Index validation
 ```
 
 ## Verification

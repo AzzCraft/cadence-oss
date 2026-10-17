@@ -23,7 +23,7 @@ func buildBinary(t *testing.T) string {
 		bin += ".exe"
 	}
 	cmd := exec.Command("go", "build", "-buildvcs=false", "-o", bin, "./cmd/cadence")
-	cmd.Dir = moduleRoot(t)
+	cmd.Dir = coreRoot(t)
 	out, err := cmd.CombinedOutput()
 	if err != nil {
 		t.Fatalf("failed to build cadence binary: %v\n%s", err, out)
@@ -31,17 +31,16 @@ func buildBinary(t *testing.T) string {
 	return bin
 }
 
-// moduleRoot returns the cadence-core module root without relying on a
-// workspace layout or checkout directory name.
-func moduleRoot(t *testing.T) string {
+// coreRoot is relative to this Go test package, independent of checkout name.
+func coreRoot(t *testing.T) string {
 	t.Helper()
-	_, file, _, ok := runtime.Caller(0)
-	if !ok {
-		t.Fatal("cannot determine integration test source path")
+	dir, err := os.Getwd()
+	if err != nil {
+		t.Fatal(err)
 	}
-	root := filepath.Clean(filepath.Join(filepath.Dir(file), "..", ".."))
+	root := filepath.Clean(filepath.Join(dir, "..", ".."))
 	if _, err := os.Stat(filepath.Join(root, "go.mod")); err != nil {
-		t.Fatalf("cadence-core module root is invalid: %v", err)
+		t.Fatalf("cannot locate cadence-core from integration test directory: %v", err)
 	}
 	return root
 }
@@ -55,6 +54,7 @@ func setupTestRepo(t *testing.T) string {
 	writeTestJSON(t, filepath.Join(dir, "sandbox.json"), map[string]any{
 		"schemaVersion": "1.0.0",
 		"sandboxId":     "test-sandbox",
+		"allowedEnv":    []string{"PYTHONDONTWRITEBYTECODE"},
 		"filesystem":    "workspace-only",
 		"networkAccess": false,
 		"timeSource":    "injected",
@@ -240,6 +240,7 @@ func configureRuntimeBackend(t *testing.T, repo, backend, filesystemMode string)
 		"schemaVersion": "1.0.0",
 		"sandboxId":     "test-sandbox",
 		"backend":       backend,
+		"allowedEnv":    []string{"PYTHONDONTWRITEBYTECODE"},
 		"filesystem": map[string]any{
 			"mode":              filesystemMode,
 			"readOnlyInputs":    true,
@@ -1449,6 +1450,23 @@ func TestVerifyFailsWhenDeprecatedPluginCompatWindowHasExpired(t *testing.T) {
 	bin := buildBinary(t)
 	repo := setupTestRepo(t)
 	outDir := filepath.Join(repo, ".cadence", "out")
+	// Plugins are discovered through the registry but require an explicit
+	// repository-level execution grant. Request the deprecated plugin here so
+	// this test continues to exercise its compatibility-window validation.
+	if err := os.WriteFile(filepath.Join(repo, "cadence.yaml"), []byte(`projectId: integration-test
+mode: strict_offline
+closureRef: suite_version_closure.json
+toolingLock: tooling_lock.json
+runtimeRef: runtime.json
+registryRef: registry.json
+sandboxRef: sandbox.json
+policies:
+  - test-pack
+plugins:
+  - expired-plugin
+`), 0o644); err != nil {
+		t.Fatalf("write cadence.yaml with requested plugin: %v", err)
+	}
 
 	pluginDir := filepath.Join(repo, "plugins")
 	if err := os.MkdirAll(pluginDir, 0o755); err != nil {
@@ -1555,6 +1573,7 @@ func TestVerifyFailsClosedWhenContainerRuntimeAdapterIsMissing(t *testing.T) {
 		"schemaVersion": "1.0.0",
 		"sandboxId":     "test-sandbox",
 		"backend":       "container-runtime",
+		"allowedEnv":    []string{"PYTHONDONTWRITEBYTECODE"},
 		"filesystem": map[string]any{
 			"mode":              "container-isolated",
 			"readOnlyInputs":    true,
@@ -1650,6 +1669,7 @@ func TestVerifyUsesContainerRuntimeAdapterExecution(t *testing.T) {
 		"schemaVersion": "1.0.0",
 		"sandboxId":     "test-sandbox",
 		"backend":       "container-runtime",
+		"allowedEnv":    []string{"PYTHONDONTWRITEBYTECODE"},
 		"filesystem": map[string]any{
 			"mode":              "container-isolated",
 			"readOnlyInputs":    true,
@@ -1759,6 +1779,7 @@ func TestVerifyUsesMicrovmRuntimeAdapterExecution(t *testing.T) {
 		"schemaVersion": "1.0.0",
 		"sandboxId":     "test-sandbox",
 		"backend":       "microvm-runtime",
+		"allowedEnv":    []string{"PYTHONDONTWRITEBYTECODE"},
 		"filesystem": map[string]any{
 			"mode":              "microvm-isolated",
 			"readOnlyInputs":    true,
@@ -1859,7 +1880,7 @@ func TestVerifyUsesRealContainerRuntime(t *testing.T) {
 	}
 	adapter := strings.TrimSpace(os.Getenv("CADENCE_SANDBOX_CONTAINER_ADAPTER"))
 	if adapter == "" {
-		t.Skip("set CADENCE_SANDBOX_CONTAINER_ADAPTER to a real container-runtime adapter")
+		t.Fatal("CADENCE_TEST_REAL_CONTAINER_RUNTIME=1 requires CADENCE_SANDBOX_CONTAINER_ADAPTER")
 	}
 
 	bin := buildBinary(t)
@@ -1912,7 +1933,7 @@ func TestVerifyUsesRealMicrovmRuntime(t *testing.T) {
 	}
 	adapter := strings.TrimSpace(os.Getenv("CADENCE_SANDBOX_MICROVM_ADAPTER"))
 	if adapter == "" {
-		t.Skip("set CADENCE_SANDBOX_MICROVM_ADAPTER to a real microvm-runtime adapter")
+		t.Fatal("CADENCE_TEST_REAL_MICROVM_RUNTIME=1 requires CADENCE_SANDBOX_MICROVM_ADAPTER")
 	}
 
 	bin := buildBinary(t)
@@ -1968,6 +1989,7 @@ func TestVerifyFailsClosedWhenContainerRuntimeProofIsInvalid(t *testing.T) {
 		"schemaVersion": "1.0.0",
 		"sandboxId":     "test-sandbox",
 		"backend":       "container-runtime",
+		"allowedEnv":    []string{"PYTHONDONTWRITEBYTECODE"},
 		"filesystem": map[string]any{
 			"mode":              "container-isolated",
 			"readOnlyInputs":    true,

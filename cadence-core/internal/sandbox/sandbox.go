@@ -54,10 +54,12 @@ type Profile struct {
 	Backend            string   `json:"backend,omitempty"`
 	Description        string   `json:"description,omitempty"`
 	Filesystem         string   `json:"filesystem,omitempty"`
+	ImageRef           string   `json:"imageRef,omitempty"`
 	NetworkAccess      bool     `json:"networkAccess,omitempty"`
 	TimeSource         string   `json:"timeSource,omitempty"`
 	DeterministicClock bool     `json:"deterministicClock,omitempty"`
 	AllowedMounts      []string `json:"allowedMounts,omitempty"`
+	AllowedEnv         []string `json:"allowedEnv,omitempty"`
 	ResourceLimits     *Limits  `json:"resourceLimits,omitempty"`
 	ReadOnlyInputs     bool     `json:"readOnlyInputs,omitempty"`
 	WritableOutputDir  string   `json:"writableOutputDir,omitempty"`
@@ -163,10 +165,12 @@ type RuntimeAdapterRequest struct {
 	WorkDir                   string            `json:"workDir"`
 	Env                       map[string]string `json:"env,omitempty"`
 	Filesystem                string            `json:"filesystem,omitempty"`
+	ImageRef                  string            `json:"imageRef,omitempty"`
 	NetworkAccess             bool              `json:"networkAccess"`
 	ReadOnlyInputs            bool              `json:"readOnlyInputs,omitempty"`
 	WritableOutputDir         string            `json:"writableOutputDir,omitempty"`
 	AllowedMounts             []string          `json:"allowedMounts,omitempty"`
+	AllowedEnv                []string          `json:"allowedEnv,omitempty"`
 	ResourceLimits            *Limits           `json:"resourceLimits,omitempty"`
 	RequiredChecks            []string          `json:"requiredChecks,omitempty"`
 	RequiredParentEnvKeys     []string          `json:"requiredParentEnvKeys,omitempty"`
@@ -233,11 +237,13 @@ type rawProfile struct {
 	Backend            string          `json:"backend,omitempty"`
 	Description        string          `json:"description,omitempty"`
 	Filesystem         json.RawMessage `json:"filesystem,omitempty"`
+	ImageRef           string          `json:"imageRef,omitempty"`
 	Network            json.RawMessage `json:"network,omitempty"`
 	NetworkAccess      *bool           `json:"networkAccess,omitempty"`
 	TimeSource         string          `json:"timeSource,omitempty"`
 	DeterministicClock bool            `json:"deterministicClock,omitempty"`
 	AllowedMounts      []string        `json:"allowedMounts,omitempty"`
+	AllowedEnv         []string        `json:"allowedEnv,omitempty"`
 	Resources          *rawResources   `json:"resources,omitempty"`
 	ResourceLimits     *Limits         `json:"resourceLimits,omitempty"`
 }
@@ -281,9 +287,11 @@ func Load(path string) (Profile, error) {
 		profile.SandboxID = profile.ProfileID
 	}
 	profile.Description = raw.Description
+	profile.ImageRef = strings.TrimSpace(raw.ImageRef)
 	profile.TimeSource = strings.TrimSpace(raw.TimeSource)
 	profile.DeterministicClock = raw.DeterministicClock
 	profile.AllowedMounts = raw.AllowedMounts
+	profile.AllowedEnv = append([]string{}, raw.AllowedEnv...)
 
 	if len(raw.Filesystem) > 0 {
 		var mode string
@@ -535,14 +543,14 @@ func executeHostLauncher(p Profile, req CommandRequest, result ExecutionResult) 
 }
 
 func executeRuntimeAdapter(p Profile, req CommandRequest, result ExecutionResult) Execution {
-	adapterEnv := adapterEnvVar(result.Backend)
-	adapterPath := strings.TrimSpace(os.Getenv(adapterEnv))
+	adapterEnvVarName := adapterEnvVar(result.Backend)
+	adapterPath := strings.TrimSpace(os.Getenv(adapterEnvVarName))
 	if adapterPath == "" {
 		result.Passed = false
 		result.Status = "denied"
 		result.FailureReasons = append(
 			result.FailureReasons,
-			fmt.Sprintf("sandbox runtime adapter is required for backend %q; set %s", result.Backend, adapterEnv),
+			fmt.Sprintf("sandbox runtime adapter is required for backend %q; set %s", result.Backend, adapterEnvVarName),
 		)
 		return Execution{Result: result}
 	}
@@ -559,16 +567,26 @@ func executeRuntimeAdapter(p Profile, req CommandRequest, result ExecutionResult
 	}
 	defer cancel()
 
+	adapterEnv, adapterEnvErr := buildRuntimeAdapterEnv(p, req.Env)
+	if adapterEnvErr != nil {
+		result.Passed = false
+		result.Status = "denied"
+		result.FailureReasons = append(result.FailureReasons, adapterEnvErr.Error())
+		return Execution{Result: result}
+	}
+
 	requestPayload := RuntimeAdapterRequest{
 		Backend:                   result.Backend,
 		Command:                   append([]string{}, req.Command...),
 		WorkDir:                   req.WorkDir,
-		Env:                       buildCommandEnvMap(p, req.Env),
+		Env:                       adapterEnv,
 		Filesystem:                p.Filesystem,
+		ImageRef:                  p.ImageRef,
 		NetworkAccess:             p.NetworkAccess,
 		ReadOnlyInputs:            p.ReadOnlyInputs,
 		WritableOutputDir:         p.WritableOutputDir,
 		AllowedMounts:             append([]string{}, p.AllowedMounts...),
+		AllowedEnv:                append([]string{}, p.AllowedEnv...),
 		ResourceLimits:            p.ResourceLimits,
 		RequiredChecks:            requiredIsolationChecks(normalizedBackendType(result.Backend)),
 		RequiredParentEnvKeys:     append([]string{}, allowedParentEnvKeys...),
@@ -649,7 +667,7 @@ func executeRuntimeAdapter(p Profile, req CommandRequest, result ExecutionResult
 	if len(adapterResp.FailureReasons) > 0 {
 		execution.Result.FailureReasons = append(execution.Result.FailureReasons, adapterResp.FailureReasons...)
 	}
-	applyAdapterEvidence(&execution.Result, p, adapterPath, adapterEnv, adapterResp)
+	applyAdapterEvidence(&execution.Result, p, adapterPath, adapterEnvVarName, adapterResp)
 	if execution.Result.BackendEvidence["attestationStatus"] == "insufficient" {
 		execution.Result.Passed = false
 		execution.Result.Status = "denied"
@@ -819,6 +837,56 @@ func buildCommandEnvMap(p Profile, overlay map[string]string) map[string]string 
 	return envMap
 }
 
+// buildRuntimeAdapterEnv deliberately does not forward the host launcher
+// environment.  A non-host backend receives only Cadence's fixed runtime
+// markers plus command environment names declared by the profile.  This keeps
+// a request from smuggling credentials or proxy settings into an isolated
+// image through CommandRequest.Env.
+func buildRuntimeAdapterEnv(p Profile, overlay map[string]string) (map[string]string, error) {
+	allowed := map[string]bool{}
+	for _, key := range p.AllowedEnv {
+		key = strings.TrimSpace(key)
+		if !validEnvironmentKey(key) {
+			return nil, fmt.Errorf("sandbox: invalid allowed environment key %q", key)
+		}
+		if strings.HasPrefix(key, "CADENCE_SANDBOX_") {
+			return nil, fmt.Errorf("sandbox: profile may not override reserved environment key %q", key)
+		}
+		allowed[key] = true
+	}
+	env := map[string]string{
+		"CADENCE_SANDBOX_PROFILE":    profileID(p),
+		"CADENCE_SANDBOX_BACKEND":    selectedBackend(p),
+		"CADENCE_SANDBOX_FILESYSTEM": p.Filesystem,
+		"CADENCE_SANDBOX_NETWORK":    "off",
+	}
+	if p.ReadOnlyInputs {
+		env["CADENCE_SANDBOX_READ_ONLY_INPUTS"] = "1"
+	}
+	if p.WritableOutputDir != "" {
+		env["CADENCE_SANDBOX_WRITABLE_OUTPUT_DIR"] = p.WritableOutputDir
+	}
+	for key, value := range overlay {
+		if !allowed[key] {
+			return nil, fmt.Errorf("sandbox: environment key %q is not declared by profile", key)
+		}
+		env[key] = value
+	}
+	return env, nil
+}
+
+func validEnvironmentKey(key string) bool {
+	if key == "" || key[0] < 'A' || key[0] > 'Z' {
+		return false
+	}
+	for _, char := range key {
+		if (char < 'A' || char > 'Z') && (char < '0' || char > '9') && char != '_' {
+			return false
+		}
+	}
+	return true
+}
+
 func selectedBackend(p Profile) string {
 	if strings.TrimSpace(p.Backend) != "" {
 		return strings.TrimSpace(p.Backend)
@@ -846,11 +914,13 @@ func buildBackendEvidence(p Profile, req CommandRequest) map[string]any {
 	contract := map[string]any{
 		"backend":           backend,
 		"filesystem":        p.Filesystem,
+		"imageRef":          p.ImageRef,
 		"networkAccess":     p.NetworkAccess,
 		"readOnlyInputs":    p.ReadOnlyInputs,
 		"writableOutputDir": writableOutput,
 		"workDir":           req.WorkDir,
 		"resourceLimits":    p.ResourceLimits,
+		"allowedEnv":        append([]string{}, p.AllowedEnv...),
 	}
 	payload, _ := json.Marshal(contract)
 	sum := sha256.Sum256(payload)

@@ -3,10 +3,10 @@ mode: strict_offline
 closureRef: suite_version_closure.json
 toolingLock: tooling_lock.json
 runtimeRef: ../../../cadence-sandbox/runtime_profile.json
-registryRef: ../../../cadence-registry/registry-core.json
+registryRef: ../../../cadence-registry/registry.json
 sandboxRef: ../../../cadence-sandbox/sandbox_profile.json
 policies:
-  - headless-v140
+  - headless-v146
 ui:
   enabled: false
   profile: pr

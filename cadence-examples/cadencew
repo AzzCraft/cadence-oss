@@ -35,7 +35,19 @@ ensure_bin() {
     mkdir -p "$BIN_DIR"
     if needs_rebuild; then
       echo "cadencew: building cadence-core -> $BIN"
-      (cd "$LOCAL_CORE" && go build -trimpath -buildvcs=false -mod=vendor -o "$BIN" ./cmd/cadence)
+      # Build beside neither the source tree nor the persistent wrapper cache.
+      # A stale executable in .cadence/bin (including one created by an older
+      # wrapper) must not make a repeat verification fail before the binary can
+      # be atomically replaced.
+      build_dir="$(mktemp -d "${TMPDIR:-/tmp}/cadencew-build.XXXXXX")"
+      temp_bin="$build_dir/cadence"
+      if ! (cd "$LOCAL_CORE" && go build -o "$temp_bin" ./cmd/cadence); then
+        rmdir "$build_dir" 2>/dev/null || true
+        return 1
+      fi
+      chmod +x "$temp_bin"
+      mv -f "$temp_bin" "$BIN"
+      rmdir "$build_dir"
       chmod +x "$BIN"
     fi
     return 0

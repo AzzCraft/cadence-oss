@@ -1,15 +1,9 @@
 #!/usr/bin/env bash
 set -euo pipefail
+export PYTEST_ADDOPTS=
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT_DIR"
-
-# Verification may build a local wrapper and evidence. Those outputs are not
-# source artifacts and must not survive a release-gate run.
-cleanup() {
-  rm -rf "$ROOT_DIR/.cadence"
-}
-trap cleanup EXIT
 
 [ -f tooling_lock.json ] || { echo "tooling_lock.json missing"; exit 2; }
 [ -f suite_version_closure.json ] || { echo "suite_version_closure.json missing"; exit 2; }
@@ -179,9 +173,82 @@ if errors:
 print(f"OK: validated {validated} cadence repos")
 VALIDATE
 
-# Examples are verified structurally and through the core's safe diagnostic
-# command. `verify` would execute every registry plugin; v1.1 deliberately
-# keeps third-party/plugin execution disabled unless a future isolated runner
-# is explicitly selected by a governed product configuration.
-bash ./cadencew doctor
-echo "OK: examples are structurally valid; plugin execution remains opt-in"
+bash ./cadencew verify --profile dev
+
+# Validate evidence artifacts against protocol validators (stdlib-only)
+python3 - <<'PY'
+import sys
+from pathlib import Path
+
+here = Path('.')
+out_dir = here / '.cadence' / 'out'
+if not (out_dir.is_dir()):
+    raise SystemExit('missing .cadence/out')
+
+# Prefer a stable alias directory if available.
+# This reduces "where did the run folder go" confusion and makes automation deterministic.
+alias = out_dir / 'latest'
+if alias.is_dir():
+    latest = alias
+else:
+    latest = sorted([p for p in out_dir.iterdir() if p.is_dir()])[-1]
+
+# Inline minimal artifact validation (self-contained — no sibling imports).
+import json
+
+def _validate_required(obj, keys, label):
+    for k in keys:
+        if k not in obj:
+            raise ValueError(f"{label}: missing {k}")
+
+for name in (
+    'input-identity.json',
+    'run-manifest.json',
+    'run-manifest.canonical.json',
+    'pipeline-result.json',
+    'pipeline-result.canonical.json',
+    'job-envelope.json',
+    'job-envelope.canonical.json',
+    'audit-telemetry.json',
+):
+    fp = latest / name
+    if not fp.exists():
+        print(f"FAIL: required evidence artifact missing: {name} in {latest.name}", file=sys.stderr)
+        sys.exit(1)
+
+rm = json.loads((latest / 'run-manifest.json').read_text(encoding='utf-8'))
+_validate_required(rm, ['runId', 'schemaVersion', 'pipeline', 'config'], 'RunManifest')
+
+pr = json.loads((latest / 'pipeline-result.json').read_text(encoding='utf-8'))
+_validate_required(pr, ['runId', 'schemaVersion', 'status'], 'PipelineResult')
+
+je = json.loads((latest / 'job-envelope.json').read_text(encoding='utf-8'))
+_validate_required(je, ['jobId', 'schemaVersion', 'status'], 'JobEnvelope')
+
+def contains_forbidden_key(node, key):
+    if isinstance(node, dict):
+        if key in node:
+            return True
+        return any(contains_forbidden_key(value, key) for value in node.values())
+    if isinstance(node, list):
+        return any(contains_forbidden_key(value, key) for value in node)
+    return False
+
+for artifact_name in (
+    'run-manifest.json',
+    'pipeline-result.json',
+    'job-envelope.json',
+    'run-manifest.canonical.json',
+    'pipeline-result.canonical.json',
+    'job-envelope.canonical.json',
+):
+    payload = json.loads((latest / artifact_name).read_text(encoding='utf-8'))
+    for forbidden in ('createdAt', 'updatedAt', 'startedAt', 'finishedAt', 'elapsedMs', 'timeMs'):
+        if contains_forbidden_key(payload, forbidden):
+            print(f"FAIL: primary/canonical artifact leaked telemetry key {forbidden}: {artifact_name}", file=sys.stderr)
+            sys.exit(1)
+
+print('OK: evidence validated', latest.name)
+PY
+
+python3 -B -m pytest -q -p no:cacheprovider tests
