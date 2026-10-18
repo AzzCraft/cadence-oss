@@ -54,6 +54,19 @@ class ExamplesRemediationSpecTests(unittest.TestCase):
         data = json.loads((ROOT / "suite_version_closure.json").read_text(encoding="utf-8"))
         self.assertIn("suiteVersion", data)
 
+    def test_local_closure_inputs_are_inside_the_public_repository(self) -> None:
+        roots = [ROOT] + sorted(p for p in (ROOT / "examples").iterdir() if p.is_dir())
+        for repo in roots:
+            closure = json.loads((repo / "suite_version_closure.json").read_bytes())
+            tooling = json.loads((repo / "tooling_lock.json").read_bytes())
+            refs = [closure["suiteLockRef"], *closure["lockRefs"].values(),
+                    *(tooling[key] for key in ("suiteLockRef", "suiteVersionClosureRef", "verifyRegistryRef"))]
+            for ref in refs:
+                with self.subTest(repo=repo.name, uri=ref["uri"]):
+                    target = (repo / ref["uri"]).resolve()
+                    self.assertTrue(target.is_relative_to(ROOT.parent.resolve()))
+                    self.assertTrue(target.is_file())
+
 
 if __name__ == "__main__":
     unittest.main()

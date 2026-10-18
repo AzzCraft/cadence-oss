@@ -8,10 +8,11 @@
   "closureUpdatedAt": "2026-04-11T00:00:00Z",
   "suiteLockRef": {
     "kind": "file",
-    "uri": "../../../../das-suite/suite_lock.json",
+    "uri": "../../suite_lock.json",
     "pinType": "manifest",
     "pinValue": "suite_lock.json",
-    "floating": false
+    "floating": false,
+    "notes": "Standalone legacy closure uses the shared example compatibility lock."
   },
   "lockRefs": {
     "suiteToolingLock": {
