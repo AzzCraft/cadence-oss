@@ -130,6 +130,16 @@ def test_independent_action_grant_vector_and_closed_payload():
             contracts.validate(contracts.codec.canonical(mutation), identity)
 
 
+def test_missing_date_time_checker_refuses_even_a_valid_contract(monkeypatch):
+    payload = json.loads((ROOT / 'fixtures/das_v1_5/action_authorization_vector.json').read_text())['payload']
+    data = contracts.codec.canonical(payload)
+    identity = 'das-action-authorization/v1'
+    assert contracts.validate(data, identity) == payload
+    monkeypatch.delitem(contracts.FormatChecker.checkers, 'date-time')
+    with pytest.raises(ValueError, match='date-time validation requires rfc3339-validator'):
+        contracts.validate(data, identity)
+
+
 @pytest.mark.parametrize('name,identity', [('http_declaration','das-http-declaration/v1'),
                                         ('http_inventory','das-http-inventory/v1')])
 def test_http_reference_contract_positive_negative_and_single_author_shape(name, identity):
