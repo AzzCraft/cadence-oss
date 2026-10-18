@@ -8,7 +8,7 @@ export PYTEST_ADDOPTS=
 
 python3 - <<'DEP'
 import importlib.metadata
-for package in ('jsonschema', 'pytest', 'rfc8785'):
+for package in ('jsonschema', 'rfc3339-validator', 'pytest', 'rfc8785'):
     try:
         version = importlib.metadata.version(package)
     except importlib.metadata.PackageNotFoundError:

@@ -81,7 +81,10 @@ def validate(data: bytes, identity: str):
     if schema["$schema"] != "https://json-schema.org/draft/2020-12/schema" or schema.get("$vocabulary"):
         raise ValueError("unapproved schema dialect or required vocabulary")
     ExactValidator.check_schema(schema)
-    ExactValidator(schema, registry=registry, format_checker=FormatChecker()).validate(value)
+    checker = FormatChecker()
+    if 'date-time' not in checker.checkers:
+        raise ValueError('date-time validation requires rfc3339-validator; install requirements-verify.txt')
+    ExactValidator(schema, registry=registry, format_checker=checker).validate(value)
     if identity in ('das-bundle-resolution/v1', 'das-context-pack/v1', 'das-bundle-resolution/v2', 'das-context-pack/v2'):
         field = 'recordDigest' if identity in ('das-bundle-resolution/v1', 'das-bundle-resolution/v2') else 'contextPackDigest'
         subject = dict(value); received = subject.pop(field)
