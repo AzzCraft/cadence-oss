@@ -99,7 +99,7 @@ class TestVerifierDispatch(unittest.TestCase):
                         self.assertEqual(sum("pytest" in call for call in calls), 1)
                         if relative.startswith("cadence-core/"):
                             self.assertEqual([c for c in calls if c[:2] == ["go", "test"]],
-                                             [["go", "test", "./...", "-count=1", "-timeout=120s"]])
+                                             [["go", "test", "./...", "-count=1", "-timeout=180s"]])
                         if relative == "verify_all.sh":
                             self.assertEqual([c for c in calls if c[0] == "bash"].count(["bash", "./scripts/verify-full"]), 1)
                             self.assertEqual([c for c in calls if "pytest" in c], [[
