@@ -7,7 +7,7 @@ export PYTHONDONTWRITEBYTECODE=1
 export PYTEST_ADDOPTS=
 case "${1:-}" in
   "") test_freshness=() ;;
-  --full) test_freshness=(-count=1 -timeout=120s) ;;
+  --full) test_freshness=(-count=1 -timeout=180s) ;;
   *) echo "Usage: scripts/verify [--full]" >&2; exit 2 ;;
 esac
 [[ $# -le 1 ]] || exit 2

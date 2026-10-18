@@ -1336,6 +1336,9 @@ func TestEveryMinimumControlAndNewRiskHasAnIndependentObservedDuty(t *testing.T)
 		}
 	}
 	for key, id := range targets {
+		// Reuse these exact observations for the monotonicity comparison below.
+		// Catalog and other facts are unchanged within this one risk's cases.
+		booleanStates := map[bool]map[string]string{}
 		for _, known := range []any{false, "unknown", true} {
 			all[key] = known
 			setFacts(input, all)
@@ -1346,7 +1349,11 @@ func TestEveryMinimumControlAndNewRiskHasAnIndependentObservedDuty(t *testing.T)
 					want = "true"
 				}
 			}
-			if leafStates(t, input)[id] != want {
+			states := leafStates(t, input)
+			if value, ok := known.(bool); ok {
+				booleanStates[value] = states
+			}
+			if states[id] != want {
 				t.Fatalf("risk %s ignored actual applicability %v", key, known)
 			}
 		}
@@ -1356,12 +1363,8 @@ func TestEveryMinimumControlAndNewRiskHasAnIndependentObservedDuty(t *testing.T)
 		if leafStates(t, input)[id] != "conflict" {
 			t.Fatalf("risk %s lost conflicting source", key)
 		}
-		all[key] = false
-		setFacts(input, all)
-		before := leafStates(t, input)
-		all[key] = true
-		setFacts(input, all)
-		for other, after := range leafStates(t, input) {
+		before := booleanStates[false]
+		for other, after := range booleanStates[true] {
 			if before[other] == "true" && after != "true" {
 				t.Fatal("new risk removed an existing duty")
 			}
