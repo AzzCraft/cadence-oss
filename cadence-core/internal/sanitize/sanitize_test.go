@@ -6,9 +6,9 @@ import (
 )
 
 func TestStringScrubs(t *testing.T) {
-	in := "user alice@example.com Bearer abcd1234efgh5678 path /Users/pengqi/work id 550e8400-e29b-41d4-a716-446655440000"
+	in := "user alice@example.com Bearer abcd1234efgh5678 path /Users/username/work id 550e8400-e29b-41d4-a716-446655440000"
 	out := String(in)
-	for _, banned := range []string{"alice@example.com", "abcd1234efgh5678", "/Users/pengqi", "550e8400-e29b-41d4-a716-446655440000"} {
+	for _, banned := range []string{"alice@example.com", "abcd1234efgh5678", "/Users/username", "550e8400-e29b-41d4-a716-446655440000"} {
 		if strings.Contains(out, banned) {
 			t.Fatalf("output still contains %q: %s", banned, out)
 		}
