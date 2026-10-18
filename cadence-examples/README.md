@@ -25,3 +25,7 @@ Notes:
 - If a pinned CLI binary exists at `.cadence/bin/cadence`, `cadencew` will use it.
 - Otherwise, `cadencew` will build `cadence-core` from `../cadence-core` (requires Go).
 - `tooling_lock.json` is the authoritative tool/runtime/policy reference file for this example repo.
+- The shared `suite_lock.json` is a separate historical 1.4 compatibility fixture
+  required by the legacy closure contract. Root and nested examples reference this
+  local file; verification needs no neighboring Suite checkout and does not clone
+  or activate the fixture's historical module pins.
