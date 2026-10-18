@@ -9,7 +9,7 @@ if [[ $# -gt 1 || ( "$mode" != "--standalone" && "$mode" != "--full" ) ]]; then
   echo "Usage: scripts/verify [--standalone|--full]" >&2
   exit 2
 fi
-command -v go >/dev/null 2>&1 || { echo "Go 1.25.12 or newer is required." >&2; exit 127; }
+command -v go >/dev/null 2>&1 || { echo "Go 1.26.9 or newer is required." >&2; exit 127; }
 
 # A developer machine can have an unavailable or broken default Go cache
 # (including a stale symlink to detached storage). Keep verification portable
@@ -31,10 +31,10 @@ if [[ -z "${GOCACHE:-}" ]]; then
   fi
 fi
 
-MIN_GO="go1.25.12"
+MIN_GO="go1.26.9"
 ACTUAL_GO="$(go env GOVERSION)"
 if [[ "$(printf '%s\n' "$MIN_GO" "$ACTUAL_GO" | sort -V | head -n 1)" != "$MIN_GO" ]]; then
-  echo "Go 1.25.12 or newer is required; found $ACTUAL_GO." >&2
+  echo "Go 1.26.9 or newer is required; found $ACTUAL_GO." >&2
   exit 1
 fi
 export GOFLAGS="${GOFLAGS:+$GOFLAGS }-buildvcs=false"

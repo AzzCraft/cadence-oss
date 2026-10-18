@@ -6,7 +6,7 @@
 
 ## Prerequisites
 
-- `go` on PATH (1.25.12+; this is the minimum security-patched baseline)
+- `go` on PATH (1.26.9+; this is the minimum security-patched baseline)
 - `python3` on PATH (3.10+)
 - `node` on PATH (20+)
 - `bash` on PATH
