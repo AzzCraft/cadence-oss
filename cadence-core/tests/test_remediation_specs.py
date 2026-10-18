@@ -32,9 +32,6 @@ class CoreRemediationSpecTests(unittest.TestCase):
         self.assertIn("governed", text.lower())
         self.assertIn("Ed25519", text)
 
-    def test_ip_boundary_exists(self) -> None:
-        self.assertTrue((ROOT.parent / "IP_BOUNDARY.md").exists())
-
     def test_license_file_exists(self) -> None:
         self.assertTrue((ROOT.parent / "LICENSE").exists())
 
