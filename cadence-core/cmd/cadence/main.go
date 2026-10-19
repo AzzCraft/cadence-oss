@@ -545,6 +545,14 @@ func verifyCmd(args []string) {
 				os.Exit(1)
 			}
 			trail := waiver.BuildAuditTrail(record, chain)
+			acceptanceErr := waiver.ValidatePersistedAcceptance(record, chain)
+			decision := waiver.AuditDecision{Check: "persisted-policy", Status: "pass"}
+			if acceptanceErr != nil {
+				trail.Compliant = false
+				decision.Status = "fail"
+				decision.Message = acceptanceErr.Error()
+			}
+			trail.Decisions = append(trail.Decisions, decision)
 			if err := persistWaiverEvidence(runOut, record, chain, trail); err != nil {
 				deliveryFailure(runOut, err)
 			}
@@ -561,8 +569,8 @@ func verifyCmd(args []string) {
 				fmt.Fprintf(os.Stderr, "verify failed: persisted waiver scope must be profile for verify bypass, got %q\n", record.Scope)
 				os.Exit(1)
 			}
-			if err := waiver.ValidatePersistedAcceptance(record, chain); err != nil {
-				fmt.Fprintf(os.Stderr, "verify failed: %v\n", err)
+			if acceptanceErr != nil {
+				fmt.Fprintf(os.Stderr, "verify failed: %v\n", acceptanceErr)
 				os.Exit(1)
 			}
 			if signingMode == "governed" {

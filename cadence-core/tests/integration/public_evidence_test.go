@@ -11,6 +11,54 @@ import (
 	"github.com/AzzCraft/cadence-oss/cadence-core/internal/evidence"
 )
 
+func TestPersistedRejectedPolicyIsRecorded(t *testing.T) {
+	bin := buildBinary(t)
+	repo := setupTestRepo(t)
+	if err := os.WriteFile(filepath.Join(repo, "app.env"), []byte("TEST_AUTH_TOKEN=synthetic-secret-token\n"), 0600); err != nil {
+		t.Fatal(err)
+	}
+	for _, defect := range []string{"repeated-principal", "unordered-role"} {
+		t.Run(defect, func(t *testing.T) {
+			record := map[string]any{"reason": "synthetic exception", "ticket": "TEST-WAIVER", "owner": "requester-a", "approvedBy": "approver-d", "createdAt": "2026-10-19T00:00:00Z", "referenceTime": "2026-10-19T00:00:00Z", "signature": "metadata-only", "scope": "profile"}
+			entries := []map[string]any{}
+			for i, role := range []string{"requester", "manager", "security", "approver"} {
+				entries = append(entries, map[string]any{"role": role, "identity": []string{"requester-a", "manager-b", "security-c", "approver-d"}[i], "timestamp": record["referenceTime"]})
+			}
+			if defect == "repeated-principal" {
+				entries[2]["identity"] = entries[1]["identity"]
+			} else {
+				entries[1]["role"] = "security"
+			}
+			writeTestJSON(t, filepath.Join(repo, "waivers.json"), map[string]any{"schemaVersion": "1.0.0", "waivers": []any{record}})
+			writeTestJSON(t, filepath.Join(repo, "approval.json"), map[string]any{"waiverTicket": "TEST-WAIVER", "depth": 4, "entries": entries})
+			cmd := exec.Command(bin, "verify", "--run-id", defect, "--waiver-file", "waivers.json", "--approval-chain-file", "approval.json", "--ticket", "TEST-WAIVER")
+			cmd.Dir = repo
+			for _, item := range os.Environ() {
+				if !strings.HasPrefix(item, "CADENCE_") {
+					cmd.Env = append(cmd.Env, item)
+				}
+			}
+			out, err := cmd.CombinedOutput()
+			if err == nil || !strings.Contains(string(out), "distinct principals and ordered roles") {
+				t.Fatalf("fixture did not reach persisted policy refusal: %v\n%s", err, out)
+			}
+			var trail map[string]any
+			loadJSON(t, filepath.Join(repo, ".cadence/out", defect, "waiver-audit-trail.json"), &trail)
+			if trail["compliant"] != false {
+				t.Fatalf("policy refusal recorded as compliant: %v", trail)
+			}
+			found := false
+			for _, item := range trail["decisions"].([]any) {
+				d := item.(map[string]any)
+				found = found || d["check"] == "persisted-policy" && d["status"] == "fail"
+			}
+			if !found {
+				t.Fatal("missing persisted policy refusal in retained trail")
+			}
+		})
+	}
+}
+
 // One producer build and one reader build cover the actual public boundary.
 func TestPublicNativeEvidenceRoundTripAndRefusal(t *testing.T) {
 	bin := buildBinary(t)
