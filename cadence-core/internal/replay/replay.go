@@ -14,6 +14,9 @@ import (
 const TaskCAD003 = "CAD-003"
 
 var excludedReplayArtifacts = map[string]struct{}{
+	// Human-facing locators are not replay inputs; RUN_PATH varies by host.
+	"RUN_ID":                   {},
+	"RUN_PATH":                 {},
 	"replay-package.json":      {},
 	"replay-bundle.json":       {},
 	"evidence-bundle.json":     {},
