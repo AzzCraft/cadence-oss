@@ -1,0 +1,86 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://cadence.dev/schemas/native-evidence-bundle-v2",
+  "title": "Native evidence inventory v2 (integrity only)",
+  "type": "object",
+  "required": [
+    "schemaVersion",
+    "audit",
+    "runManifestRef",
+    "pipelineResultRef",
+    "artifactPaths",
+    "bundleHash",
+    "chainProfile",
+    "artifactHashes"
+  ],
+  "properties": {
+    "schemaVersion": {
+      "const": "cadence-evidence-bundle/v2"
+    },
+    "audit": {
+      "type": "object",
+      "required": [
+        "bundleId",
+        "timestamp"
+      ],
+      "properties": {
+        "bundleId": {
+          "type": "string",
+          "minLength": 1
+        },
+        "timestamp": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "operator": {
+          "type": "string"
+        },
+        "host": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false
+    },
+    "runManifestRef": {
+      "type": "string",
+      "minLength": 1
+    },
+    "pipelineResultRef": {
+      "type": "string",
+      "minLength": 1
+    },
+    "jobEnvelopeRef": {
+      "type": "string",
+      "minLength": 1
+    },
+    "artifactPaths": {
+      "type": "array",
+      "maxItems": 256,
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "minLength": 1
+      },
+      "minItems": 1
+    },
+    "bundleHash": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    },
+    "signature": {
+      "type": "string"
+    },
+    "chainProfile": {
+      "const": "cadence-run/v1"
+    },
+    "artifactHashes": {
+      "type": "object",
+      "maxProperties": 256,
+      "additionalProperties": {
+        "type": "string",
+        "pattern": "^sha256:[0-9a-f]{64}$"
+      }
+    }
+  },
+  "additionalProperties": false
+}
