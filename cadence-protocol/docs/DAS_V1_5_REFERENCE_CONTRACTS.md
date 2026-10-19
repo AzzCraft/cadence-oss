@@ -49,10 +49,13 @@ New identities currently implemented:
 |---|---|
 | das-bundle-preview-input/v1 | Exact input to the one Go module resolver |
 | das-bundle-preview/v1 | Deterministic preview; authority and qualification are false |
-| das-bundle-preview-input/v2 | The same resolver plus the exact supported partial requirement catalog |
-| das-bundle-preview/v2 | Module and leaf applicability; authority, qualification and migration completeness are false |
+| das-bundle-preview-input/v2 | Historical partial-catalog input; rejected with the current complete catalog |
+| das-bundle-preview/v2 | Historical partial-catalog result; not the current complete result |
+| das-bundle-preview-input/v3 | Current module plus complete pinned leaf catalog input |
+| das-bundle-preview/v3 | Complete leaf mapping; authority and qualification remain false |
+| das-approved-facts-check/v2 | Signed-facts check result containing an unapproved v3 preview |
 | das-approved-facts/v1 | Native signed, scope/target/policy/catalog-bound fact payload; not self-authenticating approval |
-| das-approved-facts-preview-input/v1 | Public signature/current-binding probe under supplied context; produces the same unapproved v2 preview |
+| das-approved-facts-preview-input/v1 | Public signature/current-binding probe under supplied context; produces a check/v2 result containing an unapproved v3 preview |
 | das-text-delta/v1 | Existing string append/replace in a planned lane |
 | das-text-delta-end/v1 | All planned lane watermarks and final semantic digest |
 | das-action-authorization/v1 | Exact action grant; native signature and current-state checks are separate |
@@ -66,55 +69,36 @@ New identities currently implemented:
 | das-verification-evidence/v1 | Native DSSE purpose-bound results with original run/attempt/report/artifact identities; scoped original readback required |
 | das-action-decision/v1 | Native DSSE action/audience/actor/target/receipt-bound conclusion; not business authorization or execution |
 
-## Partial requirement preview
+## Complete requirement preview
 
-The v1 schemas and response digest subject are unchanged. Select v2 explicitly
-when requesting leaf applicability; neither profile upgrades an old preview to
-an approved Bundle. The Standard requirement catalog now has schemaVersion
-`2.19.0`. The earlier `2.0.0` introduced required activation predicates and a
-separate edition leaf group, incompatible with the unpublished `1.0.0` draft.
-Later unpublished catalogs extend reviewed legacy and edition obligations,
-criterion enums, original appendix parents and source-reference bounds while
-retaining explicit SHOULD strength. Their exact contents are pinned by the
-consumer, rather than selected by a caller-supplied schema version. Standard
-VERSION and Cadence releaseVersion are separate
-identities. A fixed binary still rejects catalogs other than its supported pin.
+The current requirement catalog has schemaVersion `3.0.0`, 1,745 legacy leaves
+and 978 edition leaves (2,723 total), mapping 518 legacy carriers. Current full
+input/output identities are `das-bundle-preview-input/v3` and
+`das-bundle-preview/v3`. Historical v1/v2 contracts retain their declared reading
+scope; the current catalog cannot be submitted under v2. A fixed binary rejects
+missing, modified or unsupported catalogs. Catalog completeness is not approved
+applicability, permission, execution success or deployment qualification.
 
-Use the current Standard module and requirement JSON catalogs, with their exact
-standardVersion and independent baselineSha256. The pinned Cadence binary embeds
-the supported requirement catalog through `tools/generate_contract_copies.py`.
-It rejects a missing, modified or unsupported catalog rather than accepting a
-caller rewrite of mandatory applicability. A later catalog requires updating
-and verifying the controlled copy and binary; this is not a rule plugin loader.
-Module proposals retain the existing v1 evaluator. Each leaf's module owner,
-parent clause and legacy unit must still exist in that proposed module catalog.
+The single Standard authors are `standard_modules.json`,
+`standard_requirements.json` and their schemas. Their reviewed embedded copies
+are `cadence-core/internal/resolver/testdata/module_catalog.json` and
+`cadence-core/internal/resolver/requirement_catalog.json`; schemas are alongside
+them. Compare exact bytes against the chosen Standard revision when changing
+copies, then build and check the consumer. There is no public
+`tools/generate_contract_copies.py` command in this checkout.
+The signed-facts request stays `das-approved-facts-preview-input/v1`, its DSSE
+payload stays `das-approved-facts/v1` with payloadType
+`application/vnd.das.approved-facts.v1+json`, and its outer result is
+`das-approved-facts-check/v2`. Only the embedded preview is v3.
 
-The current catalog has 1,258 reviewed legacy duties and 298 edition duties:
-68 from the twelve Z result cells, 28 selected S13 storage duties and 27 selected
-S13 audit/read/disclosure duties, 62 S14 task/completion duties, 52 S20 shared-object
-duties and 61 additional S13 audit/storage/runtime duties. The legacy mapping
-covers 294 reviewed carriers; there are 1,556 partial leaves;
-the independently pinned keyword sample remains 479, with six original minimum
-rows and three original playbook/checklist carriers in the 488-carrier inventory. Keyword blocks are
-not atomic duties. Backend, harness, data/evals, platform and operational security
-include their original conditions and alternatives. F/H/I/J duties retain migration
-triggers, UI severity and legitimate deferrals, human judgement, DDD and BDD scope;
-repeated obligations reuse their original IDs. The catalog remains partial;
-the remaining authors and edition prose prevent complete migration or qualification.
-`requirementTrace` contains one sorted record per leaf. Its `state` means the
-obligation applies (`true`), is proposed inapplicable (`false`), lacks known
-facts (`unknown`) or has conflicting sources (`conflict`). It does not indicate
-that a check passed. The full source row retains each Z control's scope,
-enforcement point and required evidence. Each Z leaf also references the shared
-preapproval paragraph: low-risk, reversible, bounded actions may use an
-authorized preapproved policy and independent per-action execution; policy
-elevation, protection changes and high-risk actions require their corresponding
-independent approval. Remaining old and edition leaves are unmigrated, even if
-every recorded leaf is true. Table source and qualifier bytes are independently
-guarded; regenerating references cannot hide changed mandatory semantics.
+Each trace row records true/false/unknown/conflict applicability, not a passing
+check. Source contexts preserve normative strength, alternatives and approved
+preapproval policies. Complete mapping can be true while authorityVerified and
+qualificationEligible remain false; approved applicability and actual protected
+execution are separate boundaries.
 
 Catalog input has a fixed 262,144-node budget because the current authored
-requirement catalog exceeds 100,000 parsed nodes. Only explicit v2 preview input
+requirement catalog exceeds 100,000 parsed nodes. Only explicit v2/v3 catalog preview input
 and the signed-facts preview input select it; the embedded requirement catalog
 uses the same budget. Generic JSON, v1 preview input, action grants and signed
 fact payloads retain 100,000 nodes. The 4 MiB byte limit, depth 64, exact numeric
@@ -324,3 +308,36 @@ while retaining security history. The dasops candidate package includes the
 full storage/recovery instructions. These Python consumers are registered in the
 exact protocol validator; Go consumption/reader compatibility must close before
 using them for any formally negotiated cross-language protected exchange.
+
+## Executable current-catalog example
+
+From the Cadence repository root, after building `cadence-core/cadence` with the
+documented Go toolchain, this example checks current identities and refuses v2:
+
+```bash
+python3 - ./cadence-core/cadence <<'PYCODE'
+import json, subprocess, sys
+from pathlib import Path
+root = Path("cadence-core/internal/resolver")
+request = {
+    "contractIdentity": "das-bundle-preview-input/v3",
+    "scope": "synthetic-doc-smoke",
+    "policyDigest": "sha256:" + "0" * 64,
+    "catalog": json.loads((root / "testdata/module_catalog.json").read_text()),
+    "requirementsCatalog": json.loads((root / "requirement_catalog.json").read_text()),
+    "facts": [],
+}
+run = subprocess.run([sys.argv[1], "resolve", "--preview"], input=json.dumps(request), text=True, capture_output=True, check=True)
+result = json.loads(run.stdout)
+ids = [row["requirementId"] for row in result["requirementTrace"]]
+if len(ids) != 2723 or len(set(ids)) != 2723 or result["contractIdentity"] != "das-bundle-preview/v3":
+    raise SystemExit("Unexpected catalog/preview identity")
+if result["leafMigrationComplete"] is not True or result["authorityVerified"] is not False or result["qualificationEligible"] is not False:
+    raise SystemExit("Incorrect authority boundary")
+request["contractIdentity"] = "das-bundle-preview-input/v2"
+old = subprocess.run([sys.argv[1], "resolve", "--preview"], input=json.dumps(request), text=True, capture_output=True)
+if old.returncode == 0:
+    raise SystemExit("Current catalog accepted under historical v2")
+print("2723 unique leaves; v3 non-authoritative preview; v2 refused")
+PYCODE
+```

@@ -794,15 +794,9 @@ func BuildHSMAnchor(rootAnchor string) HSMAnchor {
 	}
 	switch {
 	case strings.HasPrefix(anchorID, "hsm://"):
-		anchor.Provider = "hsm"
-		anchor.KeyURI = anchorID
-		anchor.Attestation = "external-hsm-anchor-active"
-		anchor.HardwareBacked = true
+		return HSMAnchor{} // Configuration alone proves no active provider.
 	case strings.HasPrefix(anchorID, "kms://"):
-		anchor.Provider = "kms"
-		anchor.KeyURI = anchorID
-		anchor.Attestation = "external-kms-anchor-active"
-		anchor.HardwareBacked = true
+		return HSMAnchor{}
 	default:
 		anchor.Provider = "software-hmac"
 		anchor.KeyURI = "env:CADENCE_SIGNING_KEY"
@@ -825,15 +819,9 @@ func BuildGovernedAnchor(rootAnchor string) HSMAnchor {
 	}
 	switch {
 	case strings.HasPrefix(anchorID, "hsm://"):
-		anchor.Provider = "hsm"
-		anchor.KeyURI = anchorID
-		anchor.Attestation = "external-hsm-anchor-active"
-		anchor.HardwareBacked = true
+		return HSMAnchor{}
 	case strings.HasPrefix(anchorID, "kms://"):
-		anchor.Provider = "kms"
-		anchor.KeyURI = anchorID
-		anchor.Attestation = "external-kms-anchor-active"
-		anchor.HardwareBacked = true
+		return HSMAnchor{}
 	default:
 		anchor.Provider = "software-ed25519"
 		anchor.KeyURI = "env:CADENCE_SIGNING_KEY"
@@ -841,6 +829,28 @@ func BuildGovernedAnchor(rootAnchor string) HSMAnchor {
 		anchor.HardwareBacked = false
 	}
 	return anchor
+}
+
+// VerifiedSoftwareAnchor emits only what a concrete local signer can prove.
+// External signers have unknown hardware storage and produce no v1 anchor.
+func VerifiedSoftwareAnchor(signer Signer, payload []byte) (HSMAnchor, bool, error) {
+	var anchor HSMAnchor
+	switch signer.(type) {
+	case *HMACSigner:
+		anchor = BuildHSMAnchor("")
+	case *Ed25519Signer:
+		anchor = BuildGovernedAnchor("")
+	default:
+		return anchor, false, nil
+	}
+	sig, err := NewDetachedSignature("provider-check", signer, "key-hierarchy.json", payload)
+	if err != nil {
+		return anchor, false, err
+	}
+	if err = VerifyDetachedSignature(sig, signer, payload); err != nil {
+		return anchor, false, err
+	}
+	return anchor, true, nil
 }
 
 // ValidateHSMAnchor checks that the anchor evidence record is internally

@@ -338,7 +338,6 @@ func TestFullVerifyFlow(t *testing.T) {
 		"input-identity.json",
 		"isolation-probe.json",
 		"key-hierarchy.json",
-		"hsm-anchor.json",
 		"run-manifest.json",
 		"run-manifest.canonical.json",
 		"pipeline-result.json",
@@ -758,8 +757,12 @@ func TestGovernedSignatureVerification(t *testing.T) {
 	if hsmAnchor["status"] != "active" {
 		t.Fatalf("hsm-anchor status = %v, want active", hsmAnchor["status"])
 	}
-	if hsmAnchor["provider"] != "hsm" {
-		t.Fatalf("hsm-anchor provider = %v, want hsm", hsmAnchor["provider"])
+	if hsmAnchor["provider"] != "software-ed25519" {
+		t.Fatalf("hsm-anchor provider = %v, want verified local software-ed25519", hsmAnchor["provider"])
+	}
+
+	if hsmAnchor["hardwareBacked"] != false {
+		t.Fatal("local key incorrectly claimed hardware")
 	}
 
 	var detached signing.DetachedSignature
@@ -798,48 +801,18 @@ func TestGovernedSignatureVerification(t *testing.T) {
 	}
 }
 
-func TestGovernedSignatureUsesActiveHSMAnchor(t *testing.T) {
+func TestConfiguredURIWithoutSignerProducesNoHardwareAnchor(t *testing.T) {
 	bin := buildBinary(t)
 	repo := setupTestRepo(t)
 	outDir := filepath.Join(repo, ".cadence", "out")
-
-	pub, priv, err := ed25519.GenerateKey(nil)
-	if err != nil {
-		t.Fatalf("GenerateKey: %v", err)
-	}
-	privateKeyPath := filepath.Join(repo, "active-anchor.key")
-	publicKeyPath := filepath.Join(repo, "active-anchor.pub")
-	if err := os.WriteFile(privateKeyPath, priv, 0o600); err != nil {
-		t.Fatalf("write private key: %v", err)
-	}
-	if err := os.WriteFile(publicKeyPath, pub, 0o644); err != nil {
-		t.Fatalf("write public key: %v", err)
-	}
-
-	cmd := exec.Command(bin, "verify", "--run-id", "active-anchor-test", "--out", outDir)
+	cmd := exec.Command(bin, "verify", "--run-id", "configured-only", "--out", outDir)
 	cmd.Dir = repo
-	cmd.Env = append(
-		os.Environ(),
-		"CADENCE_SIGNING_MODE=governed",
-		"CADENCE_ROOT_ANCHOR=hsm://tenant/root-key",
-		"CADENCE_GOVERNED_SIGNING_PRIVATE_KEY_FILE="+privateKeyPath,
-		"CADENCE_GOVERNED_SIGNING_PUBLIC_KEY_FILE="+publicKeyPath,
-	)
+	cmd.Env = append(os.Environ(), "CADENCE_SIGNING_MODE=dev", "CADENCE_SIGNING_KEY=", "CADENCE_ROOT_ANCHOR=hsm://synthetic/no-device")
 	if out, err := cmd.CombinedOutput(); err != nil {
 		t.Fatalf("verify failed: %v\n%s", err, out)
 	}
-
-	runDir := filepath.Join(outDir, "active-anchor-test")
-	var hsmAnchor map[string]any
-	loadJSON(t, filepath.Join(runDir, "hsm-anchor.json"), &hsmAnchor)
-	if hsmAnchor["status"] != "active" {
-		t.Fatalf("hsm-anchor status = %v, want active", hsmAnchor["status"])
-	}
-	if hsmAnchor["provider"] != "hsm" {
-		t.Fatalf("hsm-anchor provider = %v, want hsm", hsmAnchor["provider"])
-	}
-	if hsmAnchor["hardwareBacked"] != true {
-		t.Fatalf("hsm-anchor hardwareBacked = %v, want true", hsmAnchor["hardwareBacked"])
+	if _, err := os.Stat(filepath.Join(outDir, "configured-only", "hsm-anchor.json")); !os.IsNotExist(err) {
+		t.Fatal("URI configuration fabricated an active anchor")
 	}
 }
 
@@ -2182,13 +2155,8 @@ func TestVerifyUsesConfiguredRootAnchor(t *testing.T) {
 		t.Fatalf("key-hierarchy levels[0].anchor = %v, want hsm://tenant/root", level0["anchor"])
 	}
 
-	var hsmAnchor map[string]any
-	loadJSON(t, filepath.Join(runDir, "hsm-anchor.json"), &hsmAnchor)
-	if hsmAnchor["anchorId"] != "hsm://tenant/root" {
-		t.Fatalf("hsm-anchor anchorId = %v, want hsm://tenant/root", hsmAnchor["anchorId"])
-	}
-	if hsmAnchor["provider"] != "hsm" {
-		t.Fatalf("hsm-anchor provider = %v, want hsm", hsmAnchor["provider"])
+	if _, err := os.Stat(filepath.Join(runDir, "hsm-anchor.json")); !os.IsNotExist(err) {
+		t.Fatal("root URI configuration is not hardware evidence")
 	}
 
 	var inputIdentity map[string]any
@@ -2235,10 +2203,8 @@ func TestVerifyEnvironmentRootAnchorOverrideWins(t *testing.T) {
 		t.Fatalf("key-hierarchy rootAnchor = %v, want kms://tenant/root", keyHierarchy["rootAnchor"])
 	}
 
-	var hsmAnchor map[string]any
-	loadJSON(t, filepath.Join(runDir, "hsm-anchor.json"), &hsmAnchor)
-	if hsmAnchor["provider"] != "kms" {
-		t.Fatalf("hsm-anchor provider = %v, want kms", hsmAnchor["provider"])
+	if _, err := os.Stat(filepath.Join(runDir, "hsm-anchor.json")); !os.IsNotExist(err) {
+		t.Fatal("root URI configuration is not hardware evidence")
 	}
 
 	var inputIdentity map[string]any

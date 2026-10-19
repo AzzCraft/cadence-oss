@@ -8,10 +8,10 @@
   --probe`, comparing a separate baseline and observed routes without granting authority.
 - Embed the component release version in the executable and its generated locks.
   This source candidate has not passed final installed beta acceptance or shipped.
+- Harden native evidence profiles, delivery failure/alias semantics, persisted waiver
+  policy and truthful software/hardware declarations; see the evidence profile guide.
 
-## v1.0.0 - Current
+## v1.0.0 — Historical source baseline
 
-- Imported `cadence-oss` into the DAS Tools control workspace as a fresh child Git
-  repository.
-- Removed stale DAS identity history from current-facing child content. Historical
-  release context remains parent-audit-only.
+- Established the initial public offline verification, protocol and examples layout.
+- Historical compatibility material remains available in Git and named fixtures.

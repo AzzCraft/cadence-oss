@@ -297,8 +297,40 @@ func ValidateApprovalChain(ac ApprovalChain) error {
 			return fmt.Errorf("waiver: approval chain entry %d timestamp is invalid", i)
 		}
 	}
-	if len(ac.Entries) >= 2 && ac.Entries[0].Identity == ac.Entries[1].Identity {
+	if len(ac.Entries) >= 2 && strings.TrimSpace(ac.Entries[0].Identity) == strings.TrimSpace(ac.Entries[len(ac.Entries)-1].Identity) {
 		return errors.New("waiver: self-approval is not allowed")
+	}
+	return nil
+}
+
+// ValidatePersistedAcceptance computes policy from current input, never from a
+// supplied trail. This is metadata/policy validation, not authentication.
+func ValidatePersistedAcceptance(r Record, ac ApprovalChain) error {
+	trail := BuildAuditTrail(r, ac)
+	if !trail.Compliant {
+		return errors.New("waiver: persisted policy checks failed")
+	}
+	roles := [][]string{{"requester"}, {"approver"}}
+	switch RequiredChainDepth(ClassifyEscalation(r)) {
+	case 3:
+		roles = [][]string{{"requester"}, {"manager"}, {"security", "security-lead"}}
+	case 4:
+		roles = [][]string{{"requester"}, {"manager"}, {"security", "security-lead"}, {"approver", "exec"}}
+	}
+	if len(ac.Entries) != len(roles) {
+		return errors.New("waiver: unsupported persisted approval stages")
+	}
+	principals := map[string]bool{}
+	for i, entry := range ac.Entries {
+		roleOK := false
+		for _, role := range roles[i] {
+			roleOK = roleOK || entry.Role == role
+		}
+		principal := strings.TrimSpace(entry.Identity)
+		if !roleOK || principals[principal] {
+			return errors.New("waiver: approval stages require distinct principals and ordered roles")
+		}
+		principals[principal] = true
 	}
 	return nil
 }

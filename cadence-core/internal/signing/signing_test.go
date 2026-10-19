@@ -211,19 +211,10 @@ func TestBuildHSMAnchorDefaultSoftwareAnchor(t *testing.T) {
 	}
 }
 
-func TestBuildHSMAnchorAcceptsHSMURI(t *testing.T) {
-	anchor := BuildHSMAnchor("hsm://tenant/root-key")
-	if anchor.Provider != "hsm" {
-		t.Fatalf("expected hsm provider, got %s", anchor.Provider)
-	}
-	if !anchor.HardwareBacked {
-		t.Fatal("expected HSM URI to be marked hardware-backed")
-	}
-	if anchor.Status != "active" {
-		t.Fatalf("expected active anchor, got %s", anchor.Status)
-	}
-	if err := ValidateHSMAnchor(anchor); err != nil {
-		t.Fatalf("expected valid hsm anchor: %v", err)
+func TestConfiguredHSMURIProducesNoActiveAnchor(t *testing.T) {
+	anchor := BuildHSMAnchor("hsm://synthetic/no-device")
+	if anchor.Status != "" || anchor.HardwareBacked || anchor.Provider != "" {
+		t.Fatal("configuration must not produce an active hardware claim")
 	}
 }
 
@@ -437,19 +428,10 @@ func TestBuildGovernedKeyHierarchy(t *testing.T) {
 	}
 }
 
-func TestBuildGovernedAnchorActive(t *testing.T) {
-	anchor := BuildGovernedAnchor("hsm://tenant/root-key")
-	if anchor.Status != "active" {
-		t.Fatalf("expected active, got %s", anchor.Status)
-	}
-	if anchor.Provider != "hsm" {
-		t.Fatalf("expected hsm provider, got %s", anchor.Provider)
-	}
-	if !anchor.HardwareBacked {
-		t.Fatal("expected hardware-backed for HSM anchor")
-	}
-	if err := ValidateHSMAnchor(anchor); err != nil {
-		t.Fatalf("governed anchor should validate: %v", err)
+func TestConfiguredGovernedURIProducesNoActiveAnchor(t *testing.T) {
+	anchor := BuildGovernedAnchor("hsm://synthetic/no-device")
+	if anchor.Status != "" || anchor.HardwareBacked || anchor.Provider != "" {
+		t.Fatal("configuration must not produce an active hardware claim")
 	}
 }
 

@@ -54,9 +54,8 @@ func TestBuildEvidenceBundleEmptyDir(t *testing.T) {
 	dir := t.TempDir()
 	// No run-manifest.json or pipeline-result.json
 	_, err := BuildEvidenceBundle(dir, "run-manifest.json", "pipeline-result.json")
-	// Should still succeed (files listed are what's found on disk)
-	if err != nil {
-		t.Fatalf("unexpected error for empty dir: %v", err)
+	if err == nil {
+		t.Fatal("empty completed-run inventory must be rejected; only the generic chain helper retains empty-chain semantics")
 	}
 }
 

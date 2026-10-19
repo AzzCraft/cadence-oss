@@ -281,9 +281,13 @@ func verifyCmd(args []string) {
 		}
 	}
 	runOut := filepath.Join(outputRoot, runID)
-
-	if err := os.MkdirAll(runOut, 0o755); err != nil {
-		fmt.Fprintf(os.Stderr, "failed to create out dir: %v\n", err)
+	if err := os.MkdirAll(outputRoot, 0o755); err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		os.Exit(1)
+	}
+	// A published run is immutable. Exclusive creation also rejects concurrent reuse.
+	if err := os.Mkdir(runOut, 0o755); err != nil {
+		fmt.Fprintf(os.Stderr, "verify failed: create a fresh run directory (choose a new run id): %v\n", err)
 		os.Exit(1)
 	}
 
@@ -313,14 +317,12 @@ func verifyCmd(args []string) {
 		),
 	)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "failed to write input-identity.json: %v\n", err)
-		os.Exit(1)
+		deliveryFailure(runOut, fmt.Errorf("write input-identity.json: %w", err))
 	}
 
 	escapeClassification := sandbox.EscapeClassification(sandboxProfile)
 	if err := writeJSON(filepath.Join(runOut, "escape-classification.json"), escapeClassification); err != nil {
-		fmt.Fprintf(os.Stderr, "failed to write escape-classification.json: %v\n", err)
-		os.Exit(1)
+		deliveryFailure(runOut, fmt.Errorf("write escape-classification.json: %w", err))
 	}
 
 	signingMode := currentSigningMode()
@@ -328,7 +330,6 @@ func verifyCmd(args []string) {
 	leafKeyID := runnerBinaryDigest
 	keyHierarchyAlgorithm := "hmac-sha256"
 	var keyHierarchy signing.KeyHierarchy
-	var hsmAnchor signing.HSMAnchor
 	if signingMode == "governed" {
 		if rootAnchor == "operator-local" {
 			fmt.Fprintln(os.Stderr, "governed signing requires an explicit CADENCE_ROOT_ANCHOR or cadence.yaml rootAnchor; operator-local is not allowed")
@@ -338,26 +339,15 @@ func verifyCmd(args []string) {
 		leafKeyID = resolvedLeafKeyID
 		keyHierarchyAlgorithm = "ed25519"
 		keyHierarchy = signing.BuildGovernedKeyHierarchy(rootAnchor, rootKeyID, intermediateKeyID, leafKeyID, keyHierarchyAlgorithm)
-		hsmAnchor = signing.BuildGovernedAnchor(keyHierarchy.RootAnchor)
 	} else {
 		keyHierarchy = signing.BuildKeyHierarchy(rootAnchor, leafKeyID)
-		hsmAnchor = signing.BuildHSMAnchor(keyHierarchy.RootAnchor)
 	}
 	if err := signing.ValidateKeyHierarchy(keyHierarchy); err != nil {
 		fmt.Fprintf(os.Stderr, "key hierarchy invalid: %v\n", err)
 		os.Exit(1)
 	}
 	if err := writeJSON(filepath.Join(runOut, "key-hierarchy.json"), keyHierarchy); err != nil {
-		fmt.Fprintf(os.Stderr, "failed to write key-hierarchy.json: %v\n", err)
-		os.Exit(1)
-	}
-	if err := signing.ValidateHSMAnchor(hsmAnchor); err != nil {
-		fmt.Fprintf(os.Stderr, "hsm anchor invalid: %v\n", err)
-		os.Exit(1)
-	}
-	if err := writeJSON(filepath.Join(runOut, "hsm-anchor.json"), hsmAnchor); err != nil {
-		fmt.Fprintf(os.Stderr, "failed to write hsm-anchor.json: %v\n", err)
-		os.Exit(1)
+		deliveryFailure(runOut, fmt.Errorf("write key-hierarchy.json: %w", err))
 	}
 
 	sandboxRequest := sandbox.CommandRequest{
@@ -374,13 +364,11 @@ func verifyCmd(args []string) {
 		enrichSandboxResultWithIsolationProbe(&sandboxExecution.Result, isolationProbe)
 	}
 	if err := writeJSON(filepath.Join(runOut, "isolation-probe.json"), isolationProbe); err != nil {
-		fmt.Fprintf(os.Stderr, "failed to write isolation-probe.json: %v\n", err)
-		os.Exit(1)
+		deliveryFailure(runOut, fmt.Errorf("write isolation-probe.json: %w", err))
 	}
 	sandboxResultForEvidence := normalizeSandboxResult(sandboxExecution.Result)
 	if err := writeJSON(filepath.Join(runOut, "sandbox-result.json"), sandboxResultForEvidence); err != nil {
-		fmt.Fprintf(os.Stderr, "failed to write sandbox-result.json: %v\n", err)
-		os.Exit(1)
+		deliveryFailure(runOut, fmt.Errorf("write sandbox-result.json: %w", err))
 	}
 	if !sandboxExecution.Result.Passed || sandboxExecution.Result.Status != "ok" {
 		fmt.Fprintf(
@@ -529,6 +517,9 @@ func verifyCmd(args []string) {
 			}
 			chain := waiver.BuildApprovalChain(record)
 			trail := waiver.BuildAuditTrail(record, chain)
+			if err := persistWaiverEvidence(runOut, record, chain, trail); err != nil {
+				deliveryFailure(runOut, err)
+			}
 			for _, decision := range trail.Decisions {
 				if decision.Status != "pass" {
 					fmt.Fprintf(os.Stderr, "waiver %s warning: %s\n", decision.Check, decision.Message)
@@ -553,11 +544,18 @@ func verifyCmd(args []string) {
 				fmt.Fprintf(os.Stderr, "verify failed: persisted waiver invalid: %v\n", err)
 				os.Exit(1)
 			}
-			if strings.TrimSpace(record.Scope) != "profile" {
-				fmt.Fprintf(os.Stderr, "verify failed: persisted waiver scope must be profile for verify bypass, got %q\n", record.Scope)
-				os.Exit(1)
-			}
 			trail := waiver.BuildAuditTrail(record, chain)
+			acceptanceErr := waiver.ValidatePersistedAcceptance(record, chain)
+			decision := waiver.AuditDecision{Check: "persisted-policy", Status: "pass"}
+			if acceptanceErr != nil {
+				trail.Compliant = false
+				decision.Status = "fail"
+				decision.Message = acceptanceErr.Error()
+			}
+			trail.Decisions = append(trail.Decisions, decision)
+			if err := persistWaiverEvidence(runOut, record, chain, trail); err != nil {
+				deliveryFailure(runOut, err)
+			}
 			for _, decision := range trail.Decisions {
 				if decision.Status != "pass" {
 					fmt.Fprintf(os.Stderr, "waiver %s warning: %s\n", decision.Check, decision.Message)
@@ -567,6 +565,19 @@ func verifyCmd(args []string) {
 				fmt.Fprintf(os.Stderr, "verify failed: waiver audit-trail invalid: %v\n", err)
 				os.Exit(1)
 			}
+			if strings.TrimSpace(record.Scope) != "profile" {
+				fmt.Fprintf(os.Stderr, "verify failed: persisted waiver scope must be profile for verify bypass, got %q\n", record.Scope)
+				os.Exit(1)
+			}
+			if acceptanceErr != nil {
+				fmt.Fprintf(os.Stderr, "verify failed: %v\n", acceptanceErr)
+				os.Exit(1)
+			}
+			if signingMode == "governed" {
+				fmt.Fprintln(os.Stderr, "verify failed: file-supplied waiver metadata is not authenticated approval; governed override requires a trusted protected approval consumer")
+				os.Exit(1)
+			}
+			fmt.Fprintln(os.Stderr, "persisted waiver: metadata/policy checks only; approval identities are not authenticated")
 			waiverApplied = true
 			waiverSource = "waiver-file"
 			appliedWaiverReason = record.Reason
@@ -698,8 +709,7 @@ func verifyCmd(args []string) {
 	manifestPath := filepath.Join(runOut, "run-manifest.json")
 	manifestHash, err := evidence.WriteCanonicalJSON(manifestPath, buildPrimaryRunManifest(manifest))
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "failed to write run-manifest.json: %v\n", err)
-		os.Exit(1)
+		deliveryFailure(runOut, fmt.Errorf("write run-manifest.json: %w", err))
 	}
 
 	vs := make([]map[string]any, 0, len(violations))
@@ -773,8 +783,7 @@ func verifyCmd(args []string) {
 	resultPath := filepath.Join(runOut, "pipeline-result.json")
 	resultHash, err := evidence.WriteCanonicalJSON(resultPath, buildPrimaryPipelineResult(result))
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "failed to write pipeline-result.json: %v\n", err)
-		os.Exit(1)
+		deliveryFailure(runOut, fmt.Errorf("write pipeline-result.json: %w", err))
 	}
 
 	jobStatus := "succeeded"
@@ -824,21 +833,18 @@ func verifyCmd(args []string) {
 	jobPath := filepath.Join(runOut, "job-envelope.json")
 	jobHash, err := evidence.WriteCanonicalJSON(jobPath, buildPrimaryJobEnvelope(job))
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "failed to write job-envelope.json: %v\n", err)
-		os.Exit(1)
+		deliveryFailure(runOut, fmt.Errorf("write job-envelope.json: %w", err))
 	}
 
 	canonicalProtocolHashes, err := writeCanonicalProtocolArtifacts(runOut, manifest, result, job)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "failed to write canonical protocol artifacts: %v\n", err)
-		os.Exit(1)
+		deliveryFailure(runOut, fmt.Errorf("write canonical protocol artifacts: %w", err))
 	}
 
 	auditTelemetryPath := filepath.Join(runOut, "audit-telemetry.json")
 	auditTelemetryHash, err := evidence.WriteCanonicalJSON(auditTelemetryPath, buildAuditTelemetry(manifest, result, job, elapsedMs))
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "failed to write audit-telemetry.json: %v\n", err)
-		os.Exit(1)
+		deliveryFailure(runOut, fmt.Errorf("write audit-telemetry.json: %w", err))
 	}
 
 	deterministicPath := filepath.Join(runOut, "deterministic-evidence.json")
@@ -861,8 +867,7 @@ func verifyCmd(args []string) {
 		pluginResults,
 	)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "failed to write deterministic-evidence.json: %v\n", err)
-		os.Exit(1)
+		deliveryFailure(runOut, fmt.Errorf("write deterministic-evidence.json: %w", err))
 	}
 
 	// Optional offline attestation for strict-offline execution.
@@ -878,12 +883,14 @@ func verifyCmd(args []string) {
 			},
 			"toolchainHash": computeSelfBinaryHashOrEmpty(),
 		}
-		_ = writeJSON(filepath.Join(runOut, "offline-attestation.json"), att)
+		if err := writeJSON(filepath.Join(runOut, "offline-attestation.json"), att); err != nil {
+			deliveryFailure(runOut, err)
+		}
 	}
 
 	if waiverApplied && appliedWaiverRecord != nil && appliedApprovalChain != nil && appliedAuditTrail != nil {
 		if err := persistWaiverEvidence(runOut, *appliedWaiverRecord, *appliedApprovalChain, *appliedAuditTrail); err != nil {
-			fmt.Fprintf(os.Stderr, "warning: failed to write waiver evidence: %v\n", err)
+			deliveryFailure(runOut, err)
 		}
 	}
 
@@ -905,9 +912,15 @@ func verifyCmd(args []string) {
 		"warnings":       dependencyWarnings,
 	}
 	b, _ := json.MarshalIndent(summary, "", "  ")
-	_ = os.WriteFile(filepath.Join(runOut, "summary.json"), b, 0o644)
-	_ = os.WriteFile(filepath.Join(runOut, "summary.md"), []byte(renderMarkdownSummary(summary, violations)), 0o644)
-	_ = writeJSON(filepath.Join(runOut, "cadence-report.json"), map[string]any{"runId": runID, "decision": decision, "status": pipelineStatus, "violations": vs})
+	if err := os.WriteFile(filepath.Join(runOut, "summary.json"), b, 0o644); err != nil {
+		deliveryFailure(runOut, err)
+	}
+	if err := os.WriteFile(filepath.Join(runOut, "summary.md"), []byte(renderMarkdownSummary(summary, violations)), 0o644); err != nil {
+		deliveryFailure(runOut, err)
+	}
+	if err := writeJSON(filepath.Join(runOut, "cadence-report.json"), map[string]any{"runId": runID, "decision": decision, "status": pipelineStatus, "violations": vs}); err != nil {
+		deliveryFailure(runOut, err)
+	}
 
 	if *validateProtocol {
 		var primaryManifest evidence.RunManifest
@@ -953,7 +966,9 @@ func verifyCmd(args []string) {
 	chain.Append("audit-telemetry", auditTelemetryHash, signing.HashPayload(mustReadFile(auditTelemetryPath)))
 	chain.Append("deterministic-evidence", deterministicHash, signing.HashPayload(mustReadFile(deterministicPath)))
 	chainJSON, _ := json.MarshalIndent(chain, "", "  ")
-	_ = os.WriteFile(filepath.Join(runOut, "step-hash-chain.json"), chainJSON, 0o644)
+	if err := os.WriteFile(filepath.Join(runOut, "step-hash-chain.json"), chainJSON, 0o644); err != nil {
+		deliveryFailure(runOut, err)
+	}
 
 	// Generate structured report.
 	var reportFindings []report.Finding
@@ -969,17 +984,45 @@ func verifyCmd(args []string) {
 	durationMs := time.Since(started).Milliseconds()
 	verifyReport = report.WithMetrics(verifyReport, len(sourceTreeRecords), len(reportFindings), int(durationMs))
 	if err := report.Save(filepath.Join(runOut, "report-summary.json"), verifyReport); err != nil {
-		fmt.Fprintf(os.Stderr, "warning: failed to write report-summary.json: %v\n", err)
+		deliveryFailure(runOut, err)
+	}
+	if err := evidence.ValidateRunFiles(runOut); err != nil {
+		deliveryFailure(runOut, err)
+	}
+	for name, value := range map[string]string{"RUN_ID": runID + "\n", "RUN_PATH": runOut + "\n"} {
+		if err := os.WriteFile(filepath.Join(runOut, name), []byte(value), 0o644); err != nil {
+			deliveryFailure(runOut, err)
+		}
+	}
+	sigKey := []byte(os.Getenv("CADENCE_SIGNING_KEY"))
+	var signer signing.Signer
+	if len(sigKey) > 0 || signingMode == "governed" {
+		signer, err = signing.SelectSigner(leafKeyID, "cadence-core", sigKey)
+		if err != nil {
+			deliveryFailure(runOut, err)
+		}
+		anchor, present, err := signing.VerifiedSoftwareAnchor(signer, mustReadFile(filepath.Join(runOut, "key-hierarchy.json")))
+		if err != nil {
+			deliveryFailure(runOut, err)
+		}
+		if present {
+			if err = writeJSON(filepath.Join(runOut, "hsm-anchor.json"), anchor); err != nil {
+				deliveryFailure(runOut, err)
+			}
+		}
 	}
 
 	// Build and verify the evidence bundle.
 	evidenceBundle, bundleErr := evidence.BuildEvidenceBundle(runOut, "run-manifest.json", "pipeline-result.json")
+	if bundleErr != nil {
+		deliveryFailure(runOut, bundleErr)
+	}
 	if bundleErr == nil {
 		if err := writeJSON(filepath.Join(runOut, "evidence-bundle.json"), evidenceBundle); err != nil {
-			fmt.Fprintf(os.Stderr, "failed to write evidence-bundle.json: %v\n", err)
+			deliveryFailure(runOut, err)
 		}
 		if err := evidence.VerifyBundleIntegrity(*evidenceBundle, runOut); err != nil {
-			fmt.Fprintf(os.Stderr, "evidence bundle integrity check failed: %v\n", err)
+			deliveryFailure(runOut, err)
 		}
 	}
 
@@ -987,38 +1030,39 @@ func verifyCmd(args []string) {
 	// finalized so reused run directories do not snapshot stale intermediate
 	// files from a previous invocation.
 	replayBundle, replayErr := replay.Build(runID, "run-manifest.json", "pipeline-result.json", runOut)
-	if replayErr == nil {
-		_ = replay.Save(filepath.Join(runOut, "replay-package.json"), replayBundle)
-		_ = replay.Save(filepath.Join(runOut, "replay-bundle.json"), replayBundle)
+	if replayErr != nil {
+		deliveryFailure(runOut, replayErr)
+	}
+	if err := replay.Save(filepath.Join(runOut, "replay-package.json"), replayBundle); err != nil {
+		deliveryFailure(runOut, err)
+	}
+	if err := replay.Save(filepath.Join(runOut, "replay-bundle.json"), replayBundle); err != nil {
+		deliveryFailure(runOut, err)
 	}
 
 	// Sign the evidence bundle if a signing key is available, or if governed
 	// mode is explicitly requested. Governed mode is fail-closed.
-	sigKey := []byte(os.Getenv("CADENCE_SIGNING_KEY"))
-	if len(sigKey) > 0 || signingMode == "governed" {
-		signer, err := signing.SelectSigner(leafKeyID, "cadence-core", sigKey)
-		if err != nil {
-			fmt.Fprintf(os.Stderr, "failed to configure signer: %v\n", err)
-			os.Exit(1)
-		}
+	if signer != nil {
 		if err := writeDetachedSignatures(runOut, runID, signer, sigKey); err != nil {
-			fmt.Fprintf(os.Stderr, "failed to sign evidence bundle: %v\n", err)
-			os.Exit(1)
+			deliveryFailure(runOut, fmt.Errorf("sign evidence bundle: %w", err))
 		}
+	}
+
+	if err := evidence.ValidateDeliveryFiles(runOut); err != nil {
+		deliveryFailure(runOut, err)
 	}
 
 	// Update a stable alias directory (default: .cadence/out/latest) after all
 	// evidence artifacts exist so automation can rely on the alias as a complete
 	// evidence set.
-	if aliasName != "" {
+	if aliasName != "" && exitCode == 0 {
 		if err := writeStableAlias(outputRoot, filepath.Join(outputRoot, aliasName), runOut, runID); err != nil {
-			fmt.Fprintf(os.Stderr, "verify failed: update alias %q: %v\n", aliasName, err)
-			os.Exit(1)
+			deliveryFailure(runOut, fmt.Errorf("update alias %q: %w", aliasName, err))
 		}
 	}
 
 	fmt.Printf("verify: %s (decision=%s)\nEvidence written to %s\n", pipelineStatus, decision, runOut)
-	if strings.TrimSpace(*alias) != "" {
+	if strings.TrimSpace(*alias) != "" && exitCode == 0 {
 		fmt.Printf("Alias updated: %s\n", filepath.Join(*outDir, strings.TrimSpace(*alias)))
 	}
 	os.Exit(exitCode)
@@ -1027,83 +1071,60 @@ func verifyCmd(args []string) {
 func mustReadFile(path string) []byte {
 	data, err := os.ReadFile(path)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "failed to read required file %s: %v\n", path, err)
-		os.Exit(1)
+		deliveryFailure(filepath.Dir(path), fmt.Errorf("read required file %s: %w", filepath.Base(path), err))
 	}
 	return data
 }
 
 func writeStableAlias(outputRoot string, aliasDir string, runOut string, runID string) error {
-	if !pathWithin(outputRoot, aliasDir) || !pathWithin(outputRoot, runOut) {
-		return fmt.Errorf("alias and run output must remain under the governed output root")
+	if !pathWithin(outputRoot, aliasDir) || !pathWithin(outputRoot, runOut) || filepath.Clean(aliasDir) == filepath.Clean(runOut) {
+		return fmt.Errorf("alias and distinct run must remain in output root")
 	}
-	if filepath.Clean(aliasDir) == filepath.Clean(runOut) {
-		return fmt.Errorf("alias directory must differ from run output")
-	}
-	// Start clean each time so consumers can rely on a stable file set.
-	if err := os.RemoveAll(aliasDir); err != nil {
+	if err := evidence.ValidateDeliveryFiles(runOut); err != nil {
 		return err
 	}
-	if err := os.MkdirAll(aliasDir, 0o755); err != nil {
+	if info, err := os.Lstat(aliasDir); err == nil && info.IsDir() {
+		return fmt.Errorf("legacy alias is a directory; with writers stopped, move it to a retained backup before enabling the atomic symlink alias")
+	} else if err != nil && !os.IsNotExist(err) {
 		return err
 	}
-	// Minimal manifest for humans & scripts.
-	if err := os.WriteFile(filepath.Join(aliasDir, "RUN_ID"), []byte(runID+"\n"), 0o644); err != nil {
+	target, err := filepath.Rel(filepath.Dir(aliasDir), runOut)
+	if err != nil {
 		return err
 	}
-	if err := os.WriteFile(filepath.Join(aliasDir, "RUN_PATH"), []byte(runOut+"\n"), 0o644); err != nil {
+	tmp, err := os.CreateTemp(filepath.Dir(aliasDir), ".cadence-alias-")
+	if err != nil {
 		return err
 	}
+	name := tmp.Name()
+	if err = tmp.Close(); err != nil {
+		os.Remove(name)
+		return err
+	}
+	defer os.Remove(name)
+	if err = os.Remove(name); err != nil {
+		return err
+	}
+	if err = os.Symlink(target, name); err != nil {
+		return err
+	}
+	return os.Rename(name, aliasDir)
+}
 
-	files := []string{
-		"input-identity.json",
-		"isolation-probe.json",
-		"key-hierarchy.json",
-		"hsm-anchor.json",
-		"run-manifest.json",
-		"run-manifest.canonical.json",
-		"pipeline-result.json",
-		"pipeline-result.canonical.json",
-		"job-envelope.json",
-		"job-envelope.canonical.json",
-		"audit-telemetry.json",
-		"deterministic-evidence.json",
-		"summary.json",
-		"summary.md",
-		"cadence-report.json",
-		"plugin-results-summary.json",
-		"step-hash-chain.json",
-		"sandbox-result.json",
-		"replay-package.json",
-		"replay-bundle.json",
-		"manifest-signature.json",
-		"run-manifest.json.signature.json",
-		"pipeline-result.json.signature.json",
-		"job-envelope.json.signature.json",
-		"input-identity.json.signature.json",
-		"audit-telemetry.json.signature.json",
-		"deterministic-evidence.json.signature.json",
-		"sandbox-result.json.signature.json",
-		"plugin-results-summary.json.signature.json",
-		"replay-package.json.signature.json",
-		"approval-chain.json.signature.json",
-		"bundle-signature.json",
-		"offline-attestation.json",
-		"waiver.json",
-		"approval-chain.json",
-		"waiver-audit-trail.json",
-	}
-	for _, name := range files {
-		src := filepath.Join(runOut, name)
-		if _, err := os.Stat(src); err != nil {
-			continue
-		}
-		dst := filepath.Join(aliasDir, name)
-		if err := copyFile(src, dst); err != nil {
-			return err
+// Preserve scan outcome while explicitly recording a failed delivery.
+func deliveryFailure(runOut string, failure error) {
+	_ = writeJSON(filepath.Join(runOut, "delivery-error.json"), map[string]any{"deliveryComplete": false, "error": failure.Error()})
+	summaryPath := filepath.Join(runOut, "summary.json")
+	if data, err := os.ReadFile(summaryPath); err == nil {
+		var summary map[string]any
+		if json.Unmarshal(data, &summary) == nil && summary != nil {
+			summary["deliveryComplete"] = false
+			summary["deliveryError"] = failure.Error()
+			_ = writeJSON(summaryPath, summary)
 		}
 	}
-	return nil
+	fmt.Fprintf(os.Stderr, "verify failed: evidence delivery incomplete: %v\n", failure)
+	os.Exit(1)
 }
 
 func copyFile(src string, dst string) error {
@@ -1139,6 +1160,7 @@ func writeDetachedSignatures(runOut string, runID string, signer signing.Signer,
 		"replay-package.json",
 		"approval-chain.json",
 		"waiver-audit-trail.json",
+		"evidence-bundle.json",
 	}
 	if signer.Algorithm() == "hmac-sha256" {
 		return writeLegacyDetachedSignatures(runOut, runID, legacyHMACKey)
@@ -1156,6 +1178,9 @@ func writeDetachedSignatures(runOut string, runID string, signer signing.Signer,
 		}
 		detached, err := signing.NewDetachedSignature(runID+"/"+name, signer, name, payload)
 		if err != nil {
+			return err
+		}
+		if err := signing.VerifyDetachedSignature(detached, signer, payload); err != nil {
 			return err
 		}
 		entries[name] = detached.PayloadHash
@@ -1224,6 +1249,7 @@ func writeLegacyDetachedSignatures(runOut string, runID string, key []byte) erro
 		"replay-package.json",
 		"approval-chain.json",
 		"waiver-audit-trail.json",
+		"evidence-bundle.json",
 	}
 	entries := map[string]string{}
 	for _, name := range signable {
@@ -2715,24 +2741,8 @@ func loadPersistedWaiverInputs(repoRoot string, waiverFilePath string, approvalC
 	if err != nil {
 		return zeroRecord, zeroChain, err
 	}
-	if err := waiver.Validate(record); err != nil {
-		return zeroRecord, zeroChain, err
-	}
-	if err := waiver.ValidateScope(record); err != nil {
-		return zeroRecord, zeroChain, err
-	}
-	if err := waiver.ValidateDuration(record); err != nil {
-		return zeroRecord, zeroChain, err
-	}
-
 	chain, err := waiver.LoadApprovalChain(resolveUserPath(repoRoot, approvalChainPath))
 	if err != nil {
-		return zeroRecord, zeroChain, err
-	}
-	if err := waiver.ValidateApprovalChain(chain); err != nil {
-		return zeroRecord, zeroChain, err
-	}
-	if err := waiver.ValidateApprovalChainForRecord(record, chain); err != nil {
 		return zeroRecord, zeroChain, err
 	}
 	return record, chain, nil

@@ -12,6 +12,8 @@ import (
 	"sort"
 	"strings"
 	"time"
+
+	"github.com/AzzCraft/cadence-oss/cadence-core/internal/signing"
 )
 
 const (
@@ -385,17 +387,21 @@ type AuditMetadata struct {
 // PipelineResultRef, ArtifactPaths, and BundleHash. Wall-clock metadata lives
 // in the Audit field and MUST NOT affect BundleHash computation.
 type EvidenceBundle struct {
-	SchemaVersion     string        `json:"schemaVersion"`
-	Audit             AuditMetadata `json:"audit"`
-	RunManifestRef    string        `json:"runManifestRef"`
-	PipelineResultRef string        `json:"pipelineResultRef"`
-	JobEnvelopeRef    string        `json:"jobEnvelopeRef,omitempty"`
-	ArtifactPaths     []string      `json:"artifactPaths"`
-	BundleHash        string        `json:"bundleHash"`
-	Signature         string        `json:"signature,omitempty"`
+	SchemaVersion     string            `json:"schemaVersion"`
+	Audit             AuditMetadata     `json:"audit"`
+	RunManifestRef    string            `json:"runManifestRef"`
+	PipelineResultRef string            `json:"pipelineResultRef"`
+	JobEnvelopeRef    string            `json:"jobEnvelopeRef,omitempty"`
+	ArtifactPaths     []string          `json:"artifactPaths"`
+	BundleHash        string            `json:"bundleHash"`
+	Signature         string            `json:"signature,omitempty"`
+	ChainProfile      string            `json:"chainProfile,omitempty"`
+	ArtifactHashes    map[string]string `json:"artifactHashes,omitempty"`
 }
 
 var excludedEvidenceArtifacts = map[string]struct{}{
+	"RUN_ID":                  {},
+	"RUN_PATH":                {},
 	"evidence-bundle.json":    {},
 	"replay-package.json":     {},
 	"replay-bundle.json":      {},
@@ -429,6 +435,9 @@ func BuildEvidenceBundle(evidenceDir string, runManifestRef, pipelineResultRef s
 				return nil
 			}
 			paths = append(paths, rel)
+			if len(paths) > MaxArtifacts {
+				return errors.New("artifact count limit")
+			}
 		}
 		return nil
 	})
@@ -436,47 +445,95 @@ func BuildEvidenceBundle(evidenceDir string, runManifestRef, pipelineResultRef s
 		return nil, fmt.Errorf("walking evidence dir: %w", err)
 	}
 	sort.Strings(paths)
-
-	h := sha256.New()
-	for _, p := range paths {
-		data, err := os.ReadFile(filepath.Join(evidenceDir, p))
-		if err != nil {
-			return nil, fmt.Errorf("reading %s: %w", p, err)
-		}
-		h.Write([]byte(p))
-		h.Write(data)
+	if len(paths) == 0 {
+		return nil, errors.New("empty evidence inventory")
 	}
-	bundleHash := "sha256:" + hex.EncodeToString(h.Sum(nil))
+
+	hashes, _, err := hashArtifacts(evidenceDir, paths, false)
+	if err != nil {
+		return nil, err
+	}
+	bundleHash := signing.BundleHash(hashes)
 
 	return &EvidenceBundle{
-		SchemaVersion: SchemaVersionV1,
+		SchemaVersion:  InventoryV2,
+		ChainProfile:   NativeChainProfile,
+		ArtifactHashes: hashes,
 		Audit: AuditMetadata{
 			BundleID:  fmt.Sprintf("bundle-%d", time.Now().UnixNano()),
 			Timestamp: time.Now().UTC().Format(time.RFC3339),
 		},
 		RunManifestRef:    runManifestRef,
 		PipelineResultRef: pipelineResultRef,
-		ArtifactPaths:     paths,
-		BundleHash:        bundleHash,
+		JobEnvelopeRef: func() string {
+			if _, ok := hashes["job-envelope.json"]; ok {
+				return "job-envelope.json"
+			}
+			return ""
+		}(),
+		ArtifactPaths: paths,
+		BundleHash:    bundleHash,
 	}, nil
+}
+
+func hashArtifacts(dir string, paths []string, legacy bool) (map[string]string, string, error) {
+	if len(paths) > MaxArtifacts {
+		return nil, "", errors.New("artifact count limit")
+	}
+	root, err := os.OpenRoot(dir)
+	if err != nil {
+		return nil, "", err
+	}
+	defer root.Close()
+	hashes := map[string]string{}
+	h := sha256.New()
+	var total int64
+	for _, p := range paths {
+		if _, found := hashes[p]; found {
+			return nil, "", errors.New("duplicate artifact path")
+		}
+		data, err := ReadArtifact(root, p, MaxArtifactBytes)
+		if err != nil {
+			return nil, "", fmt.Errorf("reading %s: %w", p, err)
+		}
+		total += int64(len(data))
+		if total > MaxTotalArtifactBytes {
+			return nil, "", errors.New("total artifact size limit")
+		}
+		hashes[p] = fileHash(data)
+		if legacy {
+			h.Write([]byte(p))
+			h.Write(data)
+		}
+	}
+	return hashes, "sha256:" + hex.EncodeToString(h.Sum(nil)), nil
 }
 
 // VerifyBundleIntegrity recomputes the hash of all artifacts in the evidence
 // directory and checks it matches the bundle's recorded hash.
 func VerifyBundleIntegrity(bundle EvidenceBundle, evidenceDir string) error {
-	if bundle.BundleHash == "" {
+	if !ValidDigest(bundle.BundleHash) {
 		return errors.New("bundle has no hash")
 	}
-	h := sha256.New()
-	for _, p := range bundle.ArtifactPaths {
-		data, err := os.ReadFile(filepath.Join(evidenceDir, p))
-		if err != nil {
-			return fmt.Errorf("missing artifact %s: %w", p, err)
-		}
-		h.Write([]byte(p))
-		h.Write(data)
+	legacy := bundle.SchemaVersion == SchemaVersionV1
+	if !legacy && bundle.SchemaVersion != InventoryV2 {
+		return errors.New("unsupported inventory version")
 	}
-	got := "sha256:" + hex.EncodeToString(h.Sum(nil))
+	hashes, got, err := hashArtifacts(evidenceDir, bundle.ArtifactPaths, legacy)
+	if err != nil {
+		return err
+	}
+	if !legacy {
+		if bundle.ChainProfile != NativeChainProfile || len(hashes) != len(bundle.ArtifactHashes) {
+			return errors.New("inventory profile or artifact map mismatch")
+		}
+		for name, hash := range hashes {
+			if bundle.ArtifactHashes[name] != hash {
+				return fmt.Errorf("artifact digest mismatch: %s", name)
+			}
+		}
+		got = signing.BundleHash(hashes)
+	}
 	if got != bundle.BundleHash {
 		return fmt.Errorf("bundle hash mismatch: expected %s, got %s", bundle.BundleHash, got)
 	}

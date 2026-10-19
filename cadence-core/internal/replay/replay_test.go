@@ -141,6 +141,8 @@ func TestBuildExcludesReplayArtifacts(t *testing.T) {
 func TestBuildExcludesMutableDerivedArtifacts(t *testing.T) {
 	outDir := t.TempDir()
 	for rel, content := range map[string]string{
+		"RUN_ID":                           "demo\n",
+		"RUN_PATH":                         outDir + "\n",
 		"run-manifest.json":                `{"runId":"demo"}`,
 		"evidence-bundle.json":             `{"bundleId":"stale"}`,
 		"manifest-signature.json":          `{"signature":"stale"}`,
