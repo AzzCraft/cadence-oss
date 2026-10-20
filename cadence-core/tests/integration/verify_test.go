@@ -593,15 +593,18 @@ func TestChainIntegrity(t *testing.T) {
 	}
 }
 
-// TestDeterminism runs verify twice on identical input and asserts output hashes match.
+// TestDeterminism replays an explicit run identity in independent output roots.
+// Default invocations allocate distinct attempts; their stable input identity is
+// checked separately by TestPublicNativeEvidenceRoundTripAndRefusal.
 func TestDeterminism(t *testing.T) {
 	bin := buildBinary(t)
 	repo := setupTestRepo(t)
 	outDir1 := filepath.Join(repo, "out-a")
 	outDir2 := filepath.Join(repo, "out-b")
+	runID := "deterministic-replay"
 
 	// First run.
-	cmd1 := exec.Command(bin, "verify", "--out", outDir1, "--alias", "")
+	cmd1 := exec.Command(bin, "verify", "--run-id", runID, "--out", outDir1, "--alias", "")
 	cmd1.Dir = repo
 	cmd1.Env = append(os.Environ(), "PYTHONDONTWRITEBYTECODE=1")
 	if out, err := cmd1.CombinedOutput(); err != nil {
@@ -609,7 +612,7 @@ func TestDeterminism(t *testing.T) {
 	}
 
 	// Second run.
-	cmd2 := exec.Command(bin, "verify", "--out", outDir2, "--alias", "")
+	cmd2 := exec.Command(bin, "verify", "--run-id", runID, "--out", outDir2, "--alias", "")
 	cmd2.Dir = repo
 	cmd2.Env = append(os.Environ(), "PYTHONDONTWRITEBYTECODE=1")
 	if out, err := cmd2.CombinedOutput(); err != nil {
@@ -626,11 +629,8 @@ func TestDeterminism(t *testing.T) {
 
 	runID1 := m1["runId"]
 	runID2 := m2["runId"]
-	if runID1 == "" || runID2 == "" {
-		t.Fatalf("determinism: empty runId(s): %v vs %v", runID1, runID2)
-	}
-	if runID1 != runID2 {
-		t.Fatalf("determinism: runId differs between runs: %v vs %v", runID1, runID2)
+	if runID1 != runID || runID2 != runID {
+		t.Fatalf("determinism: explicit runId %q not preserved: %v vs %v", runID, runID1, runID2)
 	}
 
 	cfg1 := m1["config"].(map[string]any)["configHash"]

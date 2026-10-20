@@ -1,6 +1,7 @@
 package main
 
 import (
+	"crypto/rand"
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
@@ -259,7 +260,8 @@ func verifyCmd(args []string) {
 	)
 
 	runID := strings.TrimSpace(*runIDFlag)
-	if runID == "" {
+	automaticRunID := runID == ""
+	if automaticRunID {
 		runID = deriveRunID(cfg.ProjectID, *profile, configHash, inputHash, snapshotID, dependencyHash)
 	} else {
 		runID = sanitizeID(runID)
@@ -275,18 +277,9 @@ func verifyCmd(args []string) {
 			fmt.Fprintf(os.Stderr, "verify failed: alias invalid: %v\n", err)
 			os.Exit(1)
 		}
-		if aliasName == runID {
-			fmt.Fprintln(os.Stderr, "verify failed: alias and run id must be different")
-			os.Exit(1)
-		}
 	}
-	runOut := filepath.Join(outputRoot, runID)
-	if err := os.MkdirAll(outputRoot, 0o755); err != nil {
-		fmt.Fprintln(os.Stderr, err)
-		os.Exit(1)
-	}
-	// A published run is immutable. Exclusive creation also rejects concurrent reuse.
-	if err := os.Mkdir(runOut, 0o755); err != nil {
+	runID, runOut, err := allocateRunDirectory(outputRoot, runID, aliasName, automaticRunID)
+	if err != nil {
 		fmt.Fprintf(os.Stderr, "verify failed: create a fresh run directory (choose a new run id): %v\n", err)
 		os.Exit(1)
 	}
@@ -1938,6 +1931,38 @@ func valueOrEmpty(value *string) string {
 		return ""
 	}
 	return *value
+}
+
+// Stable input identity is separate from the identity of each execution attempt.
+func allocateRunDirectory(root, prefix, alias string, automatic bool) (string, string, error) {
+	if err := os.MkdirAll(root, 0o755); err != nil {
+		return "", "", err
+	}
+	for attempt := 0; attempt < 8; attempt++ {
+		id := prefix
+		if automatic {
+			var nonce [12]byte
+			if _, err := rand.Read(nonce[:]); err != nil {
+				return "", "", err
+			}
+			id += "-" + hex.EncodeToString(nonce[:])
+		}
+		if err := safePathComponent(id); err != nil {
+			return "", "", err
+		}
+		if alias == id {
+			return "", "", fmt.Errorf("alias and run id must be different")
+		}
+		dir := filepath.Join(root, id)
+		if err := os.Mkdir(dir, 0o755); err != nil {
+			if automatic && os.IsExist(err) {
+				continue
+			}
+			return "", "", err
+		}
+		return id, dir, nil
+	}
+	return "", "", fmt.Errorf("automatic run id collision retry limit")
 }
 
 func deriveRunID(projectID string, profile string, configHash string, inputHash string, snapshotID string, dependencyHash string) string {

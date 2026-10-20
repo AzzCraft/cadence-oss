@@ -56,8 +56,8 @@ Multiple waivers can be stored in a waiver file:
 }
 ```
 
-The approval depth for a persisted waiver is supplied separately through a
-governed approval-chain file:
+The approval depth for a persisted waiver is supplied separately through an
+approval-chain metadata file:
 
 ```json
 {
@@ -75,8 +75,17 @@ governed approval-chain file:
 ## CLI Integration
 
 The `--break-glass` flag in `cadence verify` creates a waiver record inline.
-For production use, waivers should be managed through `--waiver-file` and
-`--approval-chain-file` and reviewed as part of the evidence audit trail.
+`CADENCE_SIGNING_MODE` defaults to `dev`. In dev mode, `--waiver-file` plus
+`--approval-chain-file` provides policy-checked metadata, not authenticated
+approval: names, roles and a `signature` string can be self-reported.
+
+In `governed` mode, a failed verification that needs this persisted override is
+refused. This CLI has no trusted approval-import command. Use an independently
+authenticated approval consumer when such approval is required; merely changing
+the signing mode or supplying these files does not create one. Explicit inline
+`--break-glass` is the legacy warning/non-compliant path, not a production grant.
+A successful verification needs no override; use a genuinely failing check when
+validating refusal behavior, otherwise the waiver path may never be exercised.
 
 Each inline or persisted waiver run also emits:
 - `waiver.json`
@@ -94,3 +103,9 @@ Each waiver run records:
 - the derived escalation tier
 - the required approval-chain depth
 - pass/fail decisions for record, scope, duration, approval-chain, and escalation checks
+
+Policy checks retain ticket/record binding, explicit reference-time expiry,
+profile scope for verify bypass, duration/escalation requirements, ordered roles
+and distinct principals. Metadata passing those checks is separate from identity
+and signature authentication. Check `waiver-audit-trail.json` and the process
+exit status; do not treat the existence of waiver files as acceptance.

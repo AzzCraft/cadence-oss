@@ -71,3 +71,38 @@ func TestDeliveryFailureReportsNonzeroWithoutChangingScanOutcome(t *testing.T) {
 		t.Fatalf("scan/delivery facts were conflated: %s", data)
 	}
 }
+
+func TestAutomaticRunAllocationConcurrentAndExplicitExclusive(t *testing.T) {
+	root := t.TempDir()
+	type result struct {
+		id, dir string
+		err     error
+	}
+	results := make(chan result, 12)
+	for i := 0; i < 12; i++ {
+		go func() {
+			id, dir, err := allocateRunDirectory(root, "stable-input", "latest", true)
+			results <- result{id, dir, err}
+		}()
+	}
+	seen := map[string]bool{}
+	for i := 0; i < 12; i++ {
+		r := <-results
+		if r.err != nil || seen[r.id] || r.dir != filepath.Join(root, r.id) {
+			t.Fatalf("allocation collision: %+v", r)
+		}
+		seen[r.id] = true
+	}
+	if _, _, err := allocateRunDirectory(root, "explicit", "latest", false); err != nil {
+		t.Fatal(err)
+	}
+	if _, _, err := allocateRunDirectory(root, "explicit", "latest", false); !os.IsExist(err) {
+		t.Fatalf("explicit ID reuse: %v", err)
+	}
+	if _, _, err := allocateRunDirectory(root, "latest", "latest", false); err == nil {
+		t.Fatal("alias collision accepted")
+	}
+	if _, _, err := allocateRunDirectory(filepath.Join(root, "explicit", "file"), "bad/path", "", false); err == nil {
+		t.Fatal("unsafe component accepted")
+	}
+}

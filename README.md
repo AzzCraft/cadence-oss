@@ -22,13 +22,33 @@ bash ./scripts/verify
 
 ## Quickstart
 
-Build the CLI from this repository:
+Build both commands from this repository root:
 
 ```bash
-cd cadence-core
-go build -mod=vendor -o ../cadence ./cmd/cadence
-../cadence version --json
+(cd cadence-core
+ go build -mod=vendor -o ../cadence ./cmd/cadence
+ go build -mod=vendor -o ../evidence-verify ./cmd/evidence-verify)
+./cadence version --json
 ```
+
+Run verification inside the project containing `cadence.yaml`. When switching
+projects, use absolute binary paths (the build does not install anything on PATH):
+
+```bash
+CADENCE_BIN="$PWD/cadence"
+EVIDENCE_VERIFY_BIN="$PWD/evidence-verify"
+cd "$PROJECT_DIR"  # set to the project containing cadence.yaml
+"$CADENCE_BIN" verify
+RUN_BUNDLE="$PWD/.cadence/out/latest/evidence-bundle.json"
+"$EVIDENCE_VERIFY_BIN" --profile cadence-run/v2 --bundle "$RUN_BUNDLE"
+```
+
+For an existing bundle while still at this repository root, use
+`./evidence-verify --profile cadence-run/v2 --bundle "$RUN_BUNDLE"`.
+Default verify runs use a stable input-derived prefix and a fresh random suffix;
+repeated inputs get independent attempt directories. Explicit duplicate `--run-id`
+values still fail. Input hashes, snapshot identity and replay-plan hashes remain
+stable for the same inputs; attempt IDs and time-bearing evidence may differ.
 
 Run `bash ./scripts/verify --standalone` for the Go checks. The default full
 verification also covers protocol and sandbox tests; actual Linux runtime tests
@@ -47,7 +67,7 @@ project supplies any required approvals and deployment controls.
 
 ## Native evidence profiles and delivery
 
-`evidence-verify --profile cadence-run/v2 --bundle <run>/evidence-bundle.json`
+`./evidence-verify --profile cadence-run/v2 --bundle <run>/evidence-bundle.json`
 consumes current native inventory `cadence-evidence-bundle/v2`. It uses bounded,
 root-confined reads and per-file SHA-256 hashes with sorted path/NUL/digest/LF
 aggregation. The inventory binds the legacy native step-chain profile plus all

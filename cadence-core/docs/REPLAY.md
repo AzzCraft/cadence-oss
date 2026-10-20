@@ -2,9 +2,9 @@
 
 ## Overview
 
-The replay package provides deterministic re-execution capability for cadence verify runs.
-A replay bundle captures all inputs, outputs, and file snapshots from a run so that the same
-result can be reproduced independently.
+The replay package records selected output files from a Cadence verify run and compares
+their snapshots. It does not itself re-execute the run or capture every external input.
+Reproduction also requires the original inputs, configuration and execution environment.
 
 ## Bundle Structure
 
@@ -15,7 +15,7 @@ result can be reproduced independently.
   "runManifestRef": "<path-to-run-manifest>",
   "pipelineResultRef": "<path-to-pipeline-result>",
   "snapshots": [
-    { "relPath": "manifest.json", "size": 1234, "fileHash": "sha256:..." }
+    { "relPath": "run-manifest.json", "mode": "0644", "size": 1234, "fileHash": "sha256:..." }
   ],
   "inputs": { "config": "sha256:...", "source": "sha256:..." },
   "bundleHash": "sha256:..."
@@ -24,16 +24,28 @@ result can be reproduced independently.
 
 ## Lifecycle
 
-1. **Build**: After a verify run completes, `replay.Build()` walks the output directory and
-   records the hash of every artifact. Snapshots are sorted by path for deterministic ordering.
-2. **Save**: The bundle is written as canonical JSON to the output directory.
+1. **Build**: `replay.Build()` walks the output directory at the time it is called and
+   records regular files, excluding locators, replay/evidence bundles, signatures,
+   attestations and report summaries listed in `internal/replay/replay.go`.
+   Non-regular artifacts are rejected. Snapshots are sorted by relative path.
+   The `inputs` map starts empty; callers must supply any input references they need.
+2. **Save**: The bundle is written as indented JSON with a trailing newline.
 3. **Load**: A previously saved bundle can be loaded from disk.
-4. **Verify**: `replay.VerifyBundle()` re-hashes every file in the output directory and compares
-   against the recorded snapshot hashes.
+4. **Verify**: `replay.VerifyBundle()` checks each recorded path, file type, size,
+   permission mode when recorded, and content hash. It does not discover unlisted files
+   or recompute `bundleHash`; it is not the complete evidence verification entry point.
+   Use `evidence-verify` for the native evidence inventory and its associated checks.
 
 ## Determinism Guarantees
 
 - File snapshots are sorted by relative path before hashing.
-- The `bundleHash` is computed from the ordered concatenation of all snapshot hashes.
-- A replay bundle from one machine should produce identical `bundleHash` on another machine
-  given the same inputs and sandbox profile.
+- The `bundleHash` hashes each sorted snapshot's relative path, permission mode,
+  size and file hash, separated by NUL bytes and terminated by a newline.
+- Default `cadence verify` invocations allocate separate attempt IDs. Their input hashes
+  can match while files containing the run ID and their replay bundle hashes differ.
+- To compare a controlled replay, pass the same explicit `--run-id` to runs in separate
+  fresh output roots. Reusing an existing run directory is rejected. The integration test
+  `TestDeterminism` checks this explicit-ID case, including artifact bytes and `bundleHash`.
+- Equal bundle hashes require equal recorded paths, modes, sizes and content hashes.
+  Matching inputs and sandbox profile alone do not guarantee this across machines;
+  runtime observations, clocks and file permissions may also differ.

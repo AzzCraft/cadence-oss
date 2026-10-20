@@ -190,7 +190,7 @@ failure cannot suppress Worker protections, forbidden completion shortcuts or
 safe-stop duties. Facts describe activity, not the permission to perform it.
 
 For a source-development probe, form an input object with contractIdentity
-`das-bundle-preview-input/v2`, a nonempty scope, a `sha256:` policyDigest,
+`das-bundle-preview-input/v3`, a nonempty scope, a `sha256:` policyDigest,
 `catalog` loaded from Standard's standard_modules.json, `requirementsCatalog`
 loaded from standard_requirements.json and a `facts` array. Each fact has key,
 boolean or `unknown` value and sourceRef. Run `cadence resolve --preview` with
@@ -222,8 +222,12 @@ revocation states, a trusted-observation uncertainty interval, observation time,
 staleness bound, keys/principal/issuer/roles and threshold. A public caller can
 choose these values: **the probe does not authenticate the installed control
 plane, current state or real identity separation**. Its output deliberately
-retains `das-bundle-preview/v2` with all authority/qualification/completeness flags
-false. It is not a formal Bundle or permission to adopt, integrate or complete.
+returns `das-approved-facts-check/v2` with `authority=false` and
+`qualification=false`. Its embedded `das-bundle-preview/v3` reports
+`leafMigrationComplete=true` for the current 2723-leaf complete catalog, while
+`authorityVerified=false` and `qualificationEligible=false`. The probe input is
+`das-approved-facts-preview-input/v1`; the signed inner payload and its DSSE
+payload type remain v1. It is not a formal Bundle or permission to adopt, integrate or complete.
 
 Run `cadence resolve --check-approved-facts` with this explicit JSON on stdin.
 The existing pinned Python adapter exposes `resolve_facts_preview`; the existing

@@ -185,6 +185,33 @@ func TestPublicNativeEvidenceRoundTripAndRefusal(t *testing.T) {
 	if err != nil || after != original {
 		t.Fatal("failure advanced success pointer")
 	}
+
+	// Default runs retain stable inputs but allocate a fresh immutable attempt.
+	var stable map[string]any
+	for i := 0; i < 2; i++ {
+		if out, err := run("verify", "--out", outDir); err != nil {
+			t.Fatalf("default retry: %v %s", err, out)
+		}
+		id, err := os.Readlink(filepath.Join(outDir, "latest"))
+		if err != nil || id == original {
+			t.Fatal("default run reused prior output")
+		}
+		dir := filepath.Join(outDir, id)
+		if out, err := exec.Command(reader, "--profile", "cadence-run/v2", "--bundle", filepath.Join(dir, "evidence-bundle.json")).CombinedOutput(); err != nil {
+			t.Fatalf("default reader: %v %s", err, out)
+		}
+		var identity map[string]any
+		loadJSON(t, filepath.Join(dir, "input-identity.json"), &identity)
+		if stable != nil {
+			for _, key := range []string{"inputHash", "snapshotId", "replayPlanHash"} {
+				if identity[key] == nil || identity[key] != stable[key] {
+					t.Fatalf("unstable %s: %v vs %v", key, identity[key], stable[key])
+				}
+			}
+		}
+		stable = identity
+		original = id
+	}
 	// Actual late CLI failures, after scan/bundle creation, must retain a
 	// structured failed delivery rather than only stderr + a nonzero exit.
 	for _, failure := range []string{"signer", "alias"} {
@@ -234,6 +261,38 @@ func TestPublicNativeEvidenceRoundTripAndRefusal(t *testing.T) {
 				}
 			}
 		})
+	}
+	beforeEntries, _ := os.ReadDir(outDir)
+	if out, err := run("verify", "--out", outDir, "--alias", "legacy"); err == nil || !strings.Contains(string(out), "evidence delivery incomplete") {
+		t.Fatalf("expected late default failure: %v %s", err, out)
+	}
+	afterEntries, _ := os.ReadDir(outDir)
+	if len(afterEntries) != len(beforeEntries)+1 {
+		t.Fatal("default failure did not preserve an independent attempt")
+	}
+	if after, err := os.Readlink(filepath.Join(outDir, "latest")); err != nil || after != original {
+		t.Fatal("default failure advanced success pointer")
+	}
+	// Two real default CLI executions also share the input safely.
+	results := make(chan error, 2)
+	for i := 0; i < 2; i++ {
+		go func() { _, err := run("verify", "--out", outDir); results <- err }()
+	}
+	for i := 0; i < 2; i++ {
+		if err := <-results; err != nil {
+			t.Fatalf("concurrent default retry: %v", err)
+		}
+	}
+	finalEntries, _ := os.ReadDir(outDir)
+	if len(finalEntries) != len(afterEntries)+2 {
+		t.Fatal("concurrent runs reused a directory")
+	}
+	original, err = os.Readlink(filepath.Join(outDir, "latest"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if out, err := exec.Command(reader, "--profile", "cadence-run/v2", "--bundle", filepath.Join(outDir, original, "evidence-bundle.json")).CombinedOutput(); err != nil {
+		t.Fatalf("retry reader: %v %s", err, out)
 	}
 	// Synthetic policy failures have actual violations to waive.
 	os.WriteFile(filepath.Join(repo, "app.env"), []byte("TEST_AUTH_TOKEN=synthetic-secret-token\n"), 0600)
