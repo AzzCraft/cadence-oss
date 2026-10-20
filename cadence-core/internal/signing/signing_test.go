@@ -548,3 +548,59 @@ func TestSelectSignerGovernedExternalCommand(t *testing.T) {
 		t.Fatal("expected external-command signature to verify")
 	}
 }
+
+func TestVerifiedAnchorCapturesActualPrivateKeySource(t *testing.T) {
+	for _, mode := range []string{"inline", "file", "missing-file", "memory", "external"} {
+		t.Run(mode, func(t *testing.T) {
+			for _, key := range []string{"CADENCE_GOVERNED_SIGNER_COMMAND", "CADENCE_GOVERNED_SIGNING_PRIVATE_KEY_FILE", "CADENCE_GOVERNED_SIGNING_PUBLIC_KEY_FILE", "CADENCE_GOVERNED_SIGNING_PUBLIC_KEY"} {
+				t.Setenv(key, "")
+			}
+			t.Setenv("CADENCE_SIGNING_MODE", "governed")
+			seed := bytes.Repeat([]byte{7}, ed25519.SeedSize)
+			t.Setenv("CADENCE_GOVERNED_SIGNING_PRIVATE_KEY", hex.EncodeToString(seed))
+			expected := "env:CADENCE_GOVERNED_SIGNING_PRIVATE_KEY"
+			if mode == "file" || mode == "missing-file" {
+				path := filepath.Join(t.TempDir(), "private-test-seed")
+				if mode == "file" {
+					if err := os.WriteFile(path, bytes.Repeat([]byte{8}, ed25519.SeedSize), 0600); err != nil {
+						t.Fatal(err)
+					}
+				}
+				t.Setenv("CADENCE_GOVERNED_SIGNING_PRIVATE_KEY_FILE", path)
+				expected += "_FILE"
+			}
+			if mode == "external" {
+				t.Setenv("CADENCE_GOVERNED_SIGNER_COMMAND", "false")
+			}
+			signer, err := SelectSigner("test-key", "test-issuer", nil)
+			if mode == "missing-file" {
+				if err == nil {
+					t.Fatal("fell back to inline key")
+				}
+				return
+			}
+			if err != nil {
+				t.Fatal(err)
+			}
+			if mode == "memory" {
+				signer = NewEd25519SignerFromKeys(ed25519.NewKeyFromSeed(seed).Public().(ed25519.PublicKey), ed25519.NewKeyFromSeed(seed), "memory-key", "test-issuer")
+				expected = "key-id:memory-key"
+			}
+			// Provenance belongs to the selected signer, not later environment state.
+			t.Setenv("CADENCE_GOVERNED_SIGNING_PRIVATE_KEY_FILE", "changed-after-selection")
+			anchor, present, err := VerifiedSoftwareAnchor(signer, []byte("actual signature probe"))
+			if mode == "external" {
+				if present || err != nil {
+					t.Fatal("external signer fabricated anchor")
+				}
+				return
+			}
+			if err != nil || !present || anchor.KeyURI != expected || anchor.HardwareBacked {
+				t.Fatalf("wrong source: %+v %v", anchor, err)
+			}
+			if mode == "file" && !bytes.Equal(signer.(*Ed25519Signer).PrivateKey.Seed(), bytes.Repeat([]byte{8}, ed25519.SeedSize)) {
+				t.Fatal("file did not take precedence")
+			}
+		})
+	}
+}

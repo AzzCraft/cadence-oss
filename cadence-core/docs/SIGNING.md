@@ -5,7 +5,7 @@
 The signing package provides two signing modes for evidence envelopes:
 
 - **Dev mode** (`CADENCE_SIGNING_MODE=dev`): HMAC-SHA256 with a shared key — suitable for local development and CI.
-- **Governed mode** (`CADENCE_SIGNING_MODE=governed`): Ed25519 asymmetric signing with a multi-depth key hierarchy — the production-grade path.
+- **Governed mode** (`CADENCE_SIGNING_MODE=governed`): Ed25519 asymmetric signing with configured key hierarchy references.
 
 A step hash chain links individual check/plugin execution steps into a verifiable chain.
 
@@ -28,7 +28,7 @@ Uses `HMACSigner` with a pre-shared key passed via `CADENCE_SIGNING_KEY`.
 
 ### Governed Mode (Ed25519)
 
-Uses `Ed25519Signer` with asymmetric keys. This is the required mode for production deployments.
+Uses a local `Ed25519Signer` or an external signer with an explicitly configured verification key. Choosing this mode does not establish production approval or hardware custody.
 
 ```json
 {
@@ -117,7 +117,7 @@ In dev mode, the hierarchy is flat — a single operator-managed key serves as b
 
 ### Governed Hierarchy (depth 3)
 
-In governed/production mode, `BuildGovernedKeyHierarchy()` produces a full chain-of-trust:
+In governed mode, `BuildGovernedKeyHierarchy()` records configured root/intermediate/leaf references. It does not verify a certificate chain or prove the issuers authorized those relationships:
 
 ```json
 {
@@ -143,43 +143,32 @@ The hierarchy is written to `key-hierarchy.json` in the evidence output.
 The root anchor comes from `cadence.yaml` (`rootAnchor`) and may be overridden
 by `CADENCE_ROOT_ANCHOR`; both paths are part of the governed input identity.
 
-## Root Anchor
+## Root anchor and actual key source
 
-### Dev Anchor
+A configured root URI is a reference, not hardware attestation. The writer calls
+`VerifiedSoftwareAnchor` only when using a concrete signer and emits software
+anchor evidence after a real signature and local verification succeed.
 
-Dev mode uses `BuildHSMAnchor()` to record an active `software-hmac` anchor pointing to
-`env:CADENCE_SIGNING_KEY`. Status: `active`.
+| Actual signer | Anchor behavior |
+|---|---|
+| Unsigned / URI-only configuration | No active anchor |
+| Local HMAC | `software-hmac`, `hardwareBacked=false`, `env:CADENCE_SIGNING_KEY` |
+| Local Ed25519 private-key file | `software-ed25519`, `hardwareBacked=false`, `env:CADENCE_GOVERNED_SIGNING_PRIVATE_KEY_FILE` |
+| Local Ed25519 inline material | `software-ed25519`, `hardwareBacked=false`, `env:CADENCE_GOVERNED_SIGNING_PRIVATE_KEY` |
+| In-memory Ed25519 signer | Key-ID reference when available; no invented environment source |
+| External command | No v1 anchor: signature verification does not prove hardware storage |
 
-### Governed Anchor
+Source labels are captured when the key is loaded; they never contain a private
+key or its filesystem path. `CADENCE_GOVERNED_SIGNER_COMMAND` takes precedence
+over local signing. In the local path, `_PRIVATE_KEY_FILE` takes precedence over
+`_PRIVATE_KEY`; a broken file does not fall back to inline material. Changing the
+environment after selection cannot relabel the selected signer.
 
-Governed mode uses `BuildGovernedAnchor()` which produces an active anchor.
-Status: `active`. The anchor provider is determined by the anchor ID prefix:
-
-| Anchor ID Prefix | Provider | Hardware-Backed | Attestation |
-|---|---|---|---|
-| `hsm://...` | `hsm` | yes | `external-hsm-anchor-active` |
-| `kms://...` | `kms` | yes | `external-kms-anchor-active` |
-| (default) | `software-ed25519` | no | `software-ed25519-active` |
-
-### Production HSM/KMS Configuration
-
-To deploy with hardware-backed signing:
-
-1. Set `CADENCE_SIGNING_MODE=governed`
-2. Set `CADENCE_ROOT_ANCHOR` to the HSM/KMS URI (e.g., `hsm://vendor/key-id` or `kms://aws/key-arn`)
-3. Configure one of:
-   - `CADENCE_GOVERNED_SIGNER_COMMAND=/path/to/hsm-wrapper`
-   - `CADENCE_GOVERNED_SIGNING_PRIVATE_KEY_FILE=/path/to/ed25519-private-key`
-4. Provide the verification key via `CADENCE_GOVERNED_SIGNING_PUBLIC_KEY(_FILE)` when using an external signer command.
-5. The runtime will:
-   - Record `hardwareBacked: true` in the anchor evidence for `hsm://` / `kms://` roots
-   - Use the configured root anchor for the depth-3 governed key hierarchy
-   - Emit governed detached signatures for each signed artifact
-   - Emit `bundle-signature.json` with both legacy-compatible bundle fields and the governed `manifestLayer`, `bundleLayer`, `dualHash`, and `dualSignature`
-
-The `HSMAnchor` evidence record is emitted regardless of mode, ensuring
-downstream audit tools can verify the declared anchor path. The status field is
-`active` for every emitted release evidence record.
+An external command can front an operator's provider, but this release has no
+verified hardware-provider attestation adapter. `hsm://` / `kms://` strings do
+not set `hardwareBacked=true`. Installations requiring hardware must obtain that
+evidence separately; absent anchors cannot satisfy that requirement. Structural
+`ValidateHSMAnchor` validation and hierarchy references are not proof of custody.
 
 ## Dual-Layer Signatures
 

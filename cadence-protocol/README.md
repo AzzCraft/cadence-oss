@@ -31,8 +31,22 @@ Deprecated compatibility aliases remain accepted for one release cycle:
 
 ## Versioning
 
-- Schemas use SemVer under `schemaVersion`.
-- Breaking changes MUST bump major.
+Version identities are specific to each contract family; do not rewrite legacy
+fixtures to a tool release number.
+
+| Contract family | Identity | Reader/profile |
+|---|---|---|
+| General protocol objects | SemVer `schemaVersion` as required by their own schema | Python `protocol/v1` |
+| Historical native inventory | `schemaVersion=1.0.0`, native chain `cadence-run/v1` | Go `cadence-run/v1`; Python `native-inventory/v1` (schema only) |
+| Current native inventory | `schemaVersion=cadence-evidence-bundle/v2`, `chainProfile=cadence-run/v1` | Go `cadence-run/v2`; Python `native-inventory/v2` (schema only) |
+| Current DAS preview input/result | `contractIdentity=das-bundle-preview-input/v3` / `das-bundle-preview/v3` | `cadence resolve --preview` |
+| Standard requirement catalog | `schemaVersion=3.0.0` | Complete-catalog resolver |
+| Tool release | `1.2.0-beta.1` | `cadence version --json`; separate from schema identity |
+
+Breaking contract changes require a new applicable major/identity. Native v2
+inventory still binds the v1 step-chain profile; those numbers do not conflict.
+See [DAS contracts](docs/DAS_V1_5_REFERENCE_CONTRACTS.md) for independently
+versioned signed-facts input, payload and outer result identities.
 
 ## Layout
 

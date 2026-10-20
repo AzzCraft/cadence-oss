@@ -56,6 +56,7 @@ func (s *HMACSigner) Issuer() string    { return s.IssuerID }
 
 // Ed25519Signer implements the Signer interface using Ed25519 (governed mode).
 type Ed25519Signer struct {
+	sourceRef  string
 	PrivateKey ed25519.PrivateKey
 	PublicKey  ed25519.PublicKey
 	ID         string
@@ -356,30 +357,32 @@ func loadConfiguredGovernedSigner(keyID, issuer string) (Signer, error) {
 		}
 		return NewExternalCommandSigner(strings.Fields(commandText), verifier, keyID, issuer)
 	}
-	publicKey, privateKey, err := loadConfiguredEd25519Keys()
+	publicKey, privateKey, sourceRef, err := loadConfiguredEd25519Keys()
 	if err != nil {
 		return nil, err
 	}
 	if len(privateKey) == 0 {
 		return nil, errors.New("governed signing private key is required unless CADENCE_GOVERNED_SIGNER_COMMAND is configured")
 	}
-	return NewEd25519SignerFromKeys(publicKey, privateKey, keyID, issuer), nil
+	signer := NewEd25519SignerFromKeys(publicKey, privateKey, keyID, issuer)
+	signer.sourceRef = sourceRef
+	return signer, nil
 }
 
 func loadConfiguredGovernedVerifier(keyID, issuer string) (*Ed25519VerifierOnly, error) {
-	publicKey, _, err := loadConfiguredEd25519Keys()
+	publicKey, _, _, err := loadConfiguredEd25519Keys()
 	if err != nil {
 		return nil, err
 	}
 	return &Ed25519VerifierOnly{PublicKey: publicKey, ID: keyID, IssuerID: issuer}, nil
 }
 
-func loadConfiguredEd25519Keys() (ed25519.PublicKey, ed25519.PrivateKey, error) {
-	privateKey, privateErr := loadConfiguredEd25519PrivateKey()
+func loadConfiguredEd25519Keys() (ed25519.PublicKey, ed25519.PrivateKey, string, error) {
+	privateKey, sourceRef, privateErr := loadConfiguredEd25519PrivateKey()
 	publicKey, publicErr := loadConfiguredEd25519PublicKey()
 
 	if privateErr != nil && publicErr != nil {
-		return nil, nil, fmt.Errorf(
+		return nil, nil, "", fmt.Errorf(
 			"governed signing requires either CADENCE_GOVERNED_SIGNING_PRIVATE_KEY(_FILE) or CADENCE_GOVERNED_SIGNING_PUBLIC_KEY(_FILE): %v; %v",
 			privateErr,
 			publicErr,
@@ -389,33 +392,36 @@ func loadConfiguredEd25519Keys() (ed25519.PublicKey, ed25519.PrivateKey, error) 
 		publicKey = privateKey.Public().(ed25519.PublicKey)
 	}
 	if len(publicKey) == 0 {
-		return nil, nil, fmt.Errorf("governed signing public key unavailable: %w", publicErr)
+		return nil, nil, "", fmt.Errorf("governed signing public key unavailable: %w", publicErr)
 	}
 	if privateErr != nil {
-		return publicKey, nil, nil
+		return publicKey, nil, "", nil
 	}
-	return publicKey, privateKey, nil
+	return publicKey, privateKey, sourceRef, nil
 }
 
-func loadConfiguredEd25519PrivateKey() (ed25519.PrivateKey, error) {
-	material, fromFile, err := loadKeyMaterial(
-		strings.TrimSpace(os.Getenv("CADENCE_GOVERNED_SIGNING_PRIVATE_KEY")),
-		strings.TrimSpace(os.Getenv("CADENCE_GOVERNED_SIGNING_PRIVATE_KEY_FILE")),
-	)
+func loadConfiguredEd25519PrivateKey() (ed25519.PrivateKey, string, error) {
+	inline := strings.TrimSpace(os.Getenv("CADENCE_GOVERNED_SIGNING_PRIVATE_KEY"))
+	file := strings.TrimSpace(os.Getenv("CADENCE_GOVERNED_SIGNING_PRIVATE_KEY_FILE"))
+	sourceRef := "env:CADENCE_GOVERNED_SIGNING_PRIVATE_KEY"
+	if file != "" {
+		sourceRef += "_FILE"
+	}
+	material, fromFile, err := loadKeyMaterial(inline, file)
 	if err != nil {
-		return nil, err
+		return nil, "", err
 	}
 	decoded, err := decodeKeyMaterial(material, fromFile)
 	if err != nil {
-		return nil, err
+		return nil, "", err
 	}
 	switch len(decoded) {
 	case ed25519.SeedSize:
-		return ed25519.NewKeyFromSeed(decoded), nil
+		return ed25519.NewKeyFromSeed(decoded), sourceRef, nil
 	case ed25519.PrivateKeySize:
-		return ed25519.PrivateKey(decoded), nil
+		return ed25519.PrivateKey(decoded), sourceRef, nil
 	default:
-		return nil, fmt.Errorf("governed signing private key must decode to %d-byte seed or %d-byte private key, got %d bytes", ed25519.SeedSize, ed25519.PrivateKeySize, len(decoded))
+		return nil, "", fmt.Errorf("governed signing private key must decode to %d-byte seed or %d-byte private key, got %d bytes", ed25519.SeedSize, ed25519.PrivateKeySize, len(decoded))
 	}
 }
 
@@ -824,7 +830,7 @@ func BuildGovernedAnchor(rootAnchor string) HSMAnchor {
 		return HSMAnchor{}
 	default:
 		anchor.Provider = "software-ed25519"
-		anchor.KeyURI = "env:CADENCE_SIGNING_KEY"
+		anchor.KeyURI = "key-id:" + anchorID
 		anchor.Attestation = "software-ed25519-active"
 		anchor.HardwareBacked = false
 	}
@@ -835,11 +841,18 @@ func BuildGovernedAnchor(rootAnchor string) HSMAnchor {
 // External signers have unknown hardware storage and produce no v1 anchor.
 func VerifiedSoftwareAnchor(signer Signer, payload []byte) (HSMAnchor, bool, error) {
 	var anchor HSMAnchor
-	switch signer.(type) {
+	switch concrete := signer.(type) {
 	case *HMACSigner:
 		anchor = BuildHSMAnchor("")
 	case *Ed25519Signer:
 		anchor = BuildGovernedAnchor("")
+		anchor.KeyURI = concrete.sourceRef
+		if anchor.KeyURI == "" {
+			if strings.TrimSpace(concrete.KeyID()) == "" {
+				return HSMAnchor{}, false, nil
+			}
+			anchor.KeyURI = "key-id:" + concrete.KeyID()
+		}
 	default:
 		return anchor, false, nil
 	}
