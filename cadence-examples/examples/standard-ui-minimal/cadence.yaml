@@ -8,5 +8,6 @@ sandboxRef: ../../../cadence-sandbox/sandbox_profile.json
 policies:
   - standard-ui-v146
 ui:
-  enabled: true
+  # Run ui/UI_SPEC.md separately; core verification does not execute browsers.
+  enabled: false
   profile: pr

@@ -8,5 +8,6 @@ sandboxRef: ../cadence-sandbox/sandbox_profile.json
 policies:
   - standard-ui-v146
 ui:
-  enabled: true
+  # Browser checks use the explicit UI runner, not the core scanner.
+  enabled: false
   profile: pr
