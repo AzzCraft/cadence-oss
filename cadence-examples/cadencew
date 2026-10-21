@@ -15,54 +15,42 @@ BIN_DIR="$ROOT_DIR/.cadence/bin"
 BIN="$BIN_DIR/cadence"
 LOCAL_CORE="$ROOT_DIR/../cadence-core"
 
-needs_rebuild() {
-  if [[ ! -x "$BIN" ]]; then
-    return 0
-  fi
-  if [[ ! -d "$LOCAL_CORE" ]]; then
-    return 1
-  fi
-  if find "$LOCAL_CORE" -type f \( -name '*.go' -o -name 'go.mod' -o -name 'go.sum' \) -newer "$BIN" | grep -q .; then
-    return 0
-  fi
-  return 1
-}
 
 ensure_bin() {
   # Prefer the local cadence-core tree when present so the wrapper follows the
   # checked-out source of truth rather than a stale cached or global binary.
   if [[ -d "$LOCAL_CORE" ]]; then
     mkdir -p "$BIN_DIR"
-    if needs_rebuild; then
-      echo "cadencew: building cadence-core -> $BIN"
-      # Build beside neither the source tree nor the persistent wrapper cache.
-      # A stale executable in .cadence/bin (including one created by an older
-      # wrapper) must not make a repeat verification fail before the binary can
-      # be atomically replaced.
-      build_dir="$(mktemp -d "${TMPDIR:-/tmp}/cadencew-build.XXXXXX")"
-      temp_bin="$build_dir/cadence"
-      if ! (cd "$LOCAL_CORE" && go build -o "$temp_bin" ./cmd/cadence); then
-        rmdir "$build_dir" 2>/dev/null || true
-        return 1
-      fi
-      chmod +x "$temp_bin"
-      mv -f "$temp_bin" "$BIN"
-      rmdir "$build_dir"
-      chmod +x "$BIN"
+    # Go's build cache tracks bytes, deleted files, embeds, flags and toolchain.
+    # Always ask it to build; timestamps alone cannot identify the source.
+    echo "cadencew: building cadence-core -> $BIN"
+    # Build beside neither the source tree nor the persistent wrapper cache.
+    # A stale executable in .cadence/bin (including one created by an older
+    # wrapper) must not make a repeat verification fail before the binary can
+    # be atomically replaced.
+    build_dir="$(mktemp -d "${TMPDIR:-/tmp}/cadencew-build.XXXXXX")"
+    temp_bin="$build_dir/cadence"
+    if ! (cd "$LOCAL_CORE" && go build -o "$temp_bin" ./cmd/cadence); then
+      rmdir "$build_dir" 2>/dev/null || true
+      return 1
     fi
+    chmod +x "$temp_bin"
+    mv -f "$temp_bin" "$BIN"
+    rmdir "$build_dir"
+    chmod +x "$BIN"
     return 0
   fi
 
   # If cadence is already installed globally, use it.
   if command -v cadence >/dev/null 2>&1; then
-    return 0
+    exec cadence "$@"
   fi
 
   echo "cadencew: cannot locate cadence-core to build, and no system cadence found" >&2
   exit 127
 }
 
-ensure_bin
+ensure_bin "$@"
 
 if [[ ! -f "$ROOT_DIR/tooling_lock.json" ]]; then
   echo "cadencew: missing tooling_lock.json" >&2

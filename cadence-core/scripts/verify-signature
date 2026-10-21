@@ -9,7 +9,7 @@ Usage:
 
 Verifies one Cadence HMAC-SHA256 signature envelope or a bundle of detached
 signatures plus bundle-signature.json.
-If --key is omitted, CADENCE_SIGNING_KEY is used.
+Prefer CADENCE_SIGNING_KEY; explicit --key values are visible in the invoking command line.
 USAGE
 }
 
@@ -53,16 +53,19 @@ if [[ -z "$KEY" ]]; then
   exit 2
 fi
 
+export CADENCE_SIGNING_KEY="$KEY"
+
 if [[ -n "$BUNDLE" ]]; then
-  python3 - "$BUNDLE" "$KEY" <<'PY'
+  python3 - "$BUNDLE" <<'PY'
 import hashlib
+import os
 import hmac
 import json
 import sys
 from pathlib import Path
 
 bundle_dir = Path(sys.argv[1])
-key = sys.argv[2].encode("utf-8")
+key = os.environ["CADENCE_SIGNING_KEY"].encode("utf-8")
 
 bundle_sig = json.loads((bundle_dir / "bundle-signature.json").read_text(encoding="utf-8"))
 entries = bundle_sig["entries"]
@@ -102,8 +105,9 @@ if [[ -z "$INPUT" ]]; then
   exit 2
 fi
 
-python3 - "$INPUT" "$PAYLOAD" "$KEY" <<'PY'
+python3 - "$INPUT" "$PAYLOAD" <<'PY'
 import hashlib
+import os
 import hmac
 import json
 import sys
@@ -111,7 +115,7 @@ from pathlib import Path
 
 envelope = json.loads(Path(sys.argv[1]).read_text(encoding="utf-8"))
 payload_path = Path(sys.argv[2]) if sys.argv[2] else None
-key = sys.argv[3].encode("utf-8")
+key = os.environ["CADENCE_SIGNING_KEY"].encode("utf-8")
 
 payload_hash = envelope["payloadHash"]
 if payload_path is not None:

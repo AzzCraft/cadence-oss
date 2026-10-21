@@ -2,6 +2,19 @@
 import fs from 'node:fs';
 import path from 'node:path';
 
+function validateRequest(req) {
+  const object = value => value !== null && typeof value === 'object' && !Array.isArray(value);
+  const allowed = new Set(['schemaVersion', 'protocolVersion', 'repoRoot', 'files', 'mode', 'changedFiles', 'config', 'constraints', 'compat']);
+  if (!object(req) || Object.keys(req).some(key => !allowed.has(key))) throw new Error('invalid plugin request object');
+  if (req.schemaVersion !== '1.0.0' || req.protocolVersion !== '1.0.0' || !['scan', 'verify'].includes(req.mode)) throw new Error('unsupported plugin schema/protocol version or mode');
+  if (typeof req.repoRoot !== 'string' || !fs.statSync(req.repoRoot).isDirectory()) throw new Error('repoRoot must identify an existing directory');
+  for (const key of ['files', 'changedFiles']) {
+    const value = key === 'changedFiles' && !(key in req) ? [] : req[key];
+    if (!Array.isArray(value) || value.some(item => typeof item !== 'string')) throw new Error(`${key} must be an array of strings`);
+  }
+  for (const key of ['config', 'constraints', 'compat']) if (key in req && !object(req[key])) throw new Error(`${key} must be an object`);
+}
+
 function readStdin() {
   return new Promise((resolve, reject) => {
     const chunks = [];
@@ -66,8 +79,8 @@ function buildIR(repoRoot, files) {
 
 async function main() {
   const raw = await readStdin();
-  let req = {};
-  try { req = raw ? JSON.parse(raw) : {}; } catch { req = { _invalidJson: true }; }
+  const req = JSON.parse(raw);
+  validateRequest(req);
 
   const repoRoot = String(req.repoRoot || process.cwd());
   const files = Array.isArray(req.files) ? req.files.map(String) : [];
@@ -75,13 +88,13 @@ async function main() {
   const outViolations = [];
   for (const rel of files) {
     const abs = path.join(repoRoot, rel);
-    if (!fs.existsSync(abs)) continue;
     const content = fs.readFileSync(abs, 'utf8');
     const vs = scanImports(content).map(v => ({ ...v, file: rel.replaceAll('\\\\','/') }));
     outViolations.push(...vs);
   }
 
   const resp = {
+    schemaVersion: '1.0.0',
     protocolVersion: String(req.protocolVersion || '1.0.0'),
     ir: buildIR(repoRoot, files),
     violations: stableSort(outViolations, v => `${v.severity}|${v.ruleId}|${v.file}|${v.line}|${v.message}`),

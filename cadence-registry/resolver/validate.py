@@ -31,12 +31,29 @@ def validate(registry: Registry) -> list[str]:
     """
     errors: list[str] = []
 
-    if not registry.registryId:
-        errors.append("registryId is required")
+    for name in ("registryId", "schemaVersion"):
+        if not isinstance(getattr(registry, name), str) or not getattr(registry, name).strip():
+            errors.append(f"{name} must be a nonempty string")
 
     seen: set[str] = set()
     for i, entry in enumerate(registry.entries):
         prefix = f"entry[{i}]"
+        bad_type = False
+        for name in ("kind", "id", "ref", "version", "status", "digest", "compatWindow"):
+            if not isinstance(getattr(entry, name), str):
+                errors.append(f"{prefix}: {name} must be a string")
+                bad_type = True
+        for name in ("deprecatedAt", "deprecationReason"):
+            if getattr(entry, name) is not None and not isinstance(getattr(entry, name), str):
+                errors.append(f"{prefix}: {name} must be a string or null")
+                bad_type = True
+        if entry.trust is not None and (not isinstance(entry.trust.signer, str) or type(entry.trust.allowlisted) is not bool):
+            errors.append(f"{prefix}: trust requires a string signer and boolean allowlisted")
+            bad_type = True
+        if bad_type:
+            continue
+        if not entry.version.strip():
+            errors.append(f"{prefix}: version is required")
 
         if not entry.kind:
             errors.append(f"{prefix}: missing kind")

@@ -62,11 +62,12 @@ func setupTestRepo(t *testing.T) string {
 
 	// runtime_profile.json
 	writeTestJSON(t, filepath.Join(dir, "runtime.json"), map[string]any{
-		"schemaVersion": "1.0.0",
-		"runtimeId":     "test-runtime",
-		"networkAccess": false,
+		"schemaVersion":      "1.0.0",
+		"runtimeId":          "test-runtime",
+		"deterministicClock": true,
+		"networkAccess":      false,
 	})
-	if err := os.WriteFile(filepath.Join(dir, "pack.yaml"), []byte("id: test-pack\n"), 0o644); err != nil {
+	if err := os.WriteFile(filepath.Join(dir, "pack.yaml"), []byte("id: test-pack\nschemaVersion: 1.0.0\nversion: 1.0.0\nrules: []\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
 

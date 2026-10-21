@@ -12,6 +12,22 @@ from typing import Any, Dict
 
 _SHA256_RE = re.compile(r"^sha256:[0-9a-f]{64}$")
 
+from decimal import Decimal
+import math
+
+
+def _is_number(value):
+    if type(value) is int:
+        return True
+    if type(value) is Decimal:
+        return value.is_finite()
+    return type(value) is float and math.isfinite(value)
+
+
+def _is_integer(value):
+    return _is_number(value) and value == int(value)
+
+
 def _is_iso_datetime(s: str) -> bool:
     if not isinstance(s, str):
         return False
@@ -28,7 +44,7 @@ def _require(obj: Dict[str, Any], key: str, typ=None) -> Any:
     if key not in obj:
         raise ValueError(f"missing required field: {key}")
     val = obj[key]
-    if typ is not None and not isinstance(val, typ):
+    if typ is not None and not (_is_integer(val) if typ is int else isinstance(val, typ)):
         raise ValueError(f"field {key} must be {typ.__name__}")
     return val
 
@@ -66,7 +82,7 @@ def validate_budget(b: Dict[str, Any]) -> None:
     for k in ('allocated', 'consumed', 'remaining'):
         d = _require(b, k, dict)
         for kk, vv in d.items():
-            if not isinstance(vv, (int, float)):
+            if not _is_number(vv):
                 raise ValueError(f"budget.{k}.{kk} must be number")
     term = _require_obj(b, 'termination')
     _require_enum(_require_str(term, 'code'),
@@ -87,7 +103,7 @@ def validate_stage_summaries(arr: Any) -> None:
             raise ValueError('stageSummary must be object')
         _require_str(s, 'stageId')
         _require_str(s, 'status')
-        if 'timeMs' in s and not isinstance(s['timeMs'], (int, float)):
+        if 'timeMs' in s and not _is_number(s['timeMs']):
             raise ValueError('stageSummary.timeMs must be number')
         if 'codes' in s and not isinstance(s['codes'], list):
             raise ValueError('stageSummary.codes must be list')
@@ -145,7 +161,7 @@ def validate_run_manifest(m: Dict[str, Any]) -> None:
 
     det = _require_obj(m, 'determinism')
     _require_enum(_require_str(det, 'tier'), ('tier0', 'tier1', 'tier2'), 'determinism.tier')
-    if 'seed' in det and not isinstance(det['seed'], int):
+    if 'seed' in det and not _is_integer(det['seed']):
         raise ValueError('determinism.seed must be int')
 
     budget = _require_obj(m, 'budget')
@@ -276,7 +292,7 @@ def validate_dataset_manifest(m: Dict[str, Any]) -> None:
         if not isinstance(s, dict):
             raise ValueError('splits values must be objects')
         cnt = s.get('count')
-        if not isinstance(cnt, int) or cnt < 0:
+        if not _is_integer(cnt) or cnt < 0:
             raise ValueError(f'splits.{name}.count must be non-negative integer')
 
     # content hash OR snapshot id is required
@@ -302,7 +318,7 @@ def validate_dataset_manifest(m: Dict[str, Any]) -> None:
 
     ret = _require_obj(m, 'retention')
     wd = ret.get('windowDays')
-    if not isinstance(wd, int) or wd <= 0:
+    if not _is_integer(wd) or wd <= 0:
         raise ValueError('retention.windowDays must be positive integer')
     _require_str(ret, 'deletionOwner')
 
@@ -325,7 +341,7 @@ def validate_eval_report(e: Dict[str, Any]) -> None:
     for k, v in metrics.items():
         if not isinstance(k, str) or not k:
             raise ValueError('metrics keys must be non-empty strings')
-        if not isinstance(v, (int, float)):
+        if not _is_number(v):
             raise ValueError(f'metrics[{k}] must be number')
 
     status = _require_str(e, 'status')
@@ -335,7 +351,7 @@ def validate_eval_report(e: Dict[str, Any]) -> None:
     if 'thresholds' in e:
         thr = _require_obj(e, 'thresholds')
         for k, v in thr.items():
-            if not isinstance(v, (int, float)):
+            if not _is_number(v):
                 raise ValueError(f'thresholds[{k}] must be number')
     if 'artifacts' in e:
         arts = _require_obj(e, 'artifacts')
@@ -478,14 +494,14 @@ def validate_sandbox_result(r: Dict[str, Any]) -> None:
             values = _require_list(r, key)
             if any(not isinstance(item, str) for item in values):
                 raise ValueError(f'{key} must be list[str]')
-    if 'exitCode' in r and not isinstance(r['exitCode'], int):
+    if 'exitCode' in r and not _is_integer(r['exitCode']):
         raise ValueError('exitCode must be int')
     if 'backendEvidence' in r and not isinstance(r['backendEvidence'], dict):
         raise ValueError('backendEvidence must be object')
     if 'resourceLimits' in r:
         limits = _require_obj(r, 'resourceLimits')
         for key in ('maxMemoryMb', 'maxCpuMs', 'maxDiskMb', 'cpuLimit', 'memoryLimitMB', 'pidsLimit', 'timeoutSeconds'):
-            if key in limits and not isinstance(limits[key], int):
+            if key in limits and not _is_integer(limits[key]):
                 raise ValueError(f'resourceLimits.{key} must be int')
 
 

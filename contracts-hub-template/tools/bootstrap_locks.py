@@ -31,6 +31,7 @@ def main() -> None:
     if closure_path.exists():
         closure = json.loads(closure_path.read_text(encoding="utf-8"))
         closure["suiteVersion"] = args.suite_version
+        closure.setdefault("componentVersions", {})["cadence_cli"] = args.cadence_version
         closure.pop("note", None)
         closure_path.write_text(json.dumps(closure, indent=2) + "\n", encoding="utf-8")
 

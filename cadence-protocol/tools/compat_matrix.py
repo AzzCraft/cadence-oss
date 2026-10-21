@@ -59,7 +59,7 @@ def collect_schemas(schemas_dir: Path) -> list[dict]:
             entries.append({
                 "name": schema_path.stem.replace(".schema", ""),
                 "version": "PARSE_ERROR",
-                "path": str(schema_path),
+                "path": (Path("schemas") / schema_path.name).as_posix(),
             })
             continue
 
@@ -68,7 +68,7 @@ def collect_schemas(schemas_dir: Path) -> list[dict]:
         entries.append({
             "name": schema_path.stem.replace(".schema", ""),
             "version": str(version),
-            "path": str(schema_path),
+            "path": (Path("schemas") / schema_path.name).as_posix(),
             "status": status,
             "alias_of": alias_of,
         })

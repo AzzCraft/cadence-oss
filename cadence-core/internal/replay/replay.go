@@ -5,8 +5,10 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"github.com/AzzCraft/cadence-oss/cadence-core/internal/exactjson"
 	"os"
 	"path/filepath"
+	"regexp"
 	"sort"
 	"strings"
 )
@@ -95,12 +97,51 @@ func Load(path string) (Bundle, error) {
 	if err != nil {
 		return bundle, err
 	}
-	err = json.Unmarshal(data, &bundle)
-	return bundle, err
+	if _, err = exactjson.Parse(data); err != nil {
+		return bundle, err
+	}
+	if err = json.Unmarshal(data, &bundle); err != nil {
+		return bundle, err
+	}
+	return bundle, Validate(&bundle)
+}
+
+// Validate accepts the historical 1.0.0 inventory shape, including absent modes.
+// It does not reinterpret old bundle hashes as a new algorithm or reexecute a run.
+func Validate(b *Bundle) error {
+	if b == nil || b.SchemaVersion != "1.0.0" || strings.TrimSpace(b.ReplayID) == "" || !safePath(b.RunManifest) || !safePath(b.PipelineResult) || !digestPattern.MatchString(b.BundleHash) {
+		return fmt.Errorf("invalid replay identity/version/digest")
+	}
+	seen := map[string]bool{}
+	for _, s := range b.Snapshots {
+		if !safePath(s.RelPath) || seen[s.RelPath] || s.Size < 0 || !digestPattern.MatchString(s.FileHash) || (s.Mode != "" && !modePattern.MatchString(s.Mode)) {
+			return fmt.Errorf("invalid or duplicate replay snapshot: %q", s.RelPath)
+		}
+		seen[s.RelPath] = true
+	}
+	return nil
+}
+
+var digestPattern = regexp.MustCompile(`^sha256:[0-9a-f]{64}$`)
+var modePattern = regexp.MustCompile(`^0[0-7]{1,4}$`)
+
+func safePath(p string) bool {
+	if p == "" || p == "." || filepath.IsAbs(p) || strings.ContainsAny(p, "\\\x00\r\n") || filepath.ToSlash(filepath.Clean(p)) != p {
+		return false
+	}
+	for _, part := range strings.Split(p, "/") {
+		if part == ".." || part == "" {
+			return false
+		}
+	}
+	return true
 }
 
 // Compare builds a CAD-003 report from an original replay bundle and replayed bundle.
 func Compare(original *Bundle, replayed *Bundle) CompareReport {
+	if original == nil || replayed == nil {
+		return CompareReport{Task: TaskCAD003, Diagnostics: []Diagnostic{{Task: TaskCAD003, Code: "INVALID_BUNDLE", Message: "missing replay bundle"}}}
+	}
 	report := CompareReport{
 		Task:           TaskCAD003,
 		Offline:        true,
@@ -111,6 +152,25 @@ func Compare(original *Bundle, replayed *Bundle) CompareReport {
 		},
 		Artifacts:   artifactRefs(original),
 		Diagnostics: []Diagnostic{},
+	}
+	for _, b := range []*Bundle{original, replayed} {
+		if err := Validate(b); err != nil {
+			report.Compare.Same = false
+			report.Diagnostics = append(report.Diagnostics, Diagnostic{Task: TaskCAD003, Code: "INVALID_BUNDLE", Message: err.Error()})
+			return report
+		}
+	}
+	for _, item := range [][3]string{{"schemaVersion", original.SchemaVersion, replayed.SchemaVersion}, {"replayId", original.ReplayID, replayed.ReplayID}, {"runManifestRef", original.RunManifest, replayed.RunManifest}, {"pipelineResultRef", original.PipelineResult, replayed.PipelineResult}} {
+		if item[1] != item[2] {
+			report.Compare.Same = false
+			report.Compare.Diffs = append(report.Compare.Diffs, Diff{Field: item[0], Expected: item[1], Actual: item[2], Reason: "replay identity mismatch"})
+		}
+	}
+	left, _ := json.Marshal(original.Inputs)
+	right, _ := json.Marshal(replayed.Inputs)
+	if string(left) != string(right) {
+		report.Compare.Same = false
+		report.Compare.Diffs = append(report.Compare.Diffs, Diff{Field: "inputs", Expected: string(left), Actual: string(right), Reason: "replay inputs mismatch"})
 	}
 	if original.BundleHash != replayed.BundleHash {
 		report.Compare.Same = false
@@ -131,6 +191,10 @@ func Compare(original *Bundle, replayed *Bundle) CompareReport {
 			report.Compare.Diffs = append(report.Compare.Diffs, Diff{Field: "snapshots." + path, Reason: "missing replay artifact"})
 			continue
 		}
+		if originalSnap.Mode != replayedSnap.Mode || originalSnap.Size != replayedSnap.Size {
+			report.Compare.Same = false
+			report.Compare.Diffs = append(report.Compare.Diffs, Diff{Field: "snapshots." + path + ".metadata", Expected: fmt.Sprintf("%s/%d", originalSnap.Mode, originalSnap.Size), Actual: fmt.Sprintf("%s/%d", replayedSnap.Mode, replayedSnap.Size), Reason: "replay metadata mismatch"})
+		}
 		if originalSnap.FileHash != replayedSnap.FileHash {
 			report.Compare.Same = false
 			report.Compare.Diffs = append(report.Compare.Diffs, Diff{
@@ -147,6 +211,16 @@ func Compare(original *Bundle, replayed *Bundle) CompareReport {
 			report.Compare.Diffs = append(report.Compare.Diffs, Diff{Field: "snapshots." + path, Reason: "unexpected replay artifact"})
 		}
 	}
+	sort.Slice(report.Compare.Diffs, func(i, j int) bool {
+		a, b := report.Compare.Diffs[i], report.Compare.Diffs[j]
+		for _, pair := range [][2]string{{a.Field, b.Field}, {a.Reason, b.Reason}, {a.Expected, b.Expected}, {a.Actual, b.Actual}} {
+			if pair[0] != pair[1] {
+				return pair[0] < pair[1]
+			}
+		}
+		return false
+	})
+	sort.Slice(report.Artifacts, func(i, j int) bool { return report.Artifacts[i].Path < report.Artifacts[j].Path })
 	return report
 }
 

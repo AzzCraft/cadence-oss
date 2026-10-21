@@ -66,3 +66,27 @@ def test_catalog_budget_keeps_generic_bounds_and_identical_small_digests():
                                  b' ' * (codec.MAX_BYTES + 1)])
 def test_catalog_budget_does_not_relax_encoding_depth_or_numeric_domains(data):
     with pytest.raises(codec.ExactJsonError): codec.parse_catalog(data)
+
+
+@pytest.mark.parametrize('field,value,valid', [
+    ('budget',108.5,True),('budget',True,False),('budget',None,False),
+    ('budget','108.5',False),('stage',31.5,True),('stage',False,False),
+    ('seed',123456.0,True),('seed',1e3,True),('seed',1.5,False),('seed',True,False),
+])
+def test_protocol_cli_accepts_exact_numbers_without_accepting_booleans(tmp_path,field,value,valid):
+    import subprocess
+    import sys
+    for stem in ('run_manifest','pipeline_result','job_envelope'):
+        data=json.loads((ROOT/'examples'/f'{stem}.example.json').read_text())
+        if stem=='run_manifest':
+            if field=='budget':data['budget']['consumed']['timeMs']=value
+            elif field=='seed':data['determinism']['seed']=value
+            else:data['stageSummaries'][0]['timeMs']=value
+        (tmp_path/(stem.replace('_','-')+'.json')).write_text(json.dumps(data))
+    proc=subprocess.run([sys.executable,'-B',str(ROOT/'tools/validate_artifacts.py'),'--profile','protocol/v1',str(tmp_path)],capture_output=True,text=True)
+    assert (proc.returncode==0) is valid,proc.stdout+proc.stderr
+
+@pytest.mark.parametrize("text", ["1e3", "1e16", "9007199254740992.0", "1e21", "-1e16", "-9007199254740992", "9007199254740991", "295147905179352830000"])
+def test_canonical_number_round_trip(text):
+    first = codec.canonical(codec.parse(text.encode()))
+    assert codec.canonical(codec.parse(first)) == first

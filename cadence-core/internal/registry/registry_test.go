@@ -515,3 +515,39 @@ func TestSearchByDigestNoMatch(t *testing.T) {
 		t.Fatalf("expected 0 matches, got %d", len(got))
 	}
 }
+
+func TestResolveByRefValidatesOnlySelectedTargetAndRejectsAmbiguity(t *testing.T) {
+	root := t.TempDir()
+	path := filepath.Join(root, "runtime.json")
+	os.WriteFile(path, []byte("{}"), 0600)
+	digest, err := fileDigest(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	selected := Entry{Kind: "runtimeProfile", ID: "active", Ref: "runtime.json", Version: "1.0.0", Status: "active", Digest: digest, CompatWindow: "current", Trust: &Trust{Signer: "test", Allowlisted: true}}
+	retired := selected
+	retired.ID = "retired"
+	retired.Ref = "missing.json"
+	retired.Status = "removed"
+	regPath := filepath.Join(root, "registry.json")
+	for _, entries := range [][]Entry{{selected}, {retired, selected}, {selected, retired}} {
+		if _, err := ResolveByRefAt(regPath, Registry{Entries: entries}, "runtimeProfile", path, time.Now()); err != nil {
+			t.Fatal(err)
+		}
+	}
+	for _, status := range []string{"removed", "active"} {
+		bad := selected
+		bad.Status = status
+		if status == "active" {
+			bad.Digest = "sha256:1111111111111111111111111111111111111111111111111111111111111111"
+		}
+		if _, err := ResolveByRefAt(regPath, Registry{Entries: []Entry{bad}}, "runtimeProfile", path, time.Now()); err == nil {
+			t.Fatal("selected bad dependency accepted")
+		}
+	}
+	alias := selected
+	alias.ID = "alias"
+	if _, err := ResolveByRefAt(regPath, Registry{Entries: []Entry{selected, alias}}, "runtimeProfile", path, time.Now()); err == nil {
+		t.Fatal("ambiguous target accepted")
+	}
+}

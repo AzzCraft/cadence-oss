@@ -9,7 +9,7 @@ Usage:
 
 Signs one detached evidence payload or an entire evidence bundle using the
 Cadence HMAC-SHA256 envelope format.
-If --key is omitted, CADENCE_SIGNING_KEY is used.
+Prefer CADENCE_SIGNING_KEY; explicit --key values are visible in the invoking command line.
 USAGE
 }
 
@@ -63,9 +63,12 @@ if [[ -z "$KEY" ]]; then
   exit 2
 fi
 
+export CADENCE_SIGNING_KEY="$KEY"
+
 if [[ -n "$BUNDLE" ]]; then
-  python3 - "$BUNDLE" "$SIGNATURE_ID" "$SIGNER" "$KEY" <<'PY'
+  python3 - "$BUNDLE" "$SIGNATURE_ID" "$SIGNER" <<'PY'
 import hashlib
+import os
 import hmac
 import json
 import sys
@@ -74,7 +77,7 @@ from pathlib import Path
 bundle_dir = Path(sys.argv[1])
 signature_id = sys.argv[2]
 signer = sys.argv[3]
-key = sys.argv[4].encode("utf-8")
+key = os.environ["CADENCE_SIGNING_KEY"].encode("utf-8")
 
 signable = [
     "run-manifest.json",
@@ -139,8 +142,9 @@ if [[ -z "$INPUT" || -z "$OUTPUT" ]]; then
   exit 2
 fi
 
-python3 - "$INPUT" "$OUTPUT" "$SIGNATURE_ID" "$SIGNER" "$KEY" <<'PY'
+python3 - "$INPUT" "$OUTPUT" "$SIGNATURE_ID" "$SIGNER" <<'PY'
 import hashlib
+import os
 import hmac
 import json
 import sys
@@ -150,7 +154,7 @@ input_path = Path(sys.argv[1])
 output_path = Path(sys.argv[2])
 signature_id = sys.argv[3]
 signer = sys.argv[4]
-key = sys.argv[5].encode("utf-8")
+key = os.environ["CADENCE_SIGNING_KEY"].encode("utf-8")
 payload = input_path.read_bytes()
 payload_hash = "sha256:" + hashlib.sha256(payload).hexdigest()
 signature = hmac.new(key, payload_hash.encode("utf-8"), hashlib.sha256).hexdigest()

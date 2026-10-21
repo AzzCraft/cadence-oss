@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # cadence-sandbox audit hook
-# Audits a sandbox profile against a run environment to detect violations.
+# Inspects a sandbox profile declaration; does not observe runtime isolation.
 # Usage: audit-hook <profile.json> [output_dir]
 set -euo pipefail
 
@@ -31,63 +31,20 @@ audit_path = sys.argv[2]
 with open(profile_path) as f:
     profile = json.load(f)
 
-findings = []
+if not isinstance(profile, dict) or not isinstance(profile.get("schemaVersion"), str):
+    raise SystemExit("audit-hook: invalid profile declaration")
+profile_id = profile.get("profileId") or profile.get("sandboxId")
+if not isinstance(profile_id, str) or not profile_id or "filesystem" not in profile or "timeSource" not in profile or not ("network" in profile or "networkAccess" in profile):
+    raise SystemExit("audit-hook: missing profile identity/filesystem/network/timeSource")
+findings = [
+    {"check": "filesystem", "declaration": profile["filesystem"], "status": "declared"},
+    {"check": "network", "declaration": profile.get("network", profile.get("networkAccess")), "status": "declared"},
+    {"check": "timeSource", "declaration": profile["timeSource"], "status": "declared"},
+]
+resources = profile.get("resources", profile.get("limits"))
+if resources is not None:
+    findings.append({"check": "resources", "declaration": resources, "status": "declared"})
 violations = 0
-
-profile_id = profile.get("profileId") or profile.get("sandboxId") or "unknown"
-
-# Check filesystem constraints
-filesystem = profile.get("filesystem", "host")
-if isinstance(filesystem, dict):
-    fs_mode = filesystem.get("mode", "host")
-    read_only_inputs = bool(filesystem.get("readOnlyInputs", False))
-    writable_output_dir = filesystem.get("writableOutputDir")
-else:
-    fs_mode = filesystem
-    read_only_inputs = False
-    writable_output_dir = None
-
-if fs_mode == "read-only":
-    # In a real system this would check mount flags; here we verify intent
-    findings.append({"check": "filesystem", "mode": fs_mode, "status": "enforced"})
-elif fs_mode in {"workspace-only", "container-isolated", "microvm-isolated"}:
-    findings.append({"check": "filesystem", "mode": fs_mode, "status": "enforced"})
-else:
-    findings.append({"check": "filesystem", "mode": fs_mode, "status": "permissive"})
-
-if read_only_inputs:
-    findings.append({"check": "read_only_inputs", "status": "declared"})
-if writable_output_dir:
-    findings.append({"check": "writable_output_dir", "path": writable_output_dir, "status": "declared"})
-
-# Check network access
-network_val = profile.get("network", profile.get("networkAccess", False))
-if isinstance(network_val, dict):
-    allowed = bool(network_val.get("access", network_val.get("allowed", True)))
-elif isinstance(network_val, bool):
-    allowed = network_val
-else:
-    allowed = True
-
-if not allowed:
-    findings.append({"check": "network", "allowed": False, "status": "audited"})
-else:
-    findings.append({"check": "network", "allowed": True, "status": "permissive"})
-
-# Check time source
-time_src = profile.get("timeSource", "system")
-if time_src in ("injected", "epoch-frozen"):
-    findings.append({"check": "timeSource", "mode": time_src, "status": "enforced"})
-else:
-    findings.append({"check": "timeSource", "mode": time_src, "status": "permissive"})
-
-# Check resource limits
-resources = profile.get("resources", profile.get("limits", {}))
-if resources:
-    findings.append({"check": "resources", "limits": resources, "status": "declared"})
-
-# Count violations
-violations = sum(1 for f in findings if f.get("status") == "warning")
 
 audit = {
     "schemaVersion": "1.0.0",
@@ -97,7 +54,9 @@ audit = {
     "summary": {
         "totalChecks": len(findings),
         "violations": violations,
-        "status": "fail" if violations > 0 else "pass"
+        "status": "not_observed",
+        "configurationStatus": "valid",
+        "executionAudit": "not_run"
     }
 }
 

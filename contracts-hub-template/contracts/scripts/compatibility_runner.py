@@ -1,4 +1,6 @@
 #!/usr/bin/env python3
-# Demo compatibility runner: re-runs verify.
-import subprocess, sys
-raise SystemExit(subprocess.call([sys.executable, 'verify.py']))
+"""Run the delivered contract gate independently of the caller's directory."""
+import subprocess
+import sys
+from pathlib import Path
+raise SystemExit(subprocess.call([sys.executable, str(Path(__file__).with_name("verify.py"))]))

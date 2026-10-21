@@ -79,3 +79,72 @@ func TestWriteStableAliasRejectsRunCollision(t *testing.T) {
 		t.Fatal("expected alias/run directory collision to be rejected")
 	}
 }
+
+func TestOnlyConfiguredOutputsAreExcludedFromSourceIdentity(t *testing.T) {
+	root := t.TempDir()
+	source := filepath.Join(root, "src")
+	fake := filepath.Join(source, "run")
+	if err := os.MkdirAll(fake, 0700); err != nil {
+		t.Fatal(err)
+	}
+	for _, name := range []string{"run-manifest.json", "pipeline-result.json", "job-envelope.json"} {
+		if err := os.WriteFile(filepath.Join(fake, name), []byte("{}"), 0600); err != nil {
+			t.Fatal(err)
+		}
+	}
+	file := filepath.Join(source, "app.py")
+	if err := os.WriteFile(file, []byte("first"), 0600); err != nil {
+		t.Fatal(err)
+	}
+	prefixes, err := prepareGovernedOutputRoots(root, filepath.Join(root, "custom-output"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, p := range prefixes {
+		if p == "src" {
+			t.Fatal("artifact names exempted source")
+		}
+	}
+	_, before, err := computeSourceTreeIdentity(root, prefixes)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(file, []byte("changed"), 0600); err != nil {
+		t.Fatal(err)
+	}
+	_, after, err := computeSourceTreeIdentity(root, prefixes)
+	if err != nil || before == after {
+		t.Fatalf("source change not bound: %v", err)
+	}
+	out := filepath.Join(root, "custom-output")
+	if err := os.Mkdir(out, 0700); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(out, "output.txt"), []byte("output"), 0600); err != nil {
+		t.Fatal(err)
+	}
+	_, repeated, err := computeSourceTreeIdentity(root, prefixes)
+	if err != nil || repeated != after {
+		t.Fatalf("configured output changed identity: %v", err)
+	}
+}
+
+func TestLegacyLockRejectsWrongNestingAndTypes(t *testing.T) {
+	digest := "sha256:" + strings.Repeat("a", 64)
+	good := "cadence_cli:\n  version: '1.5.0-beta.1'\n  sha256: '" + digest + "'\nplugins: []\nrunners: []\n"
+	if version, sha, err := parseLegacyLock([]byte(good)); err != nil || version != "1.5.0-beta.1" || sha != digest {
+		t.Fatalf("valid lock: %s %s %v", version, sha, err)
+	}
+	for _, bad := range []string{
+		"unrelated:\n  version: '1.5.0-beta.1'\n  sha256: '" + digest + "'\n",
+		strings.Replace(good, "  version:", "  nested:\n    version:", 1),
+		strings.Replace(good, "plugins: []", "plugins: invalid", 1),
+		strings.Replace(good, "'1.5.0-beta.1'", "true", 1),
+		strings.Replace(good, digest, "bad", 1),
+		good + "---\n{}\n", good + "cadence_cli: {}\n",
+	} {
+		if _, _, err := parseLegacyLock([]byte(bad)); err == nil {
+			t.Errorf("invalid legacy lock accepted: %s", bad)
+		}
+	}
+}

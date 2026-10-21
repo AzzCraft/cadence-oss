@@ -68,5 +68,29 @@ class ExamplesRemediationSpecTests(unittest.TestCase):
                     self.assertTrue(target.is_file())
 
 
+    def test_consumer_bindings_validate_actual_data_offline(self):
+        import shutil, subprocess, sys, tempfile
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp) / "consumer"
+            shutil.copytree(ROOT / "examples/contracts-hub-consumer", root)
+            script = root / "scripts/verify_bindings.py"
+            data = root / "data/sample.json"
+            original = data.read_bytes()
+            def run():
+                return subprocess.run([sys.executable, "-B", str(script)], cwd=temp, capture_output=True, text=True)
+            result = run(); self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            for defect in ["amount", "currency", "missing"]:
+                obj = json.loads(original)
+                if defect == "amount": obj.pop("amountCents")
+                elif defect == "currency": obj["currency"] = "USDD"
+                if defect == "missing": data.unlink()
+                else: data.write_text(json.dumps(obj))
+                result = run(); self.assertNotEqual(result.returncode, 0, result.stdout)
+                self.assertIn("FAIL:", result.stderr)
+                data.write_bytes(original)
+            schema = root / "contracts/schemas/payment.schema.json"
+            schema.unlink()
+            self.assertNotEqual(run().returncode, 0)
+
 if __name__ == "__main__":
     unittest.main()

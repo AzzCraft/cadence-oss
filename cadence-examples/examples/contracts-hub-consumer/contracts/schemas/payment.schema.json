@@ -1,0 +1,45 @@
+{
+  "$id": "https://azzcraft.com/cadence/contracts/payment.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "amountCents": {
+      "minimum": 0,
+      "type": "integer"
+    },
+    "createdAt": {
+      "format": "date-time",
+      "type": "string"
+    },
+    "currency": {
+      "maxLength": 3,
+      "minLength": 3,
+      "type": "string"
+    },
+    "paymentId": {
+      "type": "string"
+    },
+    "schemaVersion": {
+      "type": "string"
+    },
+    "status": {
+      "enum": [
+        "created",
+        "authorized",
+        "captured",
+        "failed"
+      ],
+      "type": "string"
+    }
+  },
+  "required": [
+    "schemaVersion",
+    "paymentId",
+    "amountCents",
+    "currency",
+    "createdAt",
+    "status"
+  ],
+  "title": "Payment",
+  "type": "object"
+}

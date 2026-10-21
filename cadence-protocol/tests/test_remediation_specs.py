@@ -136,8 +136,13 @@ class ProtocolRemediationSpecTests(unittest.TestCase):
 
     def test_proto_009_compat_matrix_has_versions(self) -> None:
         text = (ROOT / "docs" / "COMPATIBILITY_MATRIX.md").read_text(encoding="utf-8")
-        self.assertGreater(len(text.strip()), 100, "COMPATIBILITY_MATRIX.md is too short")
-        self.assertTrue("1." in text, "COMPATIBILITY_MATRIX.md has no version references")
+        from tools.compat_matrix import collect_schemas, generate_matrix
+        entries = collect_schemas(ROOT / "schemas")
+        self.assertEqual(text, generate_matrix(entries))
+        self.assertTrue(entries)
+        for entry in entries:
+            self.assertTrue(entry["path"].startswith("schemas/"))
+            self.assertTrue((ROOT / entry["path"]).is_file())
 
     def test_proto_009_no_legacy_baseline_in_tree(self) -> None:
         marker = "unified-" + "current-baseline"

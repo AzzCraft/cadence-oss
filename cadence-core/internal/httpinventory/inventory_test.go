@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"reflect"
+	"strings"
 	"testing"
 	"time"
 )
@@ -275,6 +276,49 @@ func TestDeclaredORANDAndAnonymousHaveSeparateActualBoundaryProbes(t *testing.T)
 		response.Body.Close()
 		if response.StatusCode != probe.status {
 			t.Fatalf("actual boundary disagrees for %s: %d", probe.path, response.StatusCode)
+		}
+	}
+}
+
+func TestResponseDefaultAndExampleReferenceContexts(t *testing.T) {
+	for _, code := range []string{"200", "default"} {
+		declaration, sources := sample(t, func(root map[string]any) {
+			operation := root["paths"].(map[string]any)["/target"].(map[string]any)["get"].(map[string]any)
+			operation["responses"] = map[string]any{code: map[string]any{"$ref": "common.json#/ErrorResponse"}}
+			root["components"].(map[string]any)["schemas"] = map[string]any{"Value": map[string]any{"type": "object", "default": map[string]any{"$ref": "not-a-reference.json"}, "examples": []any{map[string]any{"$ref": "also-data"}}}}
+		})
+		if _, err := Normalize(declaration, sources); err == nil {
+			t.Fatal("missing locked response accepted", code)
+		}
+		uri := "https://test.invalid/api/common.json"
+		content := []byte(`{"ErrorResponse":{"description":"Error","content":{"application/json":{"examples":{"ordinary":{"value":{"$ref":"literal-data"}}}}}}}`)
+		sources[uri] = content
+		declaration["sources"] = append(declaration["sources"].([]any), map[string]any{"uri": uri, "sha256": digest(content)})
+		inventory, err := Normalize(declaration, sources)
+		if err != nil {
+			t.Fatalf("%s: %v", code, err)
+		}
+		encoded, _ := json.Marshal(inventory)
+		if !strings.Contains(string(encoded), "common.json#/ErrorResponse") {
+			t.Fatalf("response target omitted: %s", encoded)
+		}
+	}
+}
+
+func TestSecurityReferenceDescriptions(t *testing.T) {
+	for _, version := range []string{"3.0.3", "3.1.1"} {
+		for _, annotation := range []string{"", "summary", "description"} {
+			declaration, sources := sample(t, func(root map[string]any) {
+				root["openapi"] = version
+				scheme := map[string]any{"$ref": "#/components/securitySchemes/key"}
+				if annotation != "" {
+					scheme[annotation] = "Documentation"
+				}
+				root["components"].(map[string]any)["securitySchemes"].(map[string]any)["bearer"] = scheme
+			})
+			if _, err := Normalize(declaration, sources); err != nil {
+				t.Fatalf("%s %s: %v", version, annotation, err)
+			}
 		}
 	}
 }

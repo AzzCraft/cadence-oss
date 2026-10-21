@@ -11,7 +11,11 @@
     },
     "mode": {
       "type": "string",
-      "enum": ["strict_offline", "relaxed", "ci"],
+      "enum": [
+        "strict_offline",
+        "relaxed",
+        "ci"
+      ],
       "description": "Execution mode. Defaults to 'strict_offline'."
     },
     "closureRef": {
@@ -41,21 +45,26 @@
     },
     "policies": {
       "type": "array",
-      "items": { "type": "string" },
-      "description": "List of policy pack identifiers to apply."
+      "items": {
+        "type": "string"
+      },
+      "description": "Policy pack metadata identifiers to pin and validate. Core runs built-in rules, not pack rules or parameters."
     },
     "plugins": {
       "type": "array",
-      "items": { "type": "string", "minLength": 1 },
+      "items": {
+        "type": "string",
+        "minLength": 1
+      },
       "uniqueItems": true,
-      "description": "Explicit plugin identifiers to execute. Omit or use an empty list to verify without plugin execution."
+      "description": "Reserved plugin identifiers. The public core rejects nonempty selections because isolated plugin execution is unavailable."
     },
     "ui": {
       "type": "object",
       "properties": {
         "enabled": {
           "type": "boolean",
-          "description": "Enable UI verification. Defaults to false.",
+          "description": "UI metadata; core verify rejects true as unsupported. Use an independent reference UI runner.",
           "default": false
         },
         "profile": {

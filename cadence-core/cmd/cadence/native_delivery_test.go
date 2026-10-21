@@ -53,6 +53,8 @@ func TestDeliveryFailureReportsNonzeroWithoutChangingScanOutcome(t *testing.T) {
 	}
 	dir := t.TempDir()
 	os.WriteFile(filepath.Join(dir, "summary.json"), []byte(`{"decision":"pass","status":"ok"}`), 0600)
+	os.WriteFile(filepath.Join(dir, "cadence-report.json"), []byte(`{"decision":"pass","status":"ok"}`), 0600)
+	os.WriteFile(filepath.Join(dir, "report-summary.json"), []byte(`{"summary":{"status":"pass","violations":0}}`), 0600)
 	command := exec.Command(os.Args[0], "-test.run=^TestDeliveryFailureReportsNonzeroWithoutChangingScanOutcome$")
 	command.Env = append(os.Environ(), "CADENCE_TEST_DELIVERY_FAILURE_DIR="+dir)
 	if out, err := command.CombinedOutput(); err == nil {
@@ -67,9 +69,26 @@ func TestDeliveryFailureReportsNonzeroWithoutChangingScanOutcome(t *testing.T) {
 		t.Fatal(err)
 	}
 	var summary map[string]any
-	if err = json.Unmarshal(data, &summary); err != nil || summary["decision"] != "pass" || summary["deliveryComplete"] != false {
+	if err = json.Unmarshal(data, &summary); err != nil || (summary["decision"] != "fail" || summary["scanDecision"] != "pass") || summary["deliveryComplete"] != false {
 		t.Fatalf("scan/delivery facts were conflated: %s", data)
 	}
+	for _, name := range []string{"cadence-report.json", "report-summary.json"} {
+		data, err := os.ReadFile(filepath.Join(dir, name))
+		if err != nil {
+			t.Fatal(err)
+		}
+		var value map[string]any
+		if err = json.Unmarshal(data, &value); err != nil || value["deliveryComplete"] != false || value["scanDecision"] != "pass" {
+			t.Fatalf("lost failure observation: %s", data)
+		}
+		if name == "cadence-report.json" && value["decision"] != "fail" {
+			t.Fatal("false gate pass")
+		}
+		if name == "report-summary.json" && value["summary"].(map[string]any)["status"] != "fail" {
+			t.Fatal("false report pass")
+		}
+	}
+
 }
 
 func TestAutomaticRunAllocationConcurrentAndExplicitExclusive(t *testing.T) {

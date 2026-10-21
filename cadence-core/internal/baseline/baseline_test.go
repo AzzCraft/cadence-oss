@@ -1,6 +1,8 @@
 package baseline
 
 import (
+	"os"
+	"path/filepath"
 	"testing"
 )
 
@@ -41,5 +43,21 @@ func TestSnapshotBaseline(t *testing.T) {
 	}
 	if len(snap.Fingerprints) != 2 || snap.Fingerprints[0] != "a" {
 		t.Fatal("fingerprints should be sorted")
+	}
+}
+
+func TestLoadRejectsMalformedBaselineAndRoundTripsSavedValues(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "baseline.json")
+	for _, value := range []string{`{}`, `null`, `{"schemaVersion":"1.0.0","fingerprints":null}`, `{"schemaVersion":"1.0.0","fingerprints":[true]}`, `{"schemaVersion":"1.0.0","fingerprints":[],"fingerprints":["x"]}`, `{"schemaVersion":"1.0.0","fingerprints":[],"extra":true}`} {
+		os.WriteFile(path, []byte(value), 0600)
+		if _, err := Load(path); err == nil {
+			t.Fatal("malformed baseline accepted", value)
+		}
+	}
+	if err := Save(path, nil); err != nil {
+		t.Fatal(err)
+	}
+	if got, err := Load(path); err != nil || len(got.Fingerprints) != 0 {
+		t.Fatal(got, err)
 	}
 }

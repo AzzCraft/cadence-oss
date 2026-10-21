@@ -62,6 +62,10 @@ missing_docs = [p.as_posix() for p in required_docs if not p.exists()]
 if missing_docs:
     raise SystemExit("FAIL: missing protocol docs:\n- " + "\n- ".join(missing_docs))
 
+from tools.compat_matrix import collect_schemas, generate_matrix
+if (docs_dir / 'COMPATIBILITY_MATRIX.md').read_text() != generate_matrix(collect_schemas(schemas_dir)):
+    raise SystemExit('compatibility matrix is stale; run tools/compat_matrix.py --schemas-dir schemas --output docs/COMPATIBILITY_MATRIX.md')
+
 # --- Schema structural checks ---
 schema_files = sorted(schemas_dir.rglob('*.schema.json'))
 if not (schema_files):

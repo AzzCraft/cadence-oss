@@ -56,7 +56,8 @@ type Config struct {
 	UIEnabled bool
 	UIProfile string
 
-	BaselinePath string
+	BaselinePath     string
+	BaselineExplicit bool
 }
 
 type configDocument struct {
@@ -149,6 +150,7 @@ func Load(repoRoot string) (Config, error) {
 		cfg.RootAnchor = doc.RootAnchor
 	}
 	if doc.BaselinePath != "" {
+		cfg.BaselineExplicit = true
 		cfg.BaselinePath = doc.BaselinePath
 	}
 	cfg.Policies = doc.Policies
@@ -677,6 +679,16 @@ func validateMirrors(raw any, context string) error {
 		kind, err := requireString(entry, "kind", scope)
 		if err != nil {
 			return err
+		}
+		switch kind {
+		case "generated_contracts", "generated_clients", "generated_docs", "standard_local_copy", "policy_pack_copy", "other":
+		default:
+			return fmt.Errorf("%s.kind is unsupported: %s", scope, kind)
+		}
+		if kind == "standard_local_copy" || kind == "policy_pack_copy" {
+			if _, ok := entry["snapshotRef"]; !ok {
+				return fmt.Errorf("%s.snapshotRef is required for %s", scope, kind)
+			}
 		}
 		if _, err := requireString(entry, "path", scope); err != nil {
 			return err

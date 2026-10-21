@@ -32,6 +32,8 @@ class Trust:
     def from_dict(cls, data: dict[str, Any] | None) -> Trust | None:
         if data is None:
             return None
+        if not isinstance(data, dict):
+            raise ValueError("trust must be an object")
         return cls(signer=data.get("signer", ""), allowlisted=data.get("allowlisted", False))
 
 
@@ -50,6 +52,8 @@ class Entry:
 
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> Entry:
+        if not isinstance(data, dict):
+            raise ValueError("registry entry must be an object")
         return cls(
             kind=data.get("kind", ""),
             id=data.get("id", ""),
@@ -79,6 +83,8 @@ class Registry:
 
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> Registry:
+        if not isinstance(data, dict) or not isinstance(data.get("entries"), list):
+            raise ValueError("registry must be an object with an entries array")
         return cls(
             schemaVersion=data.get("schemaVersion", ""),
             registryId=data.get("registryId", ""),
@@ -162,8 +168,12 @@ def resolve_entry(
     reference_date: date | None = None,
 ) -> Resolution:
     """Resolve an entry by kind+ID, validate digest, and check compat window."""
+    from .validate import validate
+    errors = validate(registry)
+    if errors:
+        raise ValueError("; ".join(errors))
     entry = lookup(registry, kind, entry_id)
-    return _resolve_entry(Path(registry_path), entry, reference_date)
+    return _resolve_entry(Path(registry_path), entry, reference_date or date.today())
 
 
 def _resolve_entry(

@@ -71,10 +71,17 @@ class SandboxProfileTests(unittest.TestCase):
 
             audit_files = list(outdir.glob("audit-*.json"))
             self.assertGreaterEqual(len(audit_files), len(profile_files))
-            latest = json.loads(sorted(audit_files)[-1].read_text())
-            self.assertEqual(latest["schemaVersion"], "1.0.0")
-            self.assertIn("profileId", latest)
-            self.assertEqual(latest["summary"]["status"], "pass")
+            for audit_path in audit_files:
+                observed = json.loads(audit_path.read_text())
+                self.assertEqual(observed["schemaVersion"], "1.0.0")
+                self.assertIn("profileId", observed)
+                self.assertEqual(observed["summary"]["status"], "not_observed")
+                self.assertEqual(observed["summary"]["executionAudit"], "not_run")
+                self.assertTrue(all(f["status"] == "declared" for f in observed["findings"]))
+            empty = outdir / "empty.json"
+            empty.write_text("{}")
+            result = subprocess.run([str(audit_hook), str(empty), str(outdir)], capture_output=True, text=True)
+            self.assertNotEqual(result.returncode, 0)
 
 
 
@@ -254,6 +261,49 @@ class ContainerAdapterTests(unittest.TestCase):
                 self.assertEqual(mounts, [f"type=bind,src={Path(work).resolve()},dst=/workspace,readonly",
                                          f"type=bind,src={Path(work).resolve() / 'out'},dst=/workspace/.cadence/out"])
                 self.assertFalse(resp.observedChecks, "mocked engine is not attestation")
+
+    def test_mount_validation_has_no_rejected_path_side_effects(self):
+        from runtime.adapter import AdapterRequest
+        from runtime.container_adapter import ContainerAdapter
+        with tempfile.TemporaryDirectory() as work:
+            root = Path(work) / "root"
+            root.mkdir()
+            outside = Path(work) / "outside"
+            outside.mkdir()
+            (root / "link").symlink_to(outside, target_is_directory=True)
+            for output in (".", str(root), "../escaped", str(outside / "new"), "link/new"):
+                with self.subTest(output=output):
+                    req = AdapterRequest(backend="container-runtime", command=["echo"], workDir=str(root),
+                                         readOnlyInputs=True, writableOutputDir=output)
+                    with self.assertRaises(RuntimeError):
+                        ContainerAdapter._resolve_mounts(req)
+                    self.assertFalse((outside / "new").exists())
+                    self.assertFalse((Path(work) / "escaped").exists())
+            req.writableOutputDir = "out"
+            self.assertEqual(ContainerAdapter._resolve_mounts(req), (root, root / "out"))
+
+    def test_cid_file_is_absent_at_launch_and_literal_arguments_are_preserved(self):
+        from runtime.adapter import AdapterRequest
+        from runtime.container_adapter import ContainerAdapter
+        with tempfile.TemporaryDirectory() as work:
+            root = Path(work)
+            req = AdapterRequest(backend="container-runtime", command=["echo", "hello", "--flag", "relative.txt", str(root / "input")],
+                                 workDir=work, readOnlyInputs=True, writableOutputDir="out",
+                                 imageRef=PINNED_IMAGE, resourceLimits=CONTAINER_LIMITS)
+            seen = []
+            def execute(argv, *args, **kwargs):
+                if "--cidfile" not in argv:
+                    return 0, "Docker version fixture", ""
+                cid = Path(argv[argv.index("--cidfile") + 1])
+                self.assertFalse(cid.exists())
+                self.assertEqual(argv[-5:], ["echo", "hello", "--flag", "relative.txt", "/workspace/input"])
+                cid.write_text("fixture-id")
+                seen.append(cid)
+                return 0, "hello", ""
+            with mock.patch("runtime.container_adapter._detect_container_runtime", return_value="docker"), mock.patch("runtime.container_adapter.execute_subprocess", side_effect=execute):
+                result = ContainerAdapter().execute(req)
+            self.assertEqual(result.backendEvidence["containerId"], "fixture-id")
+            self.assertFalse(seen[0].parent.exists())
 
     def test_container_adapter_rejects_unpinned_image_and_incomplete_limits(self) -> None:
         from runtime.adapter import AdapterRequest
