@@ -140,23 +140,51 @@ func schemaContainer(key string) bool {
 	return key == "$defs" || key == "definitions" || key == "properties" || key == "patternProperties" || key == "dependentSchemas" || key == "schemas"
 }
 
-func children(value map[string]any, base string, depth int, visit func(any, string, int) error) error {
+// kind distinguishes structural maps from schema instance values. In
+// particular responses.default is a Response, whereas schema.default is data.
+func children(value map[string]any, base string, depth int, kind string, visit func(any, string, int, string) error) error {
+	if kind == "auto" {
+		kind = "structural"
+		for _, key := range []string{"$schema", "$id", "$defs", "properties", "allOf", "anyOf", "oneOf", "default", "const", "enum"} {
+			if _, ok := value[key]; ok {
+				kind = "schema"
+				break
+			}
+		}
+	}
 	for key, child := range value {
-		if instanceData(key) {
+		if strings.HasPrefix(key, "x-") || kind == "schema" && instanceData(key) || kind == "example" && key == "value" || kind != "schema" && key == "example" {
 			continue
 		}
-		if schemaContainer(key) {
+		childKind := "auto"
+		if kind == "schema" {
+			childKind = "schema"
+		}
+		if key == "schema" {
+			childKind = "schema"
+		}
+		// Mappings have literal names; their values are the structural authors.
+		mappingKind := ""
+		if kind == "schema" && schemaContainer(key) || key == "schemas" {
+			mappingKind = "schema"
+		}
+		if kind != "schema" && key == "responses" {
+			mappingKind = "response"
+		}
+		if kind != "schema" && key == "examples" {
+			mappingKind = "example"
+		}
+		if mappingKind != "" {
 			entries, err := object(child)
 			if err != nil {
 				return err
 			}
-			// Property/definition names such as "$id" and "$ref" are literal names.
 			for _, node := range entries {
-				if err := visit(node, base, depth+1); err != nil {
+				if err := visit(node, base, depth+1, mappingKind); err != nil {
 					return err
 				}
 			}
-		} else if err := visit(child, base, depth+1); err != nil {
+		} else if err := visit(child, base, depth+1, childKind); err != nil {
 			return err
 		}
 	}
@@ -165,7 +193,7 @@ func children(value map[string]any, base string, depth int, visit func(any, stri
 
 // Embedded schema resource IDs are logical bases inside already locked bytes,
 // not additional downloaded documents. Duplicate resource writers are refused.
-func (d *documents) index(value any, base string, depth int) error {
+func (d *documents) index(value any, base string, depth int, kind string) error {
 	d.indexed++
 	if d.indexed > 100000 || depth > 64 {
 		return rejected()
@@ -182,10 +210,10 @@ func (d *documents) index(value any, base string, depth int) error {
 			}
 			d.resources[next] = value
 		}
-		return children(v, next, depth, d.index)
+		return children(v, next, depth, kind, d.index)
 	case []any:
 		for _, child := range v {
-			if err := d.index(child, base, depth+1); err != nil {
+			if err := d.index(child, base, depth+1, kind); err != nil {
 				return err
 			}
 		}
@@ -223,7 +251,7 @@ func (d *documents) resolve(base, reference string) (any, string, string, error)
 
 // Walk original structural nodes, never recursively expand a schema reference.
 // Self/mutual schema references are valid; absent locked targets are not.
-func (d *documents) walk(value any, base string, depth int) error {
+func (d *documents) walk(value any, base string, depth int, kind string) error {
 	d.visited++
 	if d.visited > 100000 || depth > 64 {
 		return rejected()
@@ -252,17 +280,17 @@ func (d *documents) walk(value any, base string, depth int) error {
 				return err
 			}
 		}
-		return children(v, base, depth, d.walk)
+		return children(v, base, depth, kind, d.walk)
 	case []any:
 		for _, child := range v {
-			if err := d.walk(child, base, depth+1); err != nil {
+			if err := d.walk(child, base, depth+1, kind); err != nil {
 				return err
 			}
 		}
 	}
 	return nil
 }
-func (d *documents) referencedObject(value any, base string) (map[string]any, string, error) {
+func (d *documents) referencedObject(value any, base string, referenceVersion string) (map[string]any, string, error) {
 	seen := map[string]bool{}
 	for i := 0; i < 32; i++ {
 		v, err := object(value)
@@ -278,8 +306,19 @@ func (d *documents) referencedObject(value any, base string) (map[string]any, st
 			return nil, "", rejected()
 		}
 		// Path Item sibling precedence is undefined. Do not silently choose a writer.
-		if len(v) != 1 {
-			return nil, "", rejected()
+		for key, sibling := range v {
+			if key == "$ref" {
+				continue
+			}
+			if referenceVersion == "3.0.3" {
+				continue
+			} // Reference siblings are ignored by OAS 3.0.
+			if referenceVersion != "3.1.1" || (key != "summary" && key != "description") {
+				return nil, "", rejected()
+			}
+			if _, ok := sibling.(string); !ok {
+				return nil, "", rejected()
+			}
 		}
 		var target string
 		value, base, target, err = d.resolve(base, ref)
@@ -310,7 +349,7 @@ func security(value any, schemes map[string]any, version string, docs *documents
 			if !ok {
 				return nil, rejected()
 			}
-			scheme, _, err := docs.referencedObject(rawScheme, rootURI)
+			scheme, _, err := docs.referencedObject(rawScheme, rootURI, version)
 			if err != nil {
 				return nil, err
 			}
@@ -419,12 +458,12 @@ func Normalize(declaration any, originals map[string][]byte) (map[string]any, er
 		return nil, rejected()
 	}
 	for uri, value := range docs.values {
-		if err := docs.index(value, uri, 0); err != nil {
+		if err := docs.index(value, uri, 0, "auto"); err != nil {
 			return nil, err
 		}
 	}
 	for uri, value := range docs.values {
-		if err := docs.walk(value, uri, 0); err != nil {
+		if err := docs.walk(value, uri, 0, "auto"); err != nil {
 			return nil, err
 		}
 	}
@@ -465,7 +504,7 @@ func Normalize(declaration any, originals map[string][]byte) (map[string]any, er
 		if !strings.HasPrefix(path, "/") || strings.ContainsAny(path, "\r\n?#") || len(path) > 2048 {
 			return nil, rejected()
 		}
-		item, base, err := docs.referencedObject(raw, rootURI)
+		item, base, err := docs.referencedObject(raw, rootURI, "")
 		if err != nil {
 			return nil, err
 		}

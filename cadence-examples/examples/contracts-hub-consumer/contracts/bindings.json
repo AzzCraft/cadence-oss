@@ -3,8 +3,8 @@
   "bindings": [
     {
       "localPath": "data/sample.json",
-      "contractId": "example-contract-v1",
-      "schemaRef": "contracts-hub-template/contracts/schemas/example-contract-v1.json",
+      "contractId": "payment",
+      "schemaRef": "contracts/schemas/payment.schema.json",
       "validation": "strict"
     }
   ]

@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"errors"
 	"math"
+	"math/big"
 	"sort"
 	"strconv"
 	"strings"
@@ -66,16 +67,23 @@ func writeJCS(out *bytes.Buffer, value any, depth int, nodes *int, nodeLimit int
 			return err
 		}
 	case json.Number:
-		// Exact integral JSON lexemes cannot silently lose precision. Contract
-		// integer fields are checked with SafeInteger before this step.
-		if !strings.ContainsAny(string(v), ".eE") {
-			if _, err := SafeInteger(v); err != nil {
-				return err
-			}
-		}
 		number, err := strconv.ParseFloat(string(v), 64)
 		if err != nil {
 			return errors.New("jcs: number outside IEEE 754 domain")
+		}
+		// Accept exact IEEE integers and the decimal spellings emitted by JCS.
+		// Other integer spellings must not silently round. Typed counters still
+		// use SafeInteger independently before generic canonicalization.
+		if !strings.ContainsAny(string(v), ".eE") {
+			exact, ok := new(big.Int).SetString(string(v), 10)
+			converted, _ := new(big.Float).SetFloat64(number).Int(nil)
+			var encoded bytes.Buffer
+			if err := writeNumber(&encoded, number); err != nil {
+				return err
+			}
+			if !ok || (exact.Cmp(converted) != 0 && encoded.String() != string(v)) {
+				return errors.New("jcs: integer would lose precision")
+			}
 		}
 		if err := writeNumber(out, number); err != nil {
 			return err

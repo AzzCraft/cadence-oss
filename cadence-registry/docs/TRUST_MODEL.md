@@ -16,9 +16,11 @@ indexes references and attests to their integrity via digest pins.
 
 ## Digest Pinning
 
-When a digest is present on an entry, `cadence-core` MUST verify that the
-referenced artifact matches before using it.  When digest is null, the
-entry is trusted by path reference only (suitable for local development).
+Entries require a `sha256:` digest and strictly boolean trust metadata. Both
+Go and Python resolvers validate the registry structure before selection and
+verify the selected file bytes before use. A null digest is not a supported
+local-development bypass. Python resolution uses today's date by default;
+`--date YYYY-MM-DD` explicitly selects a historical compatibility check.
 
 ## Allowlist Enforcement
 

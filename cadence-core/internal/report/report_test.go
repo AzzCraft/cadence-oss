@@ -13,8 +13,8 @@ func TestGeneratePass(t *testing.T) {
 	if r.Summary.Status != "pass" {
 		t.Fatalf("expected pass, got %s", r.Summary.Status)
 	}
-	if r.Summary.Violations != 0 {
-		t.Fatalf("expected 0 violations, got %d", r.Summary.Violations)
+	if r.Summary.Violations != 1 {
+		t.Fatalf("expected 1 finding, got %d", r.Summary.Violations)
 	}
 }
 
@@ -27,8 +27,8 @@ func TestGenerateFail(t *testing.T) {
 	if r.Summary.Status != "fail" {
 		t.Fatalf("expected fail, got %s", r.Summary.Status)
 	}
-	if r.Summary.Violations != 1 {
-		t.Fatalf("expected 1 violation, got %d", r.Summary.Violations)
+	if r.Summary.Violations != 2 {
+		t.Fatalf("expected 2 findings, got %d", r.Summary.Violations)
 	}
 }
 
@@ -80,5 +80,14 @@ func TestValidateAcceptsValid(t *testing.T) {
 	r := Generate("run-v", "proj-v", nil)
 	if err := Validate(r); err != nil {
 		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+func TestGenerateUnderstandsNativeAndUnknownSeverities(t *testing.T) {
+	for severity, status := range map[string]string{"P0": "fail", "P1": "warn", "P2": "pass", "unknown": "fail"} {
+		r := Generate("run", "project", []Finding{{Severity: severity}})
+		if r.Summary.Status != status || r.Summary.Violations != 1 {
+			t.Fatalf("%s: %+v", severity, r.Summary)
+		}
 	}
 }

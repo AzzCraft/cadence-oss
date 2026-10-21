@@ -93,10 +93,22 @@ func ValidateAt(r Record, reference time.Time) error {
 	if err != nil {
 		return errors.New("waiver: invalid referenceTime format")
 	}
+	if r.CreatedAt != "" {
+		created, _ := time.Parse(time.RFC3339, r.CreatedAt)
+		if created.After(ref) {
+			return errors.New("waiver: createdAt is after referenceTime")
+		}
+	}
 	if r.ExpiresAt != "" {
 		expiry, err := time.Parse(time.RFC3339, r.ExpiresAt)
 		if err != nil {
 			return errors.New("waiver: invalid expiresAt format")
+		}
+		if r.CreatedAt != "" {
+			created, _ := time.Parse(time.RFC3339, r.CreatedAt)
+			if created.After(expiry) {
+				return errors.New("waiver: expiresAt is before createdAt")
+			}
 		}
 		if ref.After(expiry) {
 			return errors.New("waiver: expired")
@@ -212,6 +224,9 @@ func ValidateDuration(r Record) error {
 	expiry, err := time.Parse(time.RFC3339, r.ExpiresAt)
 	if err != nil {
 		return errors.New("waiver: invalid expiresAt format")
+	}
+	if expiry.Before(created) {
+		return errors.New("waiver: negative duration")
 	}
 	if expiry.Sub(created) > MaxWaiverDuration {
 		return fmt.Errorf("waiver: duration %v exceeds maximum %v", expiry.Sub(created), MaxWaiverDuration)

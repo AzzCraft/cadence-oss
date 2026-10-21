@@ -12,7 +12,6 @@ import (
 	"encoding/json"
 	"errors"
 	"os"
-	"sort"
 	"sync"
 )
 
@@ -78,22 +77,21 @@ func (c *Cassette) Next(method, url string) (Interaction, error) {
 	return Interaction{}, ErrNoMatch
 }
 
-// Hash returns a stable digest for cassette content; used as evidence.
+// HashIdentity names the ordered replay-content identity. Legacy sorted hashes
+// were not replay identities and must not be reinterpreted as this version.
+const HashIdentity = "cadence-cassette-ordered/v2"
+
+// Hash preserves interaction order, which controls Next; JSON sorts header keys.
 func (c *Cassette) Hash() string {
 	c.mu.Lock()
 	defer c.mu.Unlock()
-	// Sort for stable hashing irrespective of header map ordering.
-	sorted := make([]Interaction, len(c.Interactions))
-	copy(sorted, c.Interactions)
-	sort.SliceStable(sorted, func(i, j int) bool {
-		if sorted[i].URL != sorted[j].URL {
-			return sorted[i].URL < sorted[j].URL
-		}
-		return sorted[i].Method < sorted[j].Method
-	})
-	b, _ := json.Marshal(sorted)
+	payload := struct {
+		Identity     string        `json:"identity"`
+		Interactions []Interaction `json:"interactions"`
+	}{HashIdentity, c.Interactions}
+	b, _ := json.Marshal(payload)
 	h := sha256.Sum256(b)
-	return hex.EncodeToString(h[:])
+	return HashIdentity + ":sha256:" + hex.EncodeToString(h[:])
 }
 
 // ErrNoMatch is returned when no remaining interaction matches.

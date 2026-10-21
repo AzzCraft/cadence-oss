@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"encoding/json"
 	"flag"
 	"fmt"
@@ -25,7 +26,9 @@ func main() {
 		})
 		os.Exit(2)
 	}
-	if *expectedPath == *actualPath {
+	left, leftErr := os.Stat(*expectedPath)
+	right, rightErr := os.Stat(*actualPath)
+	if *expectedPath == *actualPath || leftErr == nil && rightErr == nil && os.SameFile(left, right) {
 		emit(map[string]any{"schemaVersion": 1, "task": "CAD-003", "command": "replay", "ok": false, "code": "IDENTICAL_INPUT_PATHS", "message": "expected and actual bundle paths must differ"})
 		os.Exit(2)
 	}
@@ -47,13 +50,28 @@ func main() {
 		os.Exit(1)
 	}
 	report := replay.Compare(&expected, &actual)
-	emit(sanitize.SanitizeReport(report))
+	emit(report)
 	if !report.Compare.Same {
 		os.Exit(1)
 	}
 }
 
 func emit(v any) {
+	// Convert the known report/error DTOs to JSON-shaped values before redaction.
+	// UseNumber preserves counters and comparison outcomes without float rounding.
+	raw, err := json.Marshal(v)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, "replay: invalid report")
+		os.Exit(1)
+	}
+	var public any
+	decoder := json.NewDecoder(bytes.NewReader(raw))
+	decoder.UseNumber()
+	if err := decoder.Decode(&public); err != nil {
+		fmt.Fprintln(os.Stderr, "replay: invalid report")
+		os.Exit(1)
+	}
+	v = sanitize.SanitizeReport(public)
 	enc := json.NewEncoder(os.Stdout)
 	enc.SetEscapeHTML(false)
 	if err := enc.Encode(v); err != nil {

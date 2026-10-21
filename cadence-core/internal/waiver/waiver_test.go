@@ -383,3 +383,28 @@ func TestValidateAuditTrailRejectsDepthMismatch(t *testing.T) {
 		t.Fatal("expected error for depth mismatch")
 	}
 }
+
+func TestContradictoryTimeIntervals(t *testing.T) {
+	base := Record{Reason: "test", Ticket: "TEST-1", Owner: "alice", ApprovedBy: "bob", Signature: "metadata", CreatedAt: "2026-01-01T00:00:00Z", ReferenceTime: "2026-01-10T00:00:00Z", ExpiresAt: "2026-01-20T00:00:00Z"}
+	if err := Validate(base); err != nil {
+		t.Fatal(err)
+	}
+	for _, created := range []string{"2026-01-15T00:00:00Z", "2026-01-30T00:00:00Z"} {
+		bad := base
+		bad.CreatedAt = created
+		if err := Validate(bad); err == nil {
+			t.Fatal("contradictory interval accepted", created)
+		}
+	}
+	negative := base
+	negative.CreatedAt = "2026-01-30T00:00:00Z"
+	if err := ValidateDuration(negative); err == nil {
+		t.Fatal("negative duration accepted")
+	}
+	equal := base
+	equal.CreatedAt = "2026-01-10T08:00:00+08:00"
+	equal.ExpiresAt = equal.ReferenceTime
+	if err := Validate(equal); err != nil {
+		t.Fatal("equal endpoints refused", err)
+	}
+}

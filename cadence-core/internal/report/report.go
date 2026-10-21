@@ -16,7 +16,7 @@ type Summary struct {
 // Finding represents a single policy or check violation/observation.
 type Finding struct {
 	RuleID   string `json:"ruleId"`
-	Severity string `json:"severity"` // error, warning, info
+	Severity string `json:"severity"` // error/warning/info or P0/P1/P2
 	Message  string `json:"message"`
 	FilePath string `json:"filePath,omitempty"`
 }
@@ -48,15 +48,22 @@ func NewSummary(status string, violations int) Summary {
 
 // Generate builds a Report from a runID, projectID and a list of findings.
 func Generate(runID, projectID string, findings []Finding) Report {
-	violations := 0
-	for _, f := range findings {
-		if f.Severity == "error" {
-			violations++
-		}
-	}
+	// Count all findings, including observations retained after a waiver.
+	// Callers with a profile/waiver decision must supply that final gate status.
+	violations := len(findings)
 	status := "pass"
-	if violations > 0 {
-		status = "fail"
+	for _, f := range findings {
+		switch f.Severity {
+		case "info", "P2":
+		case "warning", "P1":
+			if status == "pass" {
+				status = "warn"
+			}
+		case "error", "P0":
+			status = "fail"
+		default:
+			status = "fail"
+		}
 	}
 	return Report{
 		SchemaVersion: "1.0.0",
@@ -109,7 +116,7 @@ func Validate(r Report) error {
 	if r.Timestamp == "" {
 		return fmt.Errorf("report: timestamp is required")
 	}
-	if r.Summary.Status != "pass" && r.Summary.Status != "fail" && r.Summary.Status != "warn" {
+	if r.Summary.Status != "pass" && r.Summary.Status != "fail" && r.Summary.Status != "warn" && r.Summary.Status != "pass_with_warnings" && r.Summary.Status != "waived" {
 		return fmt.Errorf("report: invalid status %q", r.Summary.Status)
 	}
 	return nil

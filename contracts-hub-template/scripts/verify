@@ -29,6 +29,10 @@ tooling = json.loads(Path("tooling_lock.json").read_text(encoding="utf-8"))
 pins = tooling.get("pins")
 if not isinstance(pins, dict) or not pins:
     fail("tooling_lock.json pins are empty")
+if closure.get("componentVersions", {}).get("cadence_cli") != cadence_version or pins.get("cadenceCliVersion") != cadence_version:
+    fail("cadence_cli version differs across cadence_lock, closure and tooling pins")
+if pins.get("suiteVersion") != suite_version:
+    fail("suiteVersion differs across closure and tooling pins")
 PY
 
 echo "[contracts-hub-template] contract completeness (schema + semantics + fixtures + checks + ids)"

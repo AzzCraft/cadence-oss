@@ -56,3 +56,34 @@ def test_cad_003_sanitized_fixture_redacts_paths_tokens_and_names_leaks() -> Non
 
     for banned in ("/home/", "/Users/", "C:\\", "secret-token", "Bearer ", "ghp_"):
         assert banned not in sanitized_text
+
+
+def test_hmac_scripts_keep_environment_key_out_of_child_arguments(tmp_path):
+    import os
+    import subprocess
+    import sys
+    key = 'synthetic-hmac-test-key-only'
+    log = tmp_path / 'argv.jsonl'
+    wrapper_dir = tmp_path / 'bin'; wrapper_dir.mkdir()
+    wrapper = wrapper_dir / 'python3'
+    wrapper.write_text('#!' + sys.executable + '\nimport json,os,sys\n'
+                       'with open(' + repr(str(log)) + ',"a") as stream: stream.write(json.dumps(sys.argv)+"\\n")\n'
+                       'os.execv(' + repr(sys.executable) + ',[' + repr(sys.executable) + ',*sys.argv[1:]])\n')
+    wrapper.chmod(0o700)
+    env = {**os.environ, 'PATH': str(wrapper_dir) + os.pathsep + os.environ['PATH'], 'CADENCE_SIGNING_KEY': key}
+    payload = tmp_path / 'payload.json'; payload.write_text('{"test":true}')
+    signature = tmp_path / 'signature.json'
+    bundle = tmp_path / 'bundle'; bundle.mkdir()
+    (bundle / 'run-manifest.json').write_bytes(payload.read_bytes())
+    sign = CORE_ROOT / 'scripts/sign-evidence'
+    verify = CORE_ROOT / 'scripts/verify-signature'
+    for args in ([str(sign),'--input',str(payload),'--output',str(signature)],
+                 [str(verify),'--input',str(signature),'--payload',str(payload)],
+                 [str(sign),'--bundle',str(bundle)], [str(verify),'--bundle',str(bundle)]):
+        proc = subprocess.run(['bash',*args],env=env,capture_output=True,text=True)
+        assert proc.returncode == 0, proc.stdout + proc.stderr
+        assert key not in proc.stdout + proc.stderr
+    assert key not in log.read_text()
+    for args in (['--input',str(signature),'--payload',str(payload)],['--bundle',str(bundle)]):
+        bad = subprocess.run(['bash',str(verify),*args],env={**env,'CADENCE_SIGNING_KEY':'wrong-synthetic-key'},capture_output=True,text=True)
+        assert bad.returncode != 0

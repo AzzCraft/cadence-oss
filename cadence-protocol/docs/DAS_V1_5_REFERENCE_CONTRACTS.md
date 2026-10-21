@@ -180,7 +180,9 @@ Fact keys for the predicates describe actual behavior:
 Facts are proposals with sourceRefs, not approved scope or evidence of success.
 Missing facts remain unknown; disagreements retain all sources as conflict.
 Z02 approval/unknown-risk handling and Z12 provenance/safe-stop duties are
-unconditional. With no facts, these 13 leaves are true and the other 122 unknown.
+unconditional. With no facts, unconditional obligations remain applicable and
+fact-dependent obligations remain unknown. Applicability is not a test result,
+approved fact or authorization; use the current catalog to compute the distribution.
 Z06 verification and integration are evaluated separately; each external binding
 also requires material.external_required. Z07's Agent-test restriction requires
 verification and risk.agent_authored_tests. Z09's three recheck triggers require
@@ -315,11 +317,11 @@ using them for any formally negotiated cross-language protected exchange.
 
 ## Executable current-catalog example
 
-From the Cadence repository root, after building `cadence-core/cadence` with the
-documented Go toolchain, this example checks current identities and refuses v2:
+From the Cadence repository root, after building `./cadence` with the root
+README quickstart and documented Go toolchain, this example checks current identities and refuses v2:
 
 ```bash
-python3 - ./cadence-core/cadence <<'PYCODE'
+python3 - ./cadence <<'PYCODE'
 import json, subprocess, sys
 from pathlib import Path
 root = Path("cadence-core/internal/resolver")

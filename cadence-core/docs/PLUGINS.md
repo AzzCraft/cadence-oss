@@ -15,6 +15,7 @@ isolation.
   "schemaVersion": "1.0.0",
   "pluginId": "my-custom-check",
   "entryPoint": "./plugins/my-custom-check",
+  "runtime": "native",
   "capabilities": ["check", "scan"],
   "timeoutMs": 30000
 }

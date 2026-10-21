@@ -520,3 +520,21 @@ func TestValidateProjectIDRejects(t *testing.T) {
 		}
 	}
 }
+
+func TestMirrorKindsAndConditionalSnapshot(t *testing.T) {
+	for _, kind := range []string{"generated_contracts", "generated_clients", "generated_docs", "standard_local_copy", "policy_pack_copy", "other"} {
+		entry := map[string]any{"kind": kind, "path": "mirror", "sourceOfTruth": "upstream", "mirrorPurpose": "test", "localModificationsAllowed": false}
+		copyKind := kind == "standard_local_copy" || kind == "policy_pack_copy"
+		if err := validateMirrors([]any{entry}, "mirrors"); (err != nil) != copyKind {
+			t.Fatalf("%s conditional snapshot: %v", kind, err)
+		}
+		entry["snapshotRef"] = map[string]any{"kind": "git", "uri": "https://example.org/source.git", "pinType": "commit", "pinValue": "abcdef1", "floating": false}
+		if err := validateMirrors([]any{entry}, "mirrors"); err != nil {
+			t.Fatal(kind, err)
+		}
+		entry["kind"] = "invented"
+		if err := validateMirrors([]any{entry}, "mirrors"); err == nil {
+			t.Fatal("unknown mirror accepted")
+		}
+	}
+}

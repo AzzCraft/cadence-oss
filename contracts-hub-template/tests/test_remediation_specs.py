@@ -21,13 +21,14 @@ class ContractsHubRemediationSpecTests(unittest.TestCase):
             self.assertNotIn("Template placeholder", text, rel_path)
 
         cadence_lock = json.loads((ROOT / "cadence_lock.json").read_text(encoding="utf-8"))
-        self.assertEqual(cadence_lock["cadence_cli"]["version"], "1.0.0")
+        version = cadence_lock["cadence_cli"]["version"]
+        self.assertRegex(version, r"^\d+\.\d+\.\d+(?:[-+][0-9A-Za-z.-]+)?$")
         closure = json.loads((ROOT / "suite_version_closure.json").read_text(encoding="utf-8"))
-        self.assertEqual(closure["suiteVersion"], "1.0.0")
+        self.assertEqual(closure["componentVersions"]["cadence_cli"], version)
         tooling = json.loads((ROOT / "tooling_lock.json").read_text(encoding="utf-8"))
         self.assertEqual(
             tooling["pins"],
-            {"suiteVersion": "1.0.0", "cadenceCliVersion": "1.0.0"},
+            {"suiteVersion": closure["suiteVersion"], "cadenceCliVersion": version},
         )
 
     def test_cht_001_placeholder_fixture_verify_fails_until_bootstrap_locks_exist(self) -> None:
@@ -160,6 +161,34 @@ class ContractsHubRemediationSpecTests(unittest.TestCase):
             self.assertIn("OK:", proc.stdout)
 
     # --- CHT-001 matrix exact: verify script mentions bootstrap ---
+    def test_standalone_schema_and_runner_do_not_depend_on_layout(self):
+        import sys
+        with tempfile.TemporaryDirectory(prefix="hub review ") as temp:
+            scratch=Path(temp)/"template";shutil.copytree(ROOT,scratch)
+            runner=scratch/"contracts/scripts/compatibility_runner.py"
+            fixture=next((scratch/"contracts/fixtures/payment/valid").glob("*.json"))
+            original=fixture.read_bytes()
+            def run(cwd, main=False):
+                cmd=["bash",str(scratch/"scripts/verify")] if main else [sys.executable,"-B",str(runner)]
+                return subprocess.run(cmd,cwd=cwd,env={**os.environ,"CADENCE_TEMPLATE_VERIFY_SKIP_TESTS":"1"},text=True,capture_output=True)
+            for cwd in (scratch,runner.parent,Path(temp)):
+                good=run(cwd);self.assertEqual(good.returncode,0,good.stdout+good.stderr)
+            for neighbour in (False,True):
+                if neighbour:
+                    neighbour_dir=Path(temp)/"cadence-protocol/tools";neighbour_dir.mkdir(parents=True)
+                    (neighbour_dir/"validate.py").write_text("raise RuntimeError('must not import neighbour')\n")
+                for amount in (None,True,-1,"100"):
+                    data=json.loads(original)
+                    if amount is None:data.pop("amountCents")
+                    else:data["amountCents"]=amount
+                    fixture.write_text(json.dumps(data))
+                    bad=run(scratch,main=True)
+                    self.assertNotEqual(bad.returncode,0,bad.stdout+bad.stderr)
+                    self.assertNotIn("must not import neighbour",bad.stderr)
+                    self.assertNotEqual(run(Path(temp)).returncode,0)
+                fixture.write_bytes(original)
+                good=run(scratch,main=True);self.assertEqual(good.returncode,0,good.stdout+good.stderr)
+
     def test_cht_001_verify_script_mentions_bootstrap(self) -> None:
         text = (ROOT / "scripts" / "verify").read_text(encoding="utf-8")
         self.assertIn("bootstrap", text.lower())

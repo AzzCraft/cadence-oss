@@ -1,10 +1,14 @@
 package registry
 
 import (
+	"bytes"
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"github.com/AzzCraft/cadence-oss/cadence-core/internal/exactjson"
+	"gopkg.in/yaml.v3"
+	"io"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -332,22 +336,28 @@ func ResolveByRef(registryPath string, reg Registry, kind string, configuredRef 
 // path and enforces compatibility-window rules at the provided reference time.
 func ResolveByRefAt(registryPath string, reg Registry, kind string, configuredRef string, referenceTime time.Time) (Resolution, error) {
 	want := filepath.Clean(configuredRef)
+	var selected *Entry
 	for _, entry := range reg.Entries {
-		if entry.Kind != kind {
+		if entry.Kind != kind || filepath.Clean(filepath.Join(filepath.Dir(registryPath), entry.Ref)) != want {
 			continue
 		}
-		resolution, err := resolveEntry(registryPath, entry)
-		if err != nil {
-			return Resolution{}, err
+		if selected != nil {
+			return Resolution{}, fmt.Errorf("registry: ambiguous entries for kind=%s ref=%s", kind, want)
 		}
-		if err := enforceCompatWindow(entry, referenceTime); err != nil {
-			return Resolution{}, err
-		}
-		if resolution.ResolvedRef == want {
-			return resolution, nil
-		}
+		copy := entry
+		selected = &copy
 	}
-	return Resolution{}, fmt.Errorf("registry: entry not found for kind=%s ref=%s", kind, want)
+	if selected == nil {
+		return Resolution{}, fmt.Errorf("registry: entry not found for kind=%s ref=%s", kind, want)
+	}
+	resolution, err := resolveEntry(registryPath, *selected)
+	if err != nil {
+		return Resolution{}, err
+	}
+	if err := enforceCompatWindow(*selected, referenceTime); err != nil {
+		return Resolution{}, err
+	}
+	return resolution, nil
 }
 
 func resolveEntry(registryPath string, entry Entry) (Resolution, error) {
@@ -532,6 +542,88 @@ func ValidateIntegrity(reg Registry, registryDir string) error {
 		if got != e.Digest {
 			return fmt.Errorf("entry %s/%s: digest mismatch: expected %s, got %s", e.Kind, e.ID, e.Digest, got)
 		}
+	}
+	return nil
+}
+
+// ValidateSelectedMetadata validates the legacy formats actually selected by
+// core verify. These are pinned metadata, not an executable policy language.
+func ValidateSelectedMetadata(resolution Resolution) error {
+	f, err := os.Open(resolution.ResolvedRef)
+	if err != nil {
+		return err
+	}
+	defer f.Close()
+	raw, err := io.ReadAll(io.LimitReader(f, 1024*1024+1))
+	if err != nil {
+		return err
+	}
+	if len(raw) > 1024*1024 {
+		return fmt.Errorf("registry metadata exceeds size limit")
+	}
+	hash := sha256.Sum256(raw)
+	if "sha256:"+hex.EncodeToString(hash[:]) != resolution.Entry.Digest {
+		return fmt.Errorf("registry metadata changed after resolution")
+	}
+	var value map[string]any
+	switch resolution.Entry.Kind {
+	case "policyPack":
+		decoder := yaml.NewDecoder(bytes.NewReader(raw))
+		if err := decoder.Decode(&value); err != nil {
+			return fmt.Errorf("policy metadata: %w", err)
+		}
+		var extra any
+		if err := decoder.Decode(&extra); err != io.EOF {
+			return fmt.Errorf("policy metadata must be one YAML object")
+		}
+		if value["schemaVersion"] != "1.0.0" || value["id"] != resolution.Entry.ID || (resolution.Entry.Version != "" && value["version"] != resolution.Entry.Version) {
+			return fmt.Errorf("policy metadata identity differs from registry")
+		}
+		if version, ok := value["version"].(string); !ok || strings.TrimSpace(version) == "" {
+			return fmt.Errorf("policy metadata version required")
+		}
+		rules, ok := value["rules"].([]any)
+		if !ok {
+			return fmt.Errorf("policy metadata rules must be an array")
+		}
+		for _, rawRule := range rules {
+			rule, ok := rawRule.(map[string]any)
+			if !ok {
+				return fmt.Errorf("policy rule must be an object")
+			}
+			id, ok := rule["ruleId"].(string)
+			if !ok || strings.TrimSpace(id) == "" {
+				return fmt.Errorf("policy ruleId required")
+			}
+			if rule["severity"] != "P0" && rule["severity"] != "P1" && rule["severity"] != "P2" {
+				return fmt.Errorf("invalid policy severity")
+			}
+			if params, present := rule["params"]; present {
+				if _, ok := params.(map[string]any); !ok {
+					return fmt.Errorf("policy params must be an object")
+				}
+			}
+		}
+	case "runtimeProfile":
+		parsed, err := exactjson.Parse(raw)
+		if err != nil {
+			return err
+		}
+		var ok bool
+		value, ok = parsed.(map[string]any)
+		if !ok {
+			return fmt.Errorf("legacy runtime must be an object")
+		}
+		if value["schemaVersion"] != "1.0.0" || value["runtimeId"] != resolution.Entry.ID {
+			return fmt.Errorf("legacy runtime identity differs from registry")
+		}
+		for _, key := range []string{"networkAccess", "deterministicClock"} {
+			if _, ok := value[key].(bool); !ok {
+				return fmt.Errorf("legacy runtime %s must be boolean", key)
+			}
+		}
+	default:
+		return fmt.Errorf("unsupported metadata kind")
 	}
 	return nil
 }

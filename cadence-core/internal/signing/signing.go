@@ -335,7 +335,7 @@ func VerifyDualLayerSignature(dl DualLayerSignature, signer Signer) error {
 // governed/production mode. The mode is determined by the CADENCE_SIGNING_MODE
 // environment variable ("dev" or "governed").
 func SelectSigner(keyID, issuer string, hmacKey []byte) (Signer, error) {
-	mode := strings.TrimSpace(os.Getenv("CADENCE_SIGNING_MODE"))
+	mode := strings.ToLower(strings.TrimSpace(os.Getenv("CADENCE_SIGNING_MODE")))
 	if mode == "" {
 		mode = "dev"
 	}

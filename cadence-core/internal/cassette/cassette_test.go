@@ -53,7 +53,52 @@ func TestHashIsStable(t *testing.T) {
 	c2 := &Cassette{}
 	c2.Record(Interaction{Method: "GET", URL: "https://a"})
 	c2.Record(Interaction{Method: "GET", URL: "https://b"})
-	if c1.Hash() != c2.Hash() {
-		t.Fatal("hash should be insertion-order independent (sorted)")
+	if c1.Hash() == c2.Hash() {
+		t.Fatal("different replay order must have different versioned identities")
+	}
+}
+
+func TestOrderedIdentityMatchesReplaySemantics(t *testing.T) {
+	a := Interaction{Method: "GET", URL: "https://example.invalid/a", RespBody: "a", Headers: map[string]string{"B": "2", "A": "1"}}
+	b := Interaction{Method: "GET", URL: "https://example.invalid/b", RespBody: "b"}
+	first, second := &Cassette{}, &Cassette{}
+	first.Record(a)
+	first.Record(b)
+	second.Record(b)
+	second.Record(a)
+	if first.Hash() == second.Hash() {
+		t.Fatal("different replay order has same identity")
+	}
+	if first.Hash() != first.Hash() {
+		t.Fatal("unstable ordered hash")
+	}
+	if _, err := first.Next(a.Method, a.URL); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := second.Next(a.Method, a.URL); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := first.Next(b.Method, b.URL); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := second.Next(b.Method, b.URL); err != ErrNoMatch {
+		t.Fatal("expected ordered consumption difference", err)
+	}
+	path := filepath.Join(t.TempDir(), "cassette.json")
+	if err := first.Save(path); err != nil {
+		t.Fatal(err)
+	}
+	loaded, err := Load(path)
+	if err != nil || loaded.Hash() != first.Hash() {
+		t.Fatal("save/load identity changed", err)
+	}
+	duplicate := &Cassette{}
+	duplicate.Record(a)
+	a.RespBody = "second"
+	duplicate.Record(a)
+	one, _ := duplicate.Next(a.Method, a.URL)
+	two, _ := duplicate.Next(a.Method, a.URL)
+	if one.RespBody != "a" || two.RespBody != "second" {
+		t.Fatal("duplicate request order changed")
 	}
 }

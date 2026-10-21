@@ -24,6 +24,9 @@ func NewSemaphore(n int) *Semaphore {
 
 // Acquire blocks until a slot is free or ctx is cancelled.
 func (s *Semaphore) Acquire(ctx context.Context) error {
+	if err := ctx.Err(); err != nil {
+		return err
+	}
 	select {
 	case s.ch <- struct{}{}:
 		return nil
@@ -55,11 +58,13 @@ func (p *Pool) Map(ctx context.Context, inputs []any, fn func(context.Context, i
 	cctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 
+	var schedulingError error
 	for i, in := range inputs {
 		if err := sem.Acquire(cctx); err != nil {
 			// Cancellation here means a previous fn returned an error
 			// or the caller cancelled. Stop scheduling and let wg.Wait
 			// drain in-flight work; the original error is in errs.
+			schedulingError = err
 			break
 		}
 		wg.Add(1)
@@ -79,6 +84,17 @@ func (p *Pool) Map(ctx context.Context, inputs []any, fn func(context.Context, i
 		if e != nil && !errors.Is(e, context.Canceled) {
 			return out, e
 		}
+	}
+	if err := ctx.Err(); err != nil {
+		return out, err
+	}
+	for _, err := range errs {
+		if err != nil {
+			return out, err
+		}
+	}
+	if schedulingError != nil {
+		return out, schedulingError
 	}
 	return out, nil
 }

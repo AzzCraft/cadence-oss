@@ -395,8 +395,8 @@ func Validate(p Profile) error {
 		if !p.ReadOnlyInputs {
 			return fmt.Errorf("sandbox: backend %s requires readOnlyInputs=true", backend)
 		}
-		if p.WritableOutputDir == "" {
-			return fmt.Errorf("sandbox: backend %s requires writableOutputDir", backend)
+		if p.WritableOutputDir == "" || filepath.Clean(p.WritableOutputDir) == "." {
+			return fmt.Errorf("sandbox: backend %s requires a distinct writableOutputDir", backend)
 		}
 		if p.NetworkAccess {
 			return fmt.Errorf("sandbox: backend %s requires networkAccess=false", backend)

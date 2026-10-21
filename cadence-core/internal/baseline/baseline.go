@@ -1,8 +1,10 @@
 package baseline
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
+	"github.com/AzzCraft/cadence-oss/cadence-core/internal/exactjson"
 	"os"
 	"path/filepath"
 	"sort"
@@ -22,7 +24,17 @@ func Load(path string) (Baseline, error) {
 	if err != nil {
 		return b, err
 	}
-	if err := json.Unmarshal(data, &b); err != nil {
+	parsed, err := exactjson.Parse(data)
+	if err != nil {
+		return b, err
+	}
+	object, ok := parsed.(map[string]any)
+	if !ok || object["schemaVersion"] != "1.0.0" || object["fingerprints"] == nil {
+		return b, fmt.Errorf("invalid baseline object")
+	}
+	decoder := json.NewDecoder(bytes.NewReader(data))
+	decoder.DisallowUnknownFields()
+	if err := decoder.Decode(&b); err != nil {
 		return b, err
 	}
 	return b, nil

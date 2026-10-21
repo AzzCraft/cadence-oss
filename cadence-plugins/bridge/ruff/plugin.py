@@ -36,19 +36,35 @@ def scan(content: str) -> list[dict]:
     return violations
 
 
+def validate_request(req):
+    allowed = {"schemaVersion", "protocolVersion", "repoRoot", "files", "mode", "changedFiles", "config", "constraints", "compat"}
+    if not isinstance(req, dict) or set(req) - allowed:
+        raise ValueError("invalid plugin request object")
+    if req.get("schemaVersion") != "1.0.0" or req.get("protocolVersion") != "1.0.0" or req.get("mode") not in ("scan", "verify"):
+        raise ValueError("unsupported plugin schema/protocol version or mode")
+    if not isinstance(req.get("repoRoot"), str) or not Path(req["repoRoot"]).is_dir():
+        raise ValueError("repoRoot must identify an existing directory")
+    for key in ("files", "changedFiles"):
+        value = req.get(key, [] if key == "changedFiles" else None)
+        if not isinstance(value, list) or any(not isinstance(item, str) for item in value):
+            raise ValueError(f"{key} must be an array of strings")
+    for key in ("config", "constraints", "compat"):
+        if key in req and not isinstance(req[key], dict):
+            raise ValueError(f"{key} must be an object")
+
 def main() -> None:
     raw = sys.stdin.read()
-    req = json.loads(raw) if raw.strip() else {}
-    repo_root = Path(str(req.get("repoRoot") or os.getcwd()))
-    files = [str(item) for item in (req.get("files") or []) if isinstance(item, str)]
+    req = json.loads(raw)
+    validate_request(req)
+    repo_root = Path(req["repoRoot"])
+    files = req["files"]
     violations: list[dict] = []
     for rel in files:
         abs_path = repo_root / rel
-        if not abs_path.exists() or not abs_path.is_file():
-            continue
         content = abs_path.read_text(encoding="utf-8")
         violations.extend({**item, "file": rel.replace("\\", "/")} for item in scan(content))
     response = {
+        "schemaVersion": "1.0.0",
         "protocolVersion": str(req.get("protocolVersion") or "1.0.0"),
         "ir": {"irVersion": "1", "modules": [], "edges": []},
         "violations": sorted(violations, key=stable_key),
@@ -58,4 +74,8 @@ def main() -> None:
 
 
 if __name__ == "__main__":
-    main()
+    try:
+        main()
+    except (ValueError, OSError) as exc:
+        print(f"plugin request failed: {exc}", file=sys.stderr)
+        raise SystemExit(2)

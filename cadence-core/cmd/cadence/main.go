@@ -1,12 +1,14 @@
 package main
 
 import (
+	"bytes"
 	"crypto/rand"
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
 	"flag"
 	"fmt"
+	"gopkg.in/yaml.v3"
 	"io"
 	"os"
 	"os/exec"
@@ -71,7 +73,7 @@ Usage:
   cadence verify [--profile dev|ci|full] [--out .cadence/out] [--alias latest] [--run-id <id>]
   cadence scan [--json]
   cadence adopt
-  cadence report [--format html|md]
+  cadence report --in <cadence-report.json|summary.json>
   cadence lock [--check]
   cadence doctor
   cadence version [--json]
@@ -86,6 +88,18 @@ Usage:
 Cadence Core is an offline deterministic runtime for local and CI verification.
 The default checks are intentionally conservative and auditable.
 `)
+}
+
+func physicalRepoRoot() string {
+	root, err := os.Getwd()
+	if err == nil {
+		root, err = filepath.EvalSymlinks(root)
+	}
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "cannot resolve project root: %v\n", err)
+		os.Exit(1)
+	}
+	return root
 }
 
 func verifyCmd(args []string) {
@@ -106,6 +120,21 @@ func verifyCmd(args []string) {
 	validateProtocol := fs.Bool("protocol-validate", true, "validate generated evidence against Cadence protocol invariants")
 	_ = fs.Parse(args)
 
+	if fs.NArg() != 0 {
+		fmt.Fprintln(os.Stderr, "verify: unexpected positional arguments", fs.Args())
+		os.Exit(2)
+	}
+	*profile = strings.ToLower(strings.TrimSpace(*profile))
+	if *profile != "dev" && *profile != "ci" && *profile != "full" {
+		fmt.Fprintln(os.Stderr, "verify: profile must be dev, ci, or full")
+		os.Exit(2)
+	}
+	signingMode := currentSigningMode()
+	if signingMode != "dev" && signingMode != "governed" {
+		fmt.Fprintln(os.Stderr, "verify: CADENCE_SIGNING_MODE must be dev or governed")
+		os.Exit(2)
+	}
+
 	if *breakGlass && strings.TrimSpace(*waiverFile) != "" {
 		fmt.Fprintln(os.Stderr, "verify failed: --break-glass is mutually exclusive with --waiver-file")
 		os.Exit(2)
@@ -119,11 +148,15 @@ func verifyCmd(args []string) {
 		os.Exit(2)
 	}
 
-	repoRoot, _ := os.Getwd()
+	repoRoot := physicalRepoRoot()
 	cfg, err := config.Load(repoRoot)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "verify failed: %v\n", err)
 		os.Exit(1)
+	}
+	if cfg.UIEnabled {
+		fmt.Fprintln(os.Stderr, "verify: UI verification unavailable in the core scanner; use the explicit reference UI runner")
+		os.Exit(2)
 	}
 	registryPath := filepath.Join(repoRoot, cfg.RegistryRef)
 	registryConfig, err := registry.Load(registryPath)
@@ -162,6 +195,10 @@ func verifyCmd(args []string) {
 			fmt.Fprintf(os.Stderr, "verify failed: policy registry invalid: %v\n", resolveErr)
 			os.Exit(1)
 		}
+		if err := registry.ValidateSelectedMetadata(resolution); err != nil {
+			fmt.Fprintf(os.Stderr, "verify failed: policy metadata invalid: %v\n", err)
+			os.Exit(1)
+		}
 		resolvedDependencies = append(resolvedDependencies, resolution)
 		dependencyWarnings = append(dependencyWarnings, resolution.Warnings...)
 		registryDependencies = append(registryDependencies, describeRegistryDependency(resolution))
@@ -170,6 +207,10 @@ func verifyCmd(args []string) {
 	runtimeResolution, err := registry.ResolveByRefAt(registryPath, registryConfig, "runtimeProfile", runtimePath, started)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "verify failed: runtimeRef invalid: %v\n", err)
+		os.Exit(1)
+	}
+	if err := registry.ValidateSelectedMetadata(runtimeResolution); err != nil {
+		fmt.Fprintf(os.Stderr, "verify failed: runtime metadata invalid: %v\n", err)
 		os.Exit(1)
 	}
 	resolvedDependencies = append(resolvedDependencies, runtimeResolution)
@@ -303,7 +344,7 @@ func verifyCmd(args []string) {
 			replayPlanHash,
 			sourceTreeRecords,
 			runtimeInputRecords,
-			governedInputExcludedPaths(),
+			identityExcluded,
 			resolvedDependencies,
 			pluginSetHash,
 			pluginSetEvidence,
@@ -318,7 +359,6 @@ func verifyCmd(args []string) {
 		deliveryFailure(runOut, fmt.Errorf("write escape-classification.json: %w", err))
 	}
 
-	signingMode := currentSigningMode()
 	rootAnchor, _ := resolveRootAnchor(cfg)
 	leafKeyID := runnerBinaryDigest
 	keyHierarchyAlgorithm := "hmac-sha256"
@@ -424,6 +464,8 @@ func verifyCmd(args []string) {
 			}
 		}
 		violations = filtered
+	} else if !os.IsNotExist(err) || cfg.BaselineExplicit {
+		deliveryFailure(runOut, fmt.Errorf("baseline %s could not be read: %w", baselinePath, err))
 	}
 
 	sort.Slice(violations, func(i, j int) bool {
@@ -582,16 +624,7 @@ func verifyCmd(args []string) {
 		}
 	}
 
-	decision := "pass"
-	if pipelineStatus == "degraded" {
-		decision = "pass_with_warnings"
-	}
-	if pipelineStatus == "error" {
-		decision = "fail"
-	}
-	if waiverApplied {
-		decision = "waived"
-	}
+	decision := finalGateDecision(exitCode, pipelineStatus, waiverApplied)
 
 	finished := time.Now().UTC()
 	elapsedMs := float64(finished.Sub(started).Milliseconds())
@@ -974,6 +1007,7 @@ func verifyCmd(args []string) {
 		})
 	}
 	verifyReport := report.Generate(runID, cfg.ProjectID, reportFindings)
+	verifyReport.Summary = report.NewSummary(decision, len(reportFindings))
 	durationMs := time.Since(started).Milliseconds()
 	verifyReport = report.WithMetrics(verifyReport, len(sourceTreeRecords), len(reportFindings), int(durationMs))
 	if err := report.Save(filepath.Join(runOut, "report-summary.json"), verifyReport); err != nil {
@@ -1107,13 +1141,23 @@ func writeStableAlias(outputRoot string, aliasDir string, runOut string, runID s
 // Preserve scan outcome while explicitly recording a failed delivery.
 func deliveryFailure(runOut string, failure error) {
 	_ = writeJSON(filepath.Join(runOut, "delivery-error.json"), map[string]any{"deliveryComplete": false, "error": failure.Error()})
-	summaryPath := filepath.Join(runOut, "summary.json")
-	if data, err := os.ReadFile(summaryPath); err == nil {
-		var summary map[string]any
-		if json.Unmarshal(data, &summary) == nil && summary != nil {
-			summary["deliveryComplete"] = false
-			summary["deliveryError"] = failure.Error()
-			_ = writeJSON(summaryPath, summary)
+	for _, name := range []string{"summary.json", "cadence-report.json", "report-summary.json"} {
+		path := filepath.Join(runOut, name)
+		if data, err := os.ReadFile(path); err == nil {
+			var summary map[string]any
+			if json.Unmarshal(data, &summary) == nil && summary != nil {
+				summary["deliveryComplete"] = false
+				summary["deliveryError"] = failure.Error()
+				if observed, ok := summary["decision"]; ok {
+					summary["scanDecision"] = observed
+					summary["decision"] = "fail"
+				}
+				if nested, ok := summary["summary"].(map[string]any); ok {
+					summary["scanDecision"] = nested["status"]
+					nested["status"] = "fail"
+				}
+				_ = writeJSON(path, summary)
+			}
 		}
 	}
 	fmt.Fprintf(os.Stderr, "verify failed: evidence delivery incomplete: %v\n", failure)
@@ -1683,7 +1727,7 @@ func resolveRootAnchor(cfg config.Config) (string, string) {
 }
 
 func currentSigningMode() string {
-	mode := strings.TrimSpace(os.Getenv("CADENCE_SIGNING_MODE"))
+	mode := strings.ToLower(strings.TrimSpace(os.Getenv("CADENCE_SIGNING_MODE")))
 	if mode == "" {
 		return "dev"
 	}
@@ -1909,6 +1953,10 @@ func describeRegistryDependency(resolution registry.Resolution) map[string]strin
 		"digest":       resolution.Entry.Digest,
 		"compatWindow": resolution.Entry.CompatWindow,
 	}
+	if resolution.Entry.Kind == "policyPack" || resolution.Entry.Kind == "runtimeProfile" {
+		payload["execution"] = "metadata-only; core uses built-in rules and sandboxRef controls"
+		payload["runtimeCompatibility"] = "not-evaluated-for-execution"
+	}
 	if deprecatedAt := valueOrEmpty(resolution.Entry.DeprecatedAt); deprecatedAt != "" {
 		payload["deprecatedAt"] = deprecatedAt
 	}
@@ -2043,6 +2091,23 @@ func maxFloat(a, b float64) float64 {
 	return b
 }
 
+// finalGateDecision preserves observations separately from profile enforcement.
+func finalGateDecision(exitCode int, pipelineStatus string, waived bool) string {
+	if exitCode != 0 {
+		return "fail"
+	}
+	if waived {
+		return "waived"
+	}
+	if pipelineStatus == "error" {
+		return "fail"
+	}
+	if pipelineStatus == "degraded" {
+		return "pass_with_warnings"
+	}
+	return "pass"
+}
+
 func governedInputExcludedPaths() []string {
 	return []string{
 		".cadence/out",
@@ -2052,11 +2117,9 @@ func governedInputExcludedPaths() []string {
 }
 
 func prepareGovernedOutputRoots(repoRoot string, outDir string) ([]string, error) {
-	dynamicPrefixes := dynamicGovernedOutputPrefixes(repoRoot, outDir)
-	if len(dynamicPrefixes) == 0 {
-		return discoverGovernedOutputPrefixes(repoRoot), nil
-	}
-	return combineExcludedPrefixes(dynamicPrefixes, discoverGovernedOutputPrefixes(repoRoot)), nil
+	// Only configured output roots are excluded. Artifact-looking names in a
+	// source directory must never grant that directory an exemption.
+	return combineExcludedPrefixes(governedInputExcludedPaths(), dynamicGovernedOutputPrefixes(repoRoot, outDir)), nil
 }
 
 func dynamicGovernedOutputPrefixes(repoRoot string, outDir string) []string {
@@ -2075,64 +2138,6 @@ func dynamicGovernedOutputPrefixes(repoRoot string, outDir string) []string {
 		return nil
 	}
 	return []string{rel}
-}
-
-func discoverGovernedOutputPrefixes(repoRoot string) []string {
-	prefixes := []string{}
-	_ = filepath.WalkDir(repoRoot, func(path string, d os.DirEntry, err error) error {
-		if err != nil {
-			return err
-		}
-		if !d.IsDir() {
-			return nil
-		}
-		switch d.Name() {
-		case ".git", "node_modules", "dist", "build":
-			if path != repoRoot {
-				return filepath.SkipDir
-			}
-		}
-		if path != repoRoot {
-			if looksLikeGovernedOutputRoot(path) {
-				rel, relErr := filepath.Rel(repoRoot, path)
-				if relErr == nil {
-					rel = filepath.ToSlash(rel)
-					if rel != "." && rel != "" && rel != ".." && !strings.HasPrefix(rel, "../") {
-						prefixes = append(prefixes, rel)
-					}
-				}
-				return filepath.SkipDir
-			}
-		}
-		return nil
-	})
-	return combineExcludedPrefixes(prefixes)
-}
-
-func looksLikeGovernedOutputRoot(path string) bool {
-	entries, err := os.ReadDir(path)
-	if err != nil {
-		return false
-	}
-	for _, entry := range entries {
-		if !entry.IsDir() {
-			continue
-		}
-		if containsGovernedRunBundle(filepath.Join(path, entry.Name())) {
-			return true
-		}
-	}
-	return false
-}
-
-func containsGovernedRunBundle(path string) bool {
-	for _, name := range []string{"run-manifest.json", "pipeline-result.json", "job-envelope.json"} {
-		info, err := os.Stat(filepath.Join(path, name))
-		if err != nil || info.IsDir() {
-			return false
-		}
-	}
-	return true
 }
 
 func combineExcludedPrefixes(groups ...[]string) []string {
@@ -2515,7 +2520,7 @@ func scanCmd(args []string) {
 	jsonOutput := fs.Bool("json", false, "emit machine-readable violations")
 	_ = fs.Parse(args)
 
-	repoRoot, _ := os.Getwd()
+	repoRoot := physicalRepoRoot()
 	vs, err := checks.RunAll(repoRoot)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "scan failed: %v\n", err)
@@ -2538,7 +2543,13 @@ func scanCmd(args []string) {
 }
 
 func adoptCmd(args []string) {
-	repoRoot, _ := os.Getwd()
+	fs := flag.NewFlagSet("adopt", flag.ExitOnError)
+	_ = fs.Parse(args)
+	if fs.NArg() != 0 {
+		fmt.Fprintln(os.Stderr, "adopt: unexpected positional arguments", fs.Args())
+		os.Exit(2)
+	}
+	repoRoot := physicalRepoRoot()
 	cfg, err := config.Load(repoRoot)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "adopt failed: %v\n", err)
@@ -2569,13 +2580,26 @@ func reportCmd(args []string) {
 		fmt.Fprintf(os.Stderr, "report failed: %v\n", err)
 		os.Exit(1)
 	}
-	// Render a very small human summary.
 	var obj map[string]any
-	_ = json.Unmarshal(b, &obj)
+	decoder := json.NewDecoder(bytes.NewReader(b))
+	decoder.UseNumber()
+	if err := decoder.Decode(&obj); err != nil || obj == nil {
+		fmt.Fprintln(os.Stderr, "report failed: expected a JSON object")
+		os.Exit(1)
+	}
+	var extra any
+	if err := decoder.Decode(&extra); err != io.EOF {
+		fmt.Fprintln(os.Stderr, "report failed: trailing JSON data")
+		os.Exit(1)
+	}
+	pretty, err := json.MarshalIndent(obj, "", "  ")
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "report failed: %v\n", err)
+		os.Exit(1)
+	}
 	fmt.Println("Cadence Report")
 	fmt.Println("=============")
 	fmt.Printf("Input: %q\n\n", *in)
-	pretty, _ := json.MarshalIndent(obj, "", "  ")
 	fmt.Println(string(pretty))
 }
 
@@ -2592,7 +2616,11 @@ func lockCmd(args []string) {
 			fmt.Fprintf(os.Stderr, "lock check failed: cannot read %s: %v\n", lockPath, err)
 			os.Exit(1)
 		}
-		ver := extractYAMLScalar(string(b), "cadence_cli.version")
+		ver, wantSha, parseErr := parseLegacyLock(b)
+		if parseErr != nil {
+			fmt.Fprintf(os.Stderr, "lock check failed: %v\n", parseErr)
+			os.Exit(1)
+		}
 		if ver == "" {
 			fmt.Fprintf(os.Stderr, "lock check failed: missing cadence_cli.version in %s\n", lockPath)
 			os.Exit(1)
@@ -2601,7 +2629,6 @@ func lockCmd(args []string) {
 			fmt.Fprintln(os.Stderr, "lock check failed: version differs from the current executable")
 			os.Exit(1)
 		}
-		wantSha := extractYAMLScalar(string(b), "cadence_cli.sha256")
 		if wantSha != "" {
 			gotSha := computeSelfBinaryHashOrEmpty()
 			if gotSha == "" {
@@ -2627,47 +2654,58 @@ func lockCmd(args []string) {
 	fmt.Printf("lock: wrote %s\n", lockPath)
 }
 
-func extractYAMLScalar(yamlText string, dottedKey string) string {
-	// Very small YAML subset parser:
-	// Supports:
-	//   cadence_cli:
-	//     version: "x"
-	//     sha256: "sha256:..."
-	parts := strings.Split(dottedKey, ".")
-	if len(parts) != 2 {
-		return ""
+// The legacy cadence.lock is a YAML mapping, distinct from protocol lock schemas.
+func parseLegacyLock(raw []byte) (string, string, error) {
+	var root map[string]any
+	decoder := yaml.NewDecoder(bytes.NewReader(raw))
+	if err := decoder.Decode(&root); err != nil {
+		return "", "", err
 	}
-	section, key := parts[0], parts[1]
-
-	lines := strings.Split(yamlText, "\n")
-	inSection := false
-	for _, line := range lines {
-		if strings.TrimSpace(line) == "" || strings.HasPrefix(strings.TrimSpace(line), "#") {
-			continue
-		}
-		if !strings.HasPrefix(line, " ") && strings.HasSuffix(strings.TrimSpace(line), ":") {
-			inSection = strings.TrimSuffix(strings.TrimSpace(line), ":") == section
-			continue
-		}
-		if !inSection {
-			continue
-		}
-		trim := strings.TrimSpace(line)
-		if strings.HasPrefix(trim, key+":") {
-			val := strings.TrimSpace(strings.TrimPrefix(trim, key+":"))
-			val = strings.Trim(val, "\"'")
-			return val
+	var extra any
+	if err := decoder.Decode(&extra); err != io.EOF {
+		return "", "", fmt.Errorf("legacy lock must contain one YAML mapping")
+	}
+	if len(root) == 0 {
+		return "", "", fmt.Errorf("legacy lock is empty")
+	}
+	for key := range root {
+		if key != "cadence_cli" && key != "plugins" && key != "runners" {
+			return "", "", fmt.Errorf("unknown legacy lock field %s", key)
 		}
 	}
-	return ""
+	entry, ok := root["cadence_cli"].(map[string]any)
+	if !ok {
+		return "", "", fmt.Errorf("cadence_cli must be a mapping")
+	}
+	version, ok := entry["version"].(string)
+	if !ok || version == "" {
+		return "", "", fmt.Errorf("cadence_cli.version must be a string")
+	}
+	digest, ok := entry["sha256"].(string)
+	if !ok || !evidence.ValidDigest(digest) {
+		return "", "", fmt.Errorf("cadence_cli.sha256 must be a SHA-256 digest")
+	}
+	for key := range entry {
+		if key != "version" && key != "sha256" {
+			return "", "", fmt.Errorf("unknown cadence_cli field %s", key)
+		}
+	}
+	for _, key := range []string{"plugins", "runners"} {
+		if value, present := root[key]; present {
+			if _, ok := value.([]any); !ok {
+				return "", "", fmt.Errorf("%s must be an array", key)
+			}
+		}
+	}
+	return version, digest, nil
 }
 
 func doctorCmd(args []string) {
 	fs := flag.NewFlagSet("doctor", flag.ExitOnError)
-	checkLock := fs.Bool("lock", true, "validate cadence.lock (best-effort)")
+	checkLock := fs.Bool("lock", true, "validate the configured tooling_lock.json reference metadata")
 	_ = fs.Parse(args)
 
-	repoRoot, _ := os.Getwd()
+	repoRoot := physicalRepoRoot()
 	cfg, err := config.Load(repoRoot)
 	if err != nil {
 		fmt.Println("Cadence Doctor")

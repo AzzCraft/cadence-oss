@@ -307,6 +307,26 @@ func verifyNative(bundlePath, profile string) error {
 	if err = signing.VerifyChain(&chain); err != nil {
 		return err
 	}
+	if profile == "cadence-run/v2" {
+		artifacts := map[string]string{
+			"manifest": "run-manifest.json", "run-manifest-canonical": "run-manifest.canonical.json",
+			"pipeline-result": "pipeline-result.json", "pipeline-result-canonical": "pipeline-result.canonical.json",
+			"job-envelope": "job-envelope.json", "job-envelope-canonical": "job-envelope.canonical.json",
+			"input-identity": "input-identity.json", "audit-telemetry": "audit-telemetry.json",
+			"deterministic-evidence": "deterministic-evidence.json",
+		}
+		for _, step := range chain.Steps {
+			if name, ok := artifacts[step.StepID]; ok {
+				data, err := evidence.ReadArtifact(root, name, exactjson.MaxBytes)
+				if err != nil {
+					return err
+				}
+				if step.OutputHash != signing.HashPayload(data) {
+					return fmt.Errorf("step %s does not bind artifact %s", step.StepID, name)
+				}
+			}
+		}
+	}
 	var manifest evidence.RunManifest
 	var result evidence.PipelineResult
 	var job evidence.JobEnvelope
@@ -336,6 +356,40 @@ func verifyNative(bundlePath, profile string) error {
 		return err
 	}
 	manifestHash := signing.HashPayload(manifestBytes)
+	if profile == "cadence-run/v2" {
+		hashes := map[string]string{}
+		for _, name := range []string{"pipeline-result.json", "job-envelope.json", "input-identity.json", "audit-telemetry.json", "deterministic-evidence.json"} {
+			data, err := evidence.ReadArtifact(root, name, exactjson.MaxBytes)
+			if err != nil {
+				return err
+			}
+			hashes[name] = signing.HashPayload(data)
+		}
+		inputs := map[string]string{"checks": manifest.InputRef.InputHash, "dependencies": manifest.InputRef.InputHash,
+			"manifest": manifestHash, "run-manifest-canonical": manifestHash, "pipeline-result": manifestHash,
+			"pipeline-result-canonical": hashes["pipeline-result.json"], "job-envelope": manifestHash,
+			"job-envelope-canonical": hashes["job-envelope.json"], "input-identity": hashes["input-identity.json"],
+			"audit-telemetry": hashes["audit-telemetry.json"], "deterministic-evidence": hashes["deterministic-evidence.json"]}
+
+		if manifest.Diagnostics == nil {
+			return errors.New("missing native dependency metadata")
+		}
+		dependencyHash, ok := manifest.Diagnostics.KV["dependencyHash"].(string)
+		if !ok || !evidence.ValidDigest(dependencyHash) {
+			return errors.New("invalid native dependency hash")
+		}
+		for _, step := range chain.Steps {
+			if step.StepID == "dependencies" && step.OutputHash != signing.HashPayload([]byte(dependencyHash)) {
+				return errors.New("dependencies binding mismatch")
+			}
+			if step.InputHash != inputs[step.StepID] {
+				return fmt.Errorf("step %s input binding mismatch", step.StepID)
+			}
+			if step.StepID == "checks" && step.OutputHash != signing.HashPayload([]byte(manifest.Config.ConfigHash)) {
+				return errors.New("checks config binding mismatch")
+			}
+		}
+	}
 	if result.ManifestRef.ManifestHash != manifestHash {
 		return errors.New("result manifest hash mismatch")
 	}

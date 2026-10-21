@@ -148,7 +148,11 @@ def main() -> int:
         "list-deprecated": cmd_list_deprecated,
         "list": cmd_list,
     }
-    return dispatch[args.command](args)
+    try:
+        return dispatch[args.command](args)
+    except (ValueError, OSError) as exc:
+        print(f"ERROR: {exc}", file=sys.stderr)
+        return 1
 
 
 if __name__ == "__main__":

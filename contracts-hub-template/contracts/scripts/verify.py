@@ -1,94 +1,39 @@
 #!/usr/bin/env python3
-import importlib.util
+"""Standalone, offline validation of the contracts delivered in this template."""
 import json
-import sys
 from pathlib import Path
+from jsonschema import Draft202012Validator, FormatChecker
+from referencing import Registry, Resource
 
 ROOT = Path(__file__).resolve().parents[1]
-proto_tools = (ROOT.parents[1] / 'cadence-protocol' / 'tools').resolve()
-REQUIRED_VALIDATORS = (
-    'validate_run_manifest',
-    'validate_pipeline_result',
-    'validate_job_envelope',
-    'validate_payment',
-)
+schemas = {}
+resources = []
+for path in sorted((ROOT / "schemas").glob("*.schema.json")):
+    schema = json.loads(path.read_text(encoding="utf-8"))
+    Draft202012Validator.check_schema(schema)
+    resource = Resource.from_contents(schema)
+    resources.extend([(schema["$id"], resource), (path.resolve().as_uri(), resource)])
+    schemas[path.stem.removesuffix(".schema")] = schema
+registry = Registry().with_resources(resources)
 
 
-def _load_protocol_validators():
-    candidate = proto_tools / 'validate.py'
-    if not candidate.is_file():
-        return None
-    spec = importlib.util.spec_from_file_location('cadence_protocol_validate', candidate)
-    if spec is None or spec.loader is None:
-        return None
-    module = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(module)
-    if not all(hasattr(module, name) for name in REQUIRED_VALIDATORS):
-        return None
-    return tuple(getattr(module, name) for name in REQUIRED_VALIDATORS)
-
-
-_loaded = _load_protocol_validators()
-
-if _loaded is None:
-    def _require(obj, key):
-        if key not in obj:
-            raise ValueError(f"missing required field: {key}")
-        return obj[key]
-
-    def _require_obj(obj, key):
-        value = _require(obj, key)
-        if not isinstance(value, dict):
-            raise ValueError(f"{key} must be object")
-        return value
-
-    def validate_run_manifest(m):
-        _require(m, "schemaVersion")
-        _require(m, "runId")
-        _require_obj(m, "pipeline")
-        _require_obj(m, "config")
-        _require_obj(m, "inputRef")
-
-    def validate_pipeline_result(r):
-        _require(r, "schemaVersion")
-        _require(r, "runId")
-        _require_obj(r, "pipeline")
-        status = _require(r, "status")
-        _require_obj(r, "manifestRef")
-        if status in {"error", "cancelled"} and not r.get("error"):
-            raise ValueError("PipelineResult status implies error must be present")
-
-    def validate_job_envelope(j):
-        _require(j, "schemaVersion")
-        _require(j, "jobId")
-        runs = _require(j, "runs")
-        if not isinstance(runs, list):
-            raise ValueError("runs must be list")
-        for run in runs:
-            manifest_ref = run.get("manifestRef", {})
-            result_ref = run.get("result", {}).get("manifestRef", {})
-            if (
-                isinstance(manifest_ref, dict)
-                and isinstance(result_ref, dict)
-                and manifest_ref.get("manifestHash")
-                and result_ref.get("manifestHash")
-                and manifest_ref["manifestHash"] != result_ref["manifestHash"]
-            ):
+def validate(name, value):
+    Draft202012Validator(schemas[name], registry=registry, format_checker=FormatChecker()).validate(value)
+    if name == "pipeline_result" and value["status"] in {"error", "cancelled"} and not value.get("error"):
+        raise ValueError("PipelineResult status implies error must be present")
+    if name == "job_envelope":
+        for run in value["runs"]:
+            validate("pipeline_result", run["result"])
+            if run["manifestRef"]["manifestHash"] != run["result"]["manifestRef"]["manifestHash"]:
                 raise ValueError("JobEnvelope manifest refs must match")
+    if name == "payment" and (len(value["currency"]) != 3 or not value["currency"].isascii() or not value["currency"].isalpha() or value["currency"] != value["currency"].upper()):
+        raise ValueError("currency must be 3-letter uppercase")
 
-    def validate_payment(p):
-        _require(p, "schemaVersion")
-        _require(p, "paymentId")
-        currency = _require(p, "currency")
-        if not isinstance(currency, str) or currency != currency.upper() or len(currency) != 3:
-            raise ValueError("currency must be 3-letter uppercase")
-else:
-    (
-        validate_run_manifest,
-        validate_pipeline_result,
-        validate_job_envelope,
-        validate_payment,
-    ) = _loaded
+
+def validate_run_manifest(value): return validate("run_manifest", value)
+def validate_pipeline_result(value): return validate("pipeline_result", value)
+def validate_job_envelope(value): return validate("job_envelope", value)
+def validate_payment(value): return validate("payment", value)
 
 fixtures = ROOT / 'fixtures'
 semantics = ROOT / 'semantics'
@@ -103,12 +48,12 @@ pairs = [
 
 tot_v = tot_i = 0
 for name, fn in pairs:
-    assert (semantics / f'{name}.md').exists(), f'missing semantics: {name}.md'
+    if not (semantics / f'{name}.md').is_file(): raise SystemExit(f'missing semantics: {name}.md')
     vdir = fixtures / name / 'valid'
     idir = fixtures / name / 'invalid'
     val = sorted(vdir.glob('*.json'))
     inv = sorted(idir.glob('*.json'))
-    assert val and inv, f'fixtures incomplete for {name}'
+    if not val or not inv: raise SystemExit(f'fixtures incomplete for {name}')
     for fp in val:
         inst = json.loads(fp.read_text(encoding='utf-8'))
         fn(inst)
@@ -126,8 +71,8 @@ for name, fn in pairs:
 
 for fn in ('error_codes.json','job_types.json','stage_ids.json'):
     p = ids_dir / fn
-    assert p.exists(), f'missing ids file: {p}'
+    if not p.is_file(): raise SystemExit(f'missing ids file: {p}')
     arr = json.loads(p.read_text(encoding='utf-8'))
-    assert isinstance(arr, list) and arr
+    if not isinstance(arr, list) or not arr: raise SystemExit(f"invalid ids file: {p}")
 
 print(f'OK: valid_fixtures={tot_v} invalid_fixtures={tot_i}')

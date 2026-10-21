@@ -450,5 +450,49 @@ class ResolverCLITests(unittest.TestCase):
         self.assertEqual(result.returncode, 0, result.stderr)
 
 
+class RegistryCLIContractTests(unittest.TestCase):
+    def test_cli_resolve_enforces_structure_and_default_reference_date(self):
+        from tempfile import TemporaryDirectory
+        directory = TemporaryDirectory()
+        self.addCleanup(directory.cleanup)
+        tmp_path = Path(directory.name)
+        import copy
+        import subprocess
+        target = tmp_path / "pack.yaml"
+        target.write_text("version: 1\n")
+        entry = {"kind": "policyPack", "id": "example", "ref": "pack.yaml", "version": "1.0.0",
+                 "status": "active", "digest": _file_digest(target), "compatWindow": "current",
+                 "deprecatedAt": None, "deprecationReason": None,
+                 "trust": {"signer": "fixture", "allowlisted": True}}
+        original = {"schemaVersion": "1.0.0", "registryId": "fixture", "entries": [entry]}
+        path = tmp_path / "registry.json"
+        def invoke(payload, command="resolve", *extra):
+            path.write_text(json.dumps(payload))
+            args = [sys.executable, "-m", "resolver.cli", command]
+            if command == "resolve": args += ["policyPack", "example"]
+            return subprocess.run(args + ["--registry", str(path), *extra], cwd=ROOT, text=True, capture_output=True)
+        self.assertEqual(invoke(original).returncode, 0)
+        for defect in ("boolean-string", "no-digest", "status", "duplicate", "bad-ref-type", "trust-type"):
+            payload = copy.deepcopy(original)
+            item = payload["entries"][0]
+            if defect == "boolean-string": item["trust"]["allowlisted"] = "false"
+            elif defect == "no-digest": del item["digest"]
+            elif defect == "status": item["status"] = "disabled"
+            elif defect == "duplicate": payload["entries"].append(copy.deepcopy(item))
+            elif defect == "bad-ref-type": item["ref"] = 7
+            else: item["trust"] = []
+            for command in ("validate", "resolve"):
+                result = invoke(payload, command)
+                self.assertNotEqual(result.returncode, 0, (defect, command, result))
+                self.assertIn("ERROR:", result.stderr, (defect, command, result))
+                self.assertNotIn("Traceback", result.stderr)
+        expired = copy.deepcopy(original)
+        expired["entries"][0].update(status="deprecated", deprecatedAt="2020-01-01", deprecationReason="retired", compatWindow="until 2020-12-31")
+        self.assertEqual(invoke(expired, "validate").returncode, 0)
+        self.assertNotEqual(invoke(expired).returncode, 0)
+        self.assertNotEqual(invoke(expired, "resolve", "--date", date.today().isoformat()).returncode, 0)
+        self.assertEqual(invoke(expired, "resolve", "--date", "2020-06-01").returncode, 0)
+
+
 if __name__ == "__main__":
     unittest.main()

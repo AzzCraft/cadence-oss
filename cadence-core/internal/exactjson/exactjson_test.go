@@ -142,3 +142,30 @@ func TestRFC8785AppendixB(t *testing.T) {
 		}
 	}
 }
+
+func TestCanonicalNumberRoundTrip(t *testing.T) {
+	for _, input := range []string{"1e3", "1e16", "9007199254740992.0", "1e21", "-1e16", "-9007199254740992", "9007199254740991", "295147905179352830000"} {
+		value, err := Parse([]byte(input))
+		if err != nil {
+			t.Fatal(err)
+		}
+		first, err := Canonical(value)
+		if err != nil {
+			t.Fatalf("%s: %v", input, err)
+		}
+		reread, err := Parse(first)
+		if err != nil {
+			t.Fatal(err)
+		}
+		second, err := Canonical(reread)
+		if err != nil || string(first) != string(second) {
+			t.Fatalf("%s: %s -> %s (%v)", input, first, second, err)
+		}
+	}
+	for _, input := range []string{"9007199254740993", "-9007199254740993"} {
+		value, _ := Parse([]byte(input))
+		if _, err := Canonical(value); err == nil {
+			t.Fatal("rounded", input)
+		}
+	}
+}

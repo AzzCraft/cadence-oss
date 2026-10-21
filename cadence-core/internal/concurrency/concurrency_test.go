@@ -75,3 +75,29 @@ func TestPoolMapPropagatesError(t *testing.T) {
 		t.Fatalf("want boom, got %v", err)
 	}
 }
+
+func TestPoolPreservesCancellation(t *testing.T) {
+	pool := &Pool{N: 1}
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	if _, err := pool.Map(ctx, []any{1, 2}, func(context.Context, int, any) (any, error) { t.Fatal("pre-cancelled job ran"); return nil, nil }); !errors.Is(err, context.Canceled) {
+		t.Fatal(err)
+	}
+	if _, err := pool.Map(context.Background(), []any{1}, func(context.Context, int, any) (any, error) { return nil, context.Canceled }); !errors.Is(err, context.Canceled) {
+		t.Fatal(err)
+	}
+	business := errors.New("business failure")
+	if _, err := pool.Map(context.Background(), []any{1, 2}, func(_ context.Context, i int, _ any) (any, error) {
+		if i == 0 {
+			return nil, business
+		}
+		return nil, context.Canceled
+	}); !errors.Is(err, business) {
+		t.Fatal(err)
+	}
+	expired, stop := context.WithDeadline(context.Background(), time.Now().Add(-time.Second))
+	defer stop()
+	if _, err := pool.Map(expired, []any{1}, func(context.Context, int, any) (any, error) { return 1, nil }); !errors.Is(err, context.DeadlineExceeded) {
+		t.Fatal(err)
+	}
+}

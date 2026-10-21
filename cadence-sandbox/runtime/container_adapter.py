@@ -97,20 +97,31 @@ class ContainerAdapter(RuntimeAdapter):
             raise RuntimeError("container-runtime workDir must be a directory")
         configured_output = Path(request.writableOutputDir)
         output = configured_output if configured_output.is_absolute() else root / configured_output
-        output.parent.mkdir(parents=True, exist_ok=True)
-        output = output.resolve()
+        if ".." in configured_output.parts:
+            raise RuntimeError("container-runtime output may not contain parent traversal")
+        output = Path(os.path.abspath(output))
         try:
-            output.relative_to(root)
+            relative = output.relative_to(root)
         except ValueError as exc:
             raise RuntimeError("container-runtime writableOutputDir must be inside workDir") from exc
+        if relative == Path("."):
+            raise RuntimeError("container-runtime output must be a strict subdirectory of workDir")
+        for candidate in (root, output):
+            if any(character in str(candidate) for character in (",", "\n", "\r")):
+                raise RuntimeError("container-runtime mount path is unsafe")
+        for candidate in (output, *output.parents):
+            if candidate == root:
+                break
+            if candidate.is_symlink() or (candidate.exists() and not candidate.is_dir()):
+                raise RuntimeError("container-runtime output must use real directories")
         output.mkdir(parents=True, exist_ok=True)
-        if output.is_symlink():
-            raise RuntimeError("container-runtime writableOutputDir may not be a symlink")
         return root, output
 
     @staticmethod
     def _container_argument(value: str, workspace: Path, output: Path) -> str:
         """Translate only validated host-workspace paths into container paths."""
+        if not Path(value).is_absolute():
+            return value
         try:
             candidate = Path(value).resolve()
         except (OSError, RuntimeError):
@@ -137,7 +148,7 @@ class ContainerAdapter(RuntimeAdapter):
         if request.readOnlyInputs:
             env["CADENCE_SANDBOX_READ_ONLY_INPUTS"] = "1"
         if request.writableOutputDir:
-            env["CADENCE_SANDBOX_WRITABLE_OUTPUT_DIR"] = request.writableOutputDir
+            env["CADENCE_SANDBOX_WRITABLE_OUTPUT_DIR"] = _CONTAINER_OUTPUT_DIR
         env["CADENCE_SANDBOX_NETWORK"] = "off"
 
         container_runtime = _detect_container_runtime()
@@ -150,18 +161,18 @@ class ContainerAdapter(RuntimeAdapter):
 
         try:
             workspace, output = self._resolve_mounts(request)
-        except RuntimeError as exc:
+        except (RuntimeError, OSError) as exc:
             return AdapterResponse(exitCode=1, failureReasons=[str(exc)])
         if any("," in str(path) or "\n" in str(path) for path in (workspace, output)):
             return AdapterResponse(exitCode=1, failureReasons=["container-runtime mount path is unsafe"])
 
-        cid_file = tempfile.NamedTemporaryFile(prefix="cadence-container-", delete=False)
-        cid_file.close()
+        cid_directory = tempfile.TemporaryDirectory(prefix="cadence-container-")
+        cid_path = str(Path(cid_directory.name) / "container.cid")
 
         # Build container run command with isolation flags
         container_cmd: list[str] = [
             container_runtime, "run", "--rm",
-            "--cidfile", cid_file.name,
+            "--cidfile", cid_path,
             "--network", "none",
             "--read-only",
             "--user", "65532:65532",
@@ -183,20 +194,16 @@ class ContainerAdapter(RuntimeAdapter):
             for argument in request.command
         )
 
-        exit_code, stdout, stderr = execute_subprocess(
-            container_cmd, request.workDir, {}, timeout
-        )
-        container_id = ""
         try:
-            with open(cid_file.name, encoding="utf-8") as handle:
-                container_id = handle.read().strip()
-        except OSError:
-            container_id = ""
-        finally:
+            exit_code, stdout, stderr = execute_subprocess(
+                container_cmd, str(workspace), {}, timeout
+            )
             try:
-                os.unlink(cid_file.name)
+                container_id = Path(cid_path).read_text(encoding="utf-8").strip()
             except OSError:
-                pass
+                container_id = ""
+        finally:
+            cid_directory.cleanup()
 
         # Host namespaces are not evidence of the completed container.  The
         # adapter records launch controls only; a production image must emit a
