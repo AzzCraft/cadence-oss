@@ -594,34 +594,41 @@ func TestChainIntegrity(t *testing.T) {
 	}
 }
 
-// TestDeterminism replays an explicit run identity in independent output roots.
+// TestDeterminism replays an explicit run identity with identical output policy.
 // Default invocations allocate distinct attempts; their stable input identity is
 // checked separately by TestPublicNativeEvidenceRoundTripAndRefusal.
 func TestDeterminism(t *testing.T) {
 	bin := buildBinary(t)
 	repo := setupTestRepo(t)
-	outDir1 := filepath.Join(repo, "out-a")
-	outDir2 := filepath.Join(repo, "out-b")
+	outDir := filepath.Join(repo, ".cadence", "out")
+	retainedOutput := filepath.Join(t.TempDir(), "first-run")
 	runID := "deterministic-replay"
 
 	// First run.
-	cmd1 := exec.Command(bin, "verify", "--run-id", runID, "--out", outDir1, "--alias", "")
+	cmd1 := exec.Command(bin, "verify", "--run-id", runID, "--out", outDir, "--alias", "")
 	cmd1.Dir = repo
 	cmd1.Env = append(os.Environ(), "PYTHONDONTWRITEBYTECODE=1")
 	if out, err := cmd1.CombinedOutput(); err != nil {
 		t.Fatalf("verify run 1 failed: %v\n%s", err, out)
 	}
+	// Preserve the first evidence outside the source tree before replaying.
+	// An arbitrary previous output directory is now correctly hashed as input;
+	// changing --out also changes the recorded exclusion policy. Neither is an
+	// identical-input replay, and an existing run ID must not be overwritten.
+	if err := os.Rename(outDir, retainedOutput); err != nil {
+		t.Fatalf("retain first run evidence: %v", err)
+	}
 
 	// Second run.
-	cmd2 := exec.Command(bin, "verify", "--run-id", runID, "--out", outDir2, "--alias", "")
+	cmd2 := exec.Command(bin, "verify", "--run-id", runID, "--out", outDir, "--alias", "")
 	cmd2.Dir = repo
 	cmd2.Env = append(os.Environ(), "PYTHONDONTWRITEBYTECODE=1")
 	if out, err := cmd2.CombinedOutput(); err != nil {
 		t.Fatalf("verify run 2 failed: %v\n%s", err, out)
 	}
 
-	runDir1 := singleRunDir(t, outDir1)
-	runDir2 := singleRunDir(t, outDir2)
+	runDir1 := singleRunDir(t, retainedOutput)
+	runDir2 := singleRunDir(t, outDir)
 
 	// Compare: run identity, configHash, and inputHash should be identical across runs.
 	var m1, m2 map[string]any
