@@ -164,7 +164,6 @@ def test_legacy_conversion_and_current_schema_agree():
     from copy import deepcopy
     import sys
     import pytest
-    from jsonschema.exceptions import ValidationError
     sys.path.insert(0, str(ROOT/'tools'))
     spec = importlib.util.spec_from_file_location('migration_review', ROOT/'tools/migrate.py')
     migrate = importlib.util.module_from_spec(spec); spec.loader.exec_module(migrate)
@@ -177,12 +176,25 @@ def test_legacy_conversion_and_current_schema_agree():
     validate.validate_pipeline_result(migrated)
     for field, value in [('schemaVersion','9.0.0'), ('status','unknown')]:
         bad = deepcopy(migrated); bad[field] = value
-        with pytest.raises((ValueError, ValidationError)): validate.validate_pipeline_result(bad)
+        with pytest.raises(ValueError): validate.validate_pipeline_result(bad)
     source['schemaVersion'] = '9.0.0'
     with pytest.raises(ValueError, match='unsupported'): migrate.migrate_legacy_pipeline_result(source)
     job = json.loads((ROOT/'fixtures/compat/legacy_job_envelope_v0.json').read_text())
     incomplete = migrate.migrate_legacy_job_envelope(job)
-    with pytest.raises(ValidationError): validate.validate_job_envelope(incomplete)
+    with pytest.raises(ValueError): validate.validate_job_envelope(incomplete)
     job.update(createdAt='2026-04-08T09:00:00Z', updatedAt='2026-04-08T09:00:00Z', profileId='TEST', sideEffectsMode='dryRun')
     job['runs'][0].update(startedAt='2026-04-08T09:00:00Z', finishedAt='2026-04-08T09:00:00Z')
     validate.validate_job_envelope(migrate.migrate_legacy_job_envelope(job))
+
+
+def test_schema_rejections_keep_public_value_error_contract():
+    import pytest
+    from jsonschema.exceptions import ValidationError
+    from tools.validate import validate_run_manifest
+
+    valid = json.loads((ROOT/'fixtures/run_manifest/valid/basic.json').read_text())
+    validate_run_manifest(valid)
+    invalid = json.loads((ROOT/'fixtures/run_manifest/invalid/missing_runId.json').read_text())
+    with pytest.raises(ValueError, match='runId') as raised:
+        validate_run_manifest(invalid)
+    assert isinstance(raised.value.__cause__, ValidationError)

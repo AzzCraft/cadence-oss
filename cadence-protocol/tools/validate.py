@@ -39,7 +39,7 @@ def _protocol_version(obj):
 def _schema(name, obj):
     from pathlib import Path
     import json
-    from jsonschema import Draft202012Validator, FormatChecker, validators
+    from jsonschema import Draft202012Validator, FormatChecker, ValidationError, validators
     from referencing import Registry, Resource
     root = Path(__file__).resolve().parents[1] / 'schemas'
     resources = []
@@ -50,7 +50,12 @@ def _schema(name, obj):
         if path.name == name + '.schema.json': selected = value
     cls = validators.extend(Draft202012Validator, type_checker=Draft202012Validator.TYPE_CHECKER.redefine(
         'integer', lambda _, value: _is_integer(value)).redefine('number', lambda _, value: _is_number(value)))
-    cls(selected, registry=Registry().with_resources(resources), format_checker=FormatChecker()).validate(obj)
+    try:
+        cls(selected, registry=Registry().with_resources(resources), format_checker=FormatChecker()).validate(obj)
+    except ValidationError as exc:
+        # Preserve the public validator API used by fixture and CLI consumers.
+        # Only invalid instances are translated; schema/resolution errors remain errors.
+        raise ValueError(f"{name}: {exc.message}") from exc
 
 
 def _is_iso_datetime(s: str) -> bool:
