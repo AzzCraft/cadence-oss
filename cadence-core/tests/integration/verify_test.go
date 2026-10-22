@@ -1753,7 +1753,7 @@ func TestVerifyUsesContainerRuntimeAdapterExecution(t *testing.T) {
 		},
 	})
 
-	adapter := writeRuntimeAdapterScript(t, repo, `{"exitCode":0,"stdout":"[]\n","stderr":"","observedChecks":["cgroup-fenced","mount-namespace","namespace-proof-hash","network-namespace","pid-namespace","seccomp-active"],"namespaceProofHash":"sha256:test","namespaceProofs":[{"namespace":"pid","selfDescriptor":"pid:[2]","initDescriptor":"pid:[1]","matchesInit":false}],"backendEvidence":{"cgroupVersion":"v2"}}`)
+	adapter := writeRuntimeAdapterScript(t, repo, `{"exitCode":0,"stdout":"{\"violations\":[],\"executedRules\":[]}\n","stderr":"","observedChecks":["cgroup-fenced","mount-namespace","namespace-proof-hash","network-namespace","pid-namespace","seccomp-active"],"namespaceProofHash":"sha256:test","namespaceProofs":[{"namespace":"pid","selfDescriptor":"pid:[2]","initDescriptor":"pid:[1]","matchesInit":false}],"backendEvidence":{"cgroupVersion":"v2"}}`)
 	cmd := exec.Command(bin, "verify", "--run-id", "container-runtime-exec", "--out", outDir)
 	cmd.Dir = repo
 	cmd.Env = append(os.Environ(), "CADENCE_SANDBOX_CONTAINER_ADAPTER="+adapter)
@@ -1866,7 +1866,7 @@ func TestVerifyUsesMicrovmRuntimeAdapterExecution(t *testing.T) {
 		},
 	})
 
-	adapter := writeRuntimeAdapterScript(t, repo, `{"exitCode":0,"stdout":"[]\n","stderr":"","observedChecks":["cgroup-fenced","mount-namespace","namespace-proof-hash","network-namespace","pid-namespace","seccomp-active"],"namespaceProofHash":"sha256:microvm","namespaceProofs":[{"namespace":"mnt","selfDescriptor":"mnt:[2]","initDescriptor":"mnt:[1]","matchesInit":false}],"backendEvidence":{"cgroupVersion":"v2"}}`)
+	adapter := writeRuntimeAdapterScript(t, repo, `{"exitCode":0,"stdout":"{\"violations\":[],\"executedRules\":[]}\n","stderr":"","observedChecks":["cgroup-fenced","mount-namespace","namespace-proof-hash","network-namespace","pid-namespace","seccomp-active"],"namespaceProofHash":"sha256:microvm","namespaceProofs":[{"namespace":"mnt","selfDescriptor":"mnt:[2]","initDescriptor":"mnt:[1]","matchesInit":false}],"backendEvidence":{"cgroupVersion":"v2"}}`)
 	cmd := exec.Command(bin, "verify", "--run-id", "microvm-runtime-exec", "--out", outDir)
 	cmd.Dir = repo
 	cmd.Env = append(os.Environ(), "CADENCE_SANDBOX_MICROVM_ADAPTER="+adapter)
