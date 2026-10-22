@@ -24,7 +24,7 @@ def validate(name, value):
     if name == "job_envelope":
         for run in value["runs"]:
             validate("pipeline_result", run["result"])
-            if run["manifestRef"]["manifestHash"] != run["result"]["manifestRef"]["manifestHash"]:
+            if run["manifestRef"] != run["result"]["manifestRef"]:
                 raise ValueError("JobEnvelope manifest refs must match")
     if name == "payment" and (len(value["currency"]) != 3 or not value["currency"].isascii() or not value["currency"].isalpha() or value["currency"] != value["currency"].upper()):
         raise ValueError("currency must be 3-letter uppercase")

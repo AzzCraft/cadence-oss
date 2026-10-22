@@ -1,7 +1,8 @@
-"""Cadence protocol validators (stdlib-only).
+"""Offline Cadence protocol validators.
 
-This repo pack intentionally avoids pip/npm installs.
-These validators provide lightweight structural checks; they are not a full JSON Schema implementation.
+Dependencies are declared by the repository verification requirements.
+Current core objects use the delivered offline schemas plus semantic checks.
+Known 0.9 inputs use the explicit migration helpers, not implicit current decoding.
 """
 
 from __future__ import annotations
@@ -28,12 +29,42 @@ def _is_integer(value):
     return _is_number(value) and value == int(value)
 
 
+def _protocol_version(obj):
+    version = _require_str(obj, 'schemaVersion')
+    if not re.fullmatch(r'1\.(?:0|[1-9][0-9]*)\.(?:0|[1-9][0-9]*)(?:[-+][0-9A-Za-z.-]+)?', version):
+        raise ValueError('unsupported protocol schemaVersion')
+    return version
+
+
+def _schema(name, obj):
+    from pathlib import Path
+    import json
+    from jsonschema import Draft202012Validator, FormatChecker, ValidationError, validators
+    from referencing import Registry, Resource
+    root = Path(__file__).resolve().parents[1] / 'schemas'
+    resources = []
+    selected = None
+    for path in root.glob('*.schema.json'):
+        value = json.loads(path.read_text())
+        resources.append((value['$id'], Resource.from_contents(value)))
+        if path.name == name + '.schema.json': selected = value
+    cls = validators.extend(Draft202012Validator, type_checker=Draft202012Validator.TYPE_CHECKER.redefine(
+        'integer', lambda _, value: _is_integer(value)).redefine('number', lambda _, value: _is_number(value)))
+    try:
+        cls(selected, registry=Registry().with_resources(resources), format_checker=FormatChecker()).validate(obj)
+    except ValidationError as exc:
+        # Preserve the public validator API used by fixture and CLI consumers.
+        # Only invalid instances are translated; schema/resolution errors remain errors.
+        raise ValueError(f"{name}: {exc.message}") from exc
+
+
 def _is_iso_datetime(s: str) -> bool:
-    if not isinstance(s, str):
+    if not isinstance(s, str) or not re.fullmatch(r'\d{4}-\d{2}-\d{2}[Tt]\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:[Zz]|[+-]\d{2}:\d{2})', s):
         return False
     try:
-        if s.endswith('Z'):
+        if s.endswith(('Z', 'z')):
             s = s[:-1] + '+00:00'
+        s = s[:10] + 'T' + s[11:]
         datetime.fromisoformat(s)
         return True
     except Exception:
@@ -123,10 +154,12 @@ def validate_diagnostics(d: Any) -> None:
 
 
 def validate_run_manifest(m: Dict[str, Any]) -> None:
+    _protocol_version(m)
+    _schema("run_manifest", m)
     if 'manifestHash' in m:
         raise ValueError('RunManifest MUST NOT embed manifestHash inside payload')
 
-    _require_str(m, 'schemaVersion')
+    _protocol_version(m)
     _require_str(m, 'runId')
     created = _require_str(m, 'createdAt')
     if not _is_iso_datetime(created):
@@ -174,18 +207,19 @@ def validate_run_manifest(m: Dict[str, Any]) -> None:
 
 
 def validate_pipeline_result(r: Dict[str, Any]) -> None:
-    _require_str(r, 'schemaVersion')
+    _protocol_version(r)
+    _schema("pipeline_result", r)
+    _protocol_version(r)
     _require_str(r, 'runId')
 
     pipe = _require_obj(r, 'pipeline')
     _require_str(pipe, 'id')
 
     status = _require_str(r, 'status')
-    # tolerate forward-compatible additions
-    if status in ('ok', 'error', 'cancelled'):
-        pass
+    _require_enum(status, ('ok', 'degraded', 'error', 'cancelled'), 'status')
 
-    _require(r, 'output', dict)
+    if 'output' in r:
+        _require(r, 'output', dict)
     # warnings are optional
     if 'warnings' in r:
         _require(r, 'warnings', list)
@@ -209,7 +243,9 @@ def validate_pipeline_result(r: Dict[str, Any]) -> None:
 
 
 def validate_job_envelope(j: Dict[str, Any]) -> None:
-    _require_str(j, 'schemaVersion')
+    _protocol_version(j)
+    _schema("job_envelope", j)
+    _protocol_version(j)
     _require_str(j, 'jobId')
     _require_str(j, 'jobType')
     _require_str(j, 'status')
@@ -226,7 +262,7 @@ def validate_job_envelope(j: Dict[str, Any]) -> None:
         res = run.get('result') or {}
         if isinstance(mr, dict) and isinstance(res, dict):
             rr = (res.get('manifestRef') or {})
-            if isinstance(rr, dict) and mr.get('manifestHash') and rr.get('manifestHash') and mr['manifestHash'] != rr['manifestHash']:
+            if isinstance(rr, dict) and mr != rr:
                 raise ValueError('JobEnvelope: runs[].manifestRef must match runs[].result.manifestRef')
 
 
@@ -252,7 +288,7 @@ def validate_dataset_manifest(m: Dict[str, Any]) -> None:
     This is NOT full JSON Schema validation. It enforces the key invariants used
     by this repo pack's verify scripts and demo governance flows.
     """
-    _require_str(m, 'schemaVersion')
+    _protocol_version(m)
     _require_str(m, 'datasetId')
     _require_str(m, 'datasetVersion')
     _require_str(m, 'owner')
@@ -363,14 +399,16 @@ def validate_eval_report(e: Dict[str, Any]) -> None:
 
 
 def validate_evidence_bundle(b: Dict[str, Any]) -> None:
-    _require_str(b, 'schemaVersion')
+    _protocol_version(b)
+    _schema("evidence_bundle", b)
+    _protocol_version(b)
     _require_str(b, 'evidenceId')
     for key in ('runManifestRef', 'pipelineResultRef', 'jobEnvelopeRef'):
         _require_str(b, key)
 
 
 def validate_replay_package(b: Dict[str, Any]) -> None:
-    _require_str(b, 'schemaVersion')
+    _protocol_version(b)
     _require_str(b, 'replayId')
     for key in ('runManifestRef', 'pipelineResultRef', 'datasetRef'):
         _require_str(b, key)
@@ -405,7 +443,7 @@ def validate_envelope(e: Dict[str, Any]) -> None:
 
 
 def validate_plugin_manifest(m: Dict[str, Any]) -> None:
-    _require_str(m, 'schemaVersion')
+    _protocol_version(m)
     _require_str(m, 'pluginId')
     _require_str(m, 'entryPoint')
     caps = _require_list(m, 'capabilities')
@@ -415,7 +453,7 @@ def validate_plugin_manifest(m: Dict[str, Any]) -> None:
 
 
 def validate_plugin_registry_index(r: Dict[str, Any]) -> None:
-    _require_str(r, 'schemaVersion')
+    _protocol_version(r)
     _require_str(r, 'registryId')
     entries = _require_list(r, 'entries')
     if not entries:
@@ -468,7 +506,7 @@ def validate_sandbox_result(r: Dict[str, Any]) -> None:
             'legacy abstract sandbox_result envelope is not supported; unexpected fields: '
             + ', '.join(sorted(legacy_fields))
         )
-    _require_str(r, 'schemaVersion')
+    _protocol_version(r)
     _require_str(r, 'profileId')
     _require_str(r, 'backend')
     _require_str(r, 'mode')

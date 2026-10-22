@@ -29,7 +29,7 @@ const (
 
 type Trust struct {
 	Signer      string `json:"signer,omitempty"`
-	Allowlisted bool   `json:"allowlisted,omitempty"`
+	Allowlisted bool   `json:"allowlisted"`
 }
 
 type TrustedEntry struct {
@@ -65,8 +65,8 @@ type Entry struct {
 	Version           string  `json:"version,omitempty"`
 	Status            string  `json:"status,omitempty"`
 	Digest            string  `json:"digest,omitempty"`
-	DeprecatedAt      *string `json:"deprecatedAt,omitempty"`
-	DeprecationReason *string `json:"deprecationReason,omitempty"`
+	DeprecatedAt      *string `json:"deprecatedAt"`
+	DeprecationReason *string `json:"deprecationReason"`
 	CompatWindow      string  `json:"compatWindow,omitempty"`
 	Trust             *Trust  `json:"trust,omitempty"`
 }
@@ -132,8 +132,54 @@ func Load(path string) (Registry, error) {
 	if err != nil {
 		return registry, err
 	}
-	err = json.Unmarshal(data, &registry)
+	value, err := exactjson.Parse(data)
+	if err != nil {
+		return registry, err
+	}
+	if err := validateWireShape(value); err != nil {
+		return registry, err
+	}
+	decoder := json.NewDecoder(bytes.NewReader(data))
+	decoder.DisallowUnknownFields()
+	err = decoder.Decode(&registry)
+	if err == nil {
+		err = Validate(registry)
+	}
 	return registry, err
+}
+
+// encoding/json matches field names without case sensitivity and accepts null
+// for scalar fields. Check the wire shape before those distinctions are lost.
+func validateWireShape(value any) error {
+	root, err := exactjson.Object(value, []string{"schemaVersion", "registryId", "entries"}, nil)
+	if err != nil {
+		return err
+	}
+	for _, key := range []string{"schemaVersion", "registryId"} {
+		text, ok := root[key].(string)
+		if !ok || strings.TrimSpace(text) == "" {
+			return fmt.Errorf("registry: %s must be a nonempty string", key)
+		}
+	}
+	entries, ok := root["entries"].([]any)
+	if !ok {
+		return fmt.Errorf("registry: entries must be an array")
+	}
+	for _, value := range entries {
+		entry, err := exactjson.Object(value,
+			[]string{"kind", "id", "ref", "version", "status", "digest", "compatWindow", "trust", "deprecatedAt", "deprecationReason"}, nil)
+		if err != nil {
+			return err
+		}
+		trust, err := exactjson.Object(entry["trust"], []string{"signer", "allowlisted"}, nil)
+		if err != nil {
+			return err
+		}
+		if _, ok := trust["allowlisted"].(bool); !ok {
+			return fmt.Errorf("registry: trust.allowlisted must be boolean")
+		}
+	}
+	return nil
 }
 
 // Lookup finds an entry by kind and ID. Returns an error if not found.
@@ -184,6 +230,9 @@ func Validate(reg Registry) error {
 		if e.ID == "" {
 			return fmt.Errorf("registry: entry[%d] missing id", i)
 		}
+		if strings.TrimSpace(e.Version) == "" {
+			return fmt.Errorf("registry: entry[%d] version is required", i)
+		}
 		if strings.TrimSpace(e.Ref) == "" {
 			return fmt.Errorf("registry: entry[%d] missing ref", i)
 		}
@@ -211,10 +260,10 @@ func Validate(reg Registry) error {
 		}
 		switch e.Status {
 		case "active":
-			if strings.TrimSpace(valueOrEmpty(e.DeprecatedAt)) != "" {
+			if e.DeprecatedAt != nil {
 				return fmt.Errorf("registry: entry[%d] active status requires deprecatedAt=null", i)
 			}
-			if strings.TrimSpace(valueOrEmpty(e.DeprecationReason)) != "" {
+			if e.DeprecationReason != nil {
 				return fmt.Errorf("registry: entry[%d] active status requires deprecationReason=null", i)
 			}
 			if policy.Kind != "current" {
@@ -427,7 +476,8 @@ func (p compatPolicy) Contains(ts time.Time) bool {
 	if !p.Start.IsZero() && ts.Before(p.Start) {
 		return false
 	}
-	if !p.End.IsZero() && ts.After(p.End) {
+	// Date-only compatibility windows include their final UTC calendar day.
+	if !p.End.IsZero() && !ts.Before(p.End.AddDate(0, 0, 1)) {
 		return false
 	}
 	return true

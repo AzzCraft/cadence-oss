@@ -2,6 +2,7 @@ package integration
 
 import (
 	"encoding/json"
+	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -739,5 +740,55 @@ func TestReviewedCLIRefusalsAndBaselineControls(t *testing.T) {
 	os.WriteFile(filepath.Join(repo, "large-report.json"), []byte(`{"value":9007199254740993}`), 0600)
 	if out, err := run("report", "--in", "large-report.json"); err != nil || !strings.Contains(string(out), "9007199254740993") {
 		t.Fatalf("report number changed: %v %s", err, out)
+	}
+}
+
+func TestExternalBaselineBytesAndRuleMetricsUseActualInputs(t *testing.T) {
+	bin := buildBinary(t)
+	repo := setupTestRepo(t)
+	baselinePath := filepath.Join(t.TempDir(), "external-baseline.json")
+	configPath := filepath.Join(repo, "cadence.yaml")
+	config, err := os.ReadFile(configPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	encoded, _ := json.Marshal(baselinePath)
+	if err := os.WriteFile(configPath, append(config, []byte("\nbaselinePath: "+string(encoded)+"\n")...), 0600); err != nil {
+		t.Fatal(err)
+	}
+	hashes := []string{}
+	for i, body := range []string{`{"schemaVersion":"1.0.0","fingerprints":[]}`, `{"schemaVersion":"1.0.0","fingerprints":["sha256:1111111111111111111111111111111111111111111111111111111111111111"]}`} {
+		if err := os.WriteFile(baselinePath, []byte(body), 0600); err != nil {
+			t.Fatal(err)
+		}
+		run := fmt.Sprintf("baseline-input-%d", i)
+		cmd := exec.Command(bin, "verify", "--run-id", run)
+		cmd.Dir = repo
+		if out, err := cmd.CombinedOutput(); err != nil {
+			t.Fatalf("verify: %v %s", err, out)
+		}
+		raw, err := os.ReadFile(filepath.Join(repo, ".cadence", "out", run, "input-identity.json"))
+		if err != nil {
+			t.Fatal(err)
+		}
+		var identity map[string]any
+		if err := json.Unmarshal(raw, &identity); err != nil {
+			t.Fatal(err)
+		}
+		hashes = append(hashes, identity["inputHash"].(string))
+		raw, err = os.ReadFile(filepath.Join(repo, ".cadence", "out", run, "report-summary.json"))
+		if err != nil {
+			t.Fatal(err)
+		}
+		var report map[string]any
+		if err := json.Unmarshal(raw, &report); err != nil {
+			t.Fatal(err)
+		}
+		if report["metrics"].(map[string]any)["rulesEvaluated"].(float64) <= 0 || report["summary"].(map[string]any)["violations"].(float64) != 0 {
+			t.Fatal("rule coverage was derived from findings", report)
+		}
+	}
+	if hashes[0] == hashes[1] {
+		t.Fatal("external baseline bytes not bound")
 	}
 }

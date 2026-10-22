@@ -72,7 +72,11 @@ func setupTestRepo(t *testing.T) string {
 	}
 
 	writeTestJSON(t, filepath.Join(dir, "suite_lock.json"), map[string]any{
-		"schemaVersion": "1.0.0",
+		"schemaVersion": "1.0.0", "suiteId": "TEST-suite", "suiteVersion": "1.0.0", "standardManifestVersion": "1.4.0",
+		"syncMode": "locked", "allowCloneTip": false, "defaultOverridePolicy": "forbidden",
+		"modules": map[string]any{"TEST-product": map[string]any{"role": "product_repo", "required": true,
+			"lockedRef":      map[string]any{"kind": "git", "uri": "https://example.invalid/product", "pinType": "commit", "pinValue": "1111111111111111111111111111111111111111", "floating": false},
+			"overridePolicy": "forbidden", "allowedLocalState": []string{"present_locked_match"}}},
 	})
 
 	// closure ref — schema-conformant suite version closure artifact
@@ -150,6 +154,7 @@ func setupTestRepo(t *testing.T) string {
 		"entries": []map[string]any{
 			{
 				"kind":              "policyPack",
+				"version":           "1.0.0",
 				"id":                "test-pack",
 				"ref":               "pack.yaml",
 				"status":            "active",
@@ -164,6 +169,7 @@ func setupTestRepo(t *testing.T) string {
 			},
 			{
 				"kind":              "runtimeProfile",
+				"version":           "1.0.0",
 				"id":                "test-runtime",
 				"ref":               "runtime.json",
 				"status":            "active",
@@ -178,6 +184,7 @@ func setupTestRepo(t *testing.T) string {
 			},
 			{
 				"kind":              "sandboxProfile",
+				"version":           "1.0.0",
 				"id":                "test-sandbox",
 				"ref":               "sandbox.json",
 				"status":            "active",
@@ -264,6 +271,7 @@ func configureRuntimeBackend(t *testing.T, repo, backend, filesystemMode string)
 		"entries": []map[string]any{
 			{
 				"kind":              "policyPack",
+				"version":           "1.0.0",
 				"id":                "test-pack",
 				"ref":               "pack.yaml",
 				"status":            "active",
@@ -278,6 +286,7 @@ func configureRuntimeBackend(t *testing.T, repo, backend, filesystemMode string)
 			},
 			{
 				"kind":              "runtimeProfile",
+				"version":           "1.0.0",
 				"id":                "test-runtime",
 				"ref":               "runtime.json",
 				"status":            "active",
@@ -292,6 +301,7 @@ func configureRuntimeBackend(t *testing.T, repo, backend, filesystemMode string)
 			},
 			{
 				"kind":              "sandboxProfile",
+				"version":           "1.0.0",
 				"id":                "test-sandbox",
 				"ref":               "sandbox.json",
 				"status":            "active",
@@ -1055,6 +1065,7 @@ func TestVerifyFailsWhenRegistryPolicyIsMissing(t *testing.T) {
 		"entries": []map[string]any{
 			{
 				"kind":              "runtimeProfile",
+				"version":           "1.0.0",
 				"id":                "test-runtime",
 				"ref":               "runtime.json",
 				"status":            "active",
@@ -1069,6 +1080,7 @@ func TestVerifyFailsWhenRegistryPolicyIsMissing(t *testing.T) {
 			},
 			{
 				"kind":              "sandboxProfile",
+				"version":           "1.0.0",
 				"id":                "test-sandbox",
 				"ref":               "sandbox.json",
 				"status":            "active",
@@ -1106,6 +1118,7 @@ func TestVerifyDegradesForDeprecatedRegistryDependency(t *testing.T) {
 		"entries": []map[string]any{
 			{
 				"kind":              "policyPack",
+				"version":           "1.0.0",
 				"id":                "test-pack",
 				"ref":               "pack.yaml",
 				"status":            "deprecated",
@@ -1120,6 +1133,7 @@ func TestVerifyDegradesForDeprecatedRegistryDependency(t *testing.T) {
 			},
 			{
 				"kind":              "runtimeProfile",
+				"version":           "1.0.0",
 				"id":                "test-runtime",
 				"ref":               "runtime.json",
 				"status":            "active",
@@ -1134,6 +1148,7 @@ func TestVerifyDegradesForDeprecatedRegistryDependency(t *testing.T) {
 			},
 			{
 				"kind":              "sandboxProfile",
+				"version":           "1.0.0",
 				"id":                "test-sandbox",
 				"ref":               "sandbox.json",
 				"status":            "active",
@@ -1178,6 +1193,7 @@ func TestVerifyFailsWhenRegistryTrustIsNotAllowlisted(t *testing.T) {
 		"entries": []map[string]any{
 			{
 				"kind":              "policyPack",
+				"version":           "1.0.0",
 				"id":                "test-pack",
 				"ref":               "pack.yaml",
 				"status":            "active",
@@ -1192,6 +1208,7 @@ func TestVerifyFailsWhenRegistryTrustIsNotAllowlisted(t *testing.T) {
 			},
 			{
 				"kind":              "runtimeProfile",
+				"version":           "1.0.0",
 				"id":                "test-runtime",
 				"ref":               "runtime.json",
 				"status":            "active",
@@ -1206,6 +1223,7 @@ func TestVerifyFailsWhenRegistryTrustIsNotAllowlisted(t *testing.T) {
 			},
 			{
 				"kind":              "sandboxProfile",
+				"version":           "1.0.0",
 				"id":                "test-sandbox",
 				"ref":               "sandbox.json",
 				"status":            "active",
@@ -1243,6 +1261,7 @@ func TestVerifyFailsWhenDeprecatedRuntimeUsesCurrentCompatWindow(t *testing.T) {
 		"entries": []map[string]any{
 			{
 				"kind":              "policyPack",
+				"version":           "1.0.0",
 				"id":                "test-pack",
 				"ref":               "pack.yaml",
 				"status":            "active",
@@ -1257,6 +1276,7 @@ func TestVerifyFailsWhenDeprecatedRuntimeUsesCurrentCompatWindow(t *testing.T) {
 			},
 			{
 				"kind":              "runtimeProfile",
+				"version":           "1.0.0",
 				"id":                "test-runtime",
 				"ref":               "runtime.json",
 				"status":            "deprecated",
@@ -1271,6 +1291,7 @@ func TestVerifyFailsWhenDeprecatedRuntimeUsesCurrentCompatWindow(t *testing.T) {
 			},
 			{
 				"kind":              "sandboxProfile",
+				"version":           "1.0.0",
 				"id":                "test-sandbox",
 				"ref":               "sandbox.json",
 				"status":            "active",
@@ -1308,6 +1329,7 @@ func TestVerifyFailsWhenDeprecatedRuntimeCompatWindowHasExpired(t *testing.T) {
 		"entries": []map[string]any{
 			{
 				"kind":              "policyPack",
+				"version":           "1.0.0",
 				"id":                "test-pack",
 				"ref":               "pack.yaml",
 				"status":            "active",
@@ -1322,6 +1344,7 @@ func TestVerifyFailsWhenDeprecatedRuntimeCompatWindowHasExpired(t *testing.T) {
 			},
 			{
 				"kind":              "runtimeProfile",
+				"version":           "1.0.0",
 				"id":                "test-runtime",
 				"ref":               "runtime.json",
 				"status":            "deprecated",
@@ -1336,6 +1359,7 @@ func TestVerifyFailsWhenDeprecatedRuntimeCompatWindowHasExpired(t *testing.T) {
 			},
 			{
 				"kind":              "sandboxProfile",
+				"version":           "1.0.0",
 				"id":                "test-sandbox",
 				"ref":               "sandbox.json",
 				"status":            "active",
@@ -1373,6 +1397,7 @@ func TestVerifyFailsWhenDeprecatedSandboxCompatWindowHasExpired(t *testing.T) {
 		"entries": []map[string]any{
 			{
 				"kind":              "policyPack",
+				"version":           "1.0.0",
 				"id":                "test-pack",
 				"ref":               "pack.yaml",
 				"status":            "active",
@@ -1387,6 +1412,7 @@ func TestVerifyFailsWhenDeprecatedSandboxCompatWindowHasExpired(t *testing.T) {
 			},
 			{
 				"kind":              "runtimeProfile",
+				"version":           "1.0.0",
 				"id":                "test-runtime",
 				"ref":               "runtime.json",
 				"status":            "active",
@@ -1401,6 +1427,7 @@ func TestVerifyFailsWhenDeprecatedSandboxCompatWindowHasExpired(t *testing.T) {
 			},
 			{
 				"kind":              "sandboxProfile",
+				"version":           "1.0.0",
 				"id":                "test-sandbox",
 				"ref":               "sandbox.json",
 				"status":            "deprecated",
@@ -1477,6 +1504,7 @@ plugins:
 		"entries": []map[string]any{
 			{
 				"kind":              "policyPack",
+				"version":           "1.0.0",
 				"id":                "test-pack",
 				"ref":               "pack.yaml",
 				"status":            "active",
@@ -1491,6 +1519,7 @@ plugins:
 			},
 			{
 				"kind":              "runtimeProfile",
+				"version":           "1.0.0",
 				"id":                "test-runtime",
 				"ref":               "runtime.json",
 				"status":            "active",
@@ -1505,6 +1534,7 @@ plugins:
 			},
 			{
 				"kind":              "sandboxProfile",
+				"version":           "1.0.0",
 				"id":                "test-sandbox",
 				"ref":               "sandbox.json",
 				"status":            "active",
@@ -1519,6 +1549,7 @@ plugins:
 			},
 			{
 				"kind":              "plugin",
+				"version":           "1.0.0",
 				"id":                "expired-plugin",
 				"ref":               "plugins/expired-plugin.json",
 				"status":            "deprecated",
@@ -1577,6 +1608,7 @@ func TestVerifyFailsClosedWhenContainerRuntimeAdapterIsMissing(t *testing.T) {
 		"entries": []map[string]any{
 			{
 				"kind":              "policyPack",
+				"version":           "1.0.0",
 				"id":                "test-pack",
 				"ref":               "pack.yaml",
 				"status":            "active",
@@ -1591,6 +1623,7 @@ func TestVerifyFailsClosedWhenContainerRuntimeAdapterIsMissing(t *testing.T) {
 			},
 			{
 				"kind":              "runtimeProfile",
+				"version":           "1.0.0",
 				"id":                "test-runtime",
 				"ref":               "runtime.json",
 				"status":            "active",
@@ -1605,6 +1638,7 @@ func TestVerifyFailsClosedWhenContainerRuntimeAdapterIsMissing(t *testing.T) {
 			},
 			{
 				"kind":              "sandboxProfile",
+				"version":           "1.0.0",
 				"id":                "test-sandbox",
 				"ref":               "sandbox.json",
 				"status":            "active",
@@ -1673,6 +1707,7 @@ func TestVerifyUsesContainerRuntimeAdapterExecution(t *testing.T) {
 		"entries": []map[string]any{
 			{
 				"kind":              "policyPack",
+				"version":           "1.0.0",
 				"id":                "test-pack",
 				"ref":               "pack.yaml",
 				"status":            "active",
@@ -1687,6 +1722,7 @@ func TestVerifyUsesContainerRuntimeAdapterExecution(t *testing.T) {
 			},
 			{
 				"kind":              "runtimeProfile",
+				"version":           "1.0.0",
 				"id":                "test-runtime",
 				"ref":               "runtime.json",
 				"status":            "active",
@@ -1701,6 +1737,7 @@ func TestVerifyUsesContainerRuntimeAdapterExecution(t *testing.T) {
 			},
 			{
 				"kind":              "sandboxProfile",
+				"version":           "1.0.0",
 				"id":                "test-sandbox",
 				"ref":               "sandbox.json",
 				"status":            "active",
@@ -1716,7 +1753,7 @@ func TestVerifyUsesContainerRuntimeAdapterExecution(t *testing.T) {
 		},
 	})
 
-	adapter := writeRuntimeAdapterScript(t, repo, `{"exitCode":0,"stdout":"[]\n","stderr":"","observedChecks":["cgroup-fenced","mount-namespace","namespace-proof-hash","network-namespace","pid-namespace","seccomp-active"],"namespaceProofHash":"sha256:test","namespaceProofs":[{"namespace":"pid","selfDescriptor":"pid:[2]","initDescriptor":"pid:[1]","matchesInit":false}],"backendEvidence":{"cgroupVersion":"v2"}}`)
+	adapter := writeRuntimeAdapterScript(t, repo, `{"exitCode":0,"stdout":"{\"violations\":[],\"executedRules\":[]}\n","stderr":"","observedChecks":["cgroup-fenced","mount-namespace","namespace-proof-hash","network-namespace","pid-namespace","seccomp-active"],"namespaceProofHash":"sha256:test","namespaceProofs":[{"namespace":"pid","selfDescriptor":"pid:[2]","initDescriptor":"pid:[1]","matchesInit":false}],"backendEvidence":{"cgroupVersion":"v2"}}`)
 	cmd := exec.Command(bin, "verify", "--run-id", "container-runtime-exec", "--out", outDir)
 	cmd.Dir = repo
 	cmd.Env = append(os.Environ(), "CADENCE_SANDBOX_CONTAINER_ADAPTER="+adapter)
@@ -1783,6 +1820,7 @@ func TestVerifyUsesMicrovmRuntimeAdapterExecution(t *testing.T) {
 		"entries": []map[string]any{
 			{
 				"kind":              "policyPack",
+				"version":           "1.0.0",
 				"id":                "test-pack",
 				"ref":               "pack.yaml",
 				"status":            "active",
@@ -1797,6 +1835,7 @@ func TestVerifyUsesMicrovmRuntimeAdapterExecution(t *testing.T) {
 			},
 			{
 				"kind":              "runtimeProfile",
+				"version":           "1.0.0",
 				"id":                "test-runtime",
 				"ref":               "runtime.json",
 				"status":            "active",
@@ -1811,6 +1850,7 @@ func TestVerifyUsesMicrovmRuntimeAdapterExecution(t *testing.T) {
 			},
 			{
 				"kind":              "sandboxProfile",
+				"version":           "1.0.0",
 				"id":                "test-sandbox",
 				"ref":               "sandbox.json",
 				"status":            "active",
@@ -1826,7 +1866,7 @@ func TestVerifyUsesMicrovmRuntimeAdapterExecution(t *testing.T) {
 		},
 	})
 
-	adapter := writeRuntimeAdapterScript(t, repo, `{"exitCode":0,"stdout":"[]\n","stderr":"","observedChecks":["cgroup-fenced","mount-namespace","namespace-proof-hash","network-namespace","pid-namespace","seccomp-active"],"namespaceProofHash":"sha256:microvm","namespaceProofs":[{"namespace":"mnt","selfDescriptor":"mnt:[2]","initDescriptor":"mnt:[1]","matchesInit":false}],"backendEvidence":{"cgroupVersion":"v2"}}`)
+	adapter := writeRuntimeAdapterScript(t, repo, `{"exitCode":0,"stdout":"{\"violations\":[],\"executedRules\":[]}\n","stderr":"","observedChecks":["cgroup-fenced","mount-namespace","namespace-proof-hash","network-namespace","pid-namespace","seccomp-active"],"namespaceProofHash":"sha256:microvm","namespaceProofs":[{"namespace":"mnt","selfDescriptor":"mnt:[2]","initDescriptor":"mnt:[1]","matchesInit":false}],"backendEvidence":{"cgroupVersion":"v2"}}`)
 	cmd := exec.Command(bin, "verify", "--run-id", "microvm-runtime-exec", "--out", outDir)
 	cmd.Dir = repo
 	cmd.Env = append(os.Environ(), "CADENCE_SANDBOX_MICROVM_ADAPTER="+adapter)
@@ -1993,6 +2033,7 @@ func TestVerifyFailsClosedWhenContainerRuntimeProofIsInvalid(t *testing.T) {
 		"entries": []map[string]any{
 			{
 				"kind":              "policyPack",
+				"version":           "1.0.0",
 				"id":                "test-pack",
 				"ref":               "pack.yaml",
 				"status":            "active",
@@ -2007,6 +2048,7 @@ func TestVerifyFailsClosedWhenContainerRuntimeProofIsInvalid(t *testing.T) {
 			},
 			{
 				"kind":              "runtimeProfile",
+				"version":           "1.0.0",
 				"id":                "test-runtime",
 				"ref":               "runtime.json",
 				"status":            "active",
@@ -2021,6 +2063,7 @@ func TestVerifyFailsClosedWhenContainerRuntimeProofIsInvalid(t *testing.T) {
 			},
 			{
 				"kind":              "sandboxProfile",
+				"version":           "1.0.0",
 				"id":                "test-sandbox",
 				"ref":               "sandbox.json",
 				"status":            "active",

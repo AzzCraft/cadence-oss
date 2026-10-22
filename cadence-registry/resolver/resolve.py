@@ -9,8 +9,8 @@ from __future__ import annotations
 import hashlib
 import json
 import re
-from dataclasses import dataclass, field
-from datetime import date, datetime
+from dataclasses import dataclass, field, fields
+from datetime import date, datetime, timezone
 from pathlib import Path
 from typing import Any
 
@@ -23,6 +23,25 @@ ALLOWED_KINDS = {"plugin", "policyPack", "runtimeProfile", "sandboxProfile"}
 ALLOWED_STATUSES = {"active", "deprecated", "removed"}
 
 
+def _closed_fields(cls, data):
+    allowed = {item.name for item in fields(cls)}
+    if not isinstance(data, dict) or set(data) != allowed:
+        raise ValueError(f"{cls.__name__} has missing, unknown or incorrectly cased fields")
+
+
+def _unique_members(pairs):
+    result = {}
+    for key, value in pairs:
+        if key in result:
+            raise ValueError("duplicate decoded registry field")
+        result[key] = value
+    return result
+
+
+def _invalid_constant(value):
+    raise ValueError("invalid JSON constant in registry")
+
+
 @dataclass
 class Trust:
     signer: str = ""
@@ -32,8 +51,7 @@ class Trust:
     def from_dict(cls, data: dict[str, Any] | None) -> Trust | None:
         if data is None:
             return None
-        if not isinstance(data, dict):
-            raise ValueError("trust must be an object")
+        _closed_fields(cls, data)
         return cls(signer=data.get("signer", ""), allowlisted=data.get("allowlisted", False))
 
 
@@ -52,8 +70,7 @@ class Entry:
 
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> Entry:
-        if not isinstance(data, dict):
-            raise ValueError("registry entry must be an object")
+        _closed_fields(cls, data)
         return cls(
             kind=data.get("kind", ""),
             id=data.get("id", ""),
@@ -83,7 +100,8 @@ class Registry:
 
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> Registry:
-        if not isinstance(data, dict) or not isinstance(data.get("entries"), list):
+        _closed_fields(cls, data)
+        if not isinstance(data.get("entries"), list):
             raise ValueError("registry must be an object with an entries array")
         return cls(
             schemaVersion=data.get("schemaVersion", ""),
@@ -94,8 +112,14 @@ class Registry:
 
 def load(path: str | Path) -> Registry:
     """Load a registry from a JSON file."""
-    data = json.loads(Path(path).read_text(encoding="utf-8"))
-    return Registry.from_dict(data)
+    from .validate import validate
+    data = json.loads(Path(path).read_text(encoding="utf-8"),
+                      object_pairs_hook=_unique_members, parse_constant=_invalid_constant)
+    registry = Registry.from_dict(data)
+    errors = validate(registry)
+    if errors:
+        raise ValueError("; ".join(errors))
+    return registry
 
 
 def lookup(registry: Registry, kind: str, entry_id: str) -> Entry:
@@ -173,7 +197,7 @@ def resolve_entry(
     if errors:
         raise ValueError("; ".join(errors))
     entry = lookup(registry, kind, entry_id)
-    return _resolve_entry(Path(registry_path), entry, reference_date or date.today())
+    return _resolve_entry(Path(registry_path), entry, reference_date or datetime.now(timezone.utc).date())
 
 
 def _resolve_entry(

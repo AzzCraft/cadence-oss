@@ -81,3 +81,22 @@ spelling emitted by JCS for a finite number, so canonical output can be read
 again. Integers that would silently round are rejected. Typed protocol fields
 that require safe integers retain their narrower bounds; this does not change
 those schemas or authorize a wider currency/budget range.
+
+### Scan and report boundaries
+
+`scan --json` retains its violation-array response. Internal verification uses
+`scan --json --with-rule-trace` to obtain the actual executed built-in rule IDs;
+`report-summary.json` counts those unique IDs as `rulesEvaluated`. Findings and
+plugin counts are separate and cannot substitute for executed-rule coverage.
+
+The project root is always scanned regardless of its basename. The built-in
+JavaScript/TypeScript deep-import check recognizes multiline/static imports,
+side-effect imports and named re-exports while excluding comments and string
+contents; it is not a whole-program module resolver. The Python plugin parses
+Python syntax, including multiple imports on one line.
+
+The exact bytes of a selected external baseline affect configuration/input
+identity. Secret fingerprints also bind a digest of the matched source line;
+a changed credential cannot inherit the old line's suppression. Existing
+baseline JSON is not rewritten automatically; review and regenerate it using
+`adopt` when changing the supported scanner version.

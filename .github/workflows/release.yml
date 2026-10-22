@@ -601,6 +601,7 @@ jobs:
               raise SystemExit('protected derived asset identity or bytes differ')
           for name,data in [(filename,payload),('tool-build-binding.json',raw)]:
               with (dest/name).open('xb') as f:f.write(data)
+              (dest/name).chmod(0o755 if name == filename else 0o644)
           PY
           (
             cd "$ARTIFACT_DIR"

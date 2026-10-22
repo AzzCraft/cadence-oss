@@ -31,6 +31,9 @@ Status semantics:
 - `active`: `deprecatedAt` and `deprecationReason` MUST be `null`; `compatWindow` is still required (`current` by default).
 - `active`: `compatWindow` MUST be `current`.
 - `deprecated` / `removed`: `deprecatedAt`, `deprecationReason`, and `compatWindow` MUST be non-empty, and `compatWindow` MUST be bounded (`until ...` or `from ... to ...`).
+- `deprecatedAt` is an RFC3339 timestamp whose UTC date falls within that window.
+  Date-only or timezone-free values are invalid. Window endpoints are inclusive
+  UTC dates; an omitted resolution date uses the current UTC date in both readers.
 
 Compat window format is constrained to one of:
 

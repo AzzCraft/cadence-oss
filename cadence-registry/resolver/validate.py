@@ -7,7 +7,8 @@ and ValidateIntegrity() semantics.
 from __future__ import annotations
 
 import json
-from datetime import date, datetime
+import re
+from datetime import date, datetime, timezone
 from pathlib import Path
 from typing import Any
 
@@ -74,6 +75,7 @@ def validate(registry: Registry) -> list[str]:
         elif not SHA256_RE.match(entry.digest):
             errors.append(f"{prefix}: digest must be sha256:..., got {entry.digest!r}")
 
+        policy = None
         if not entry.compatWindow.strip():
             errors.append(f"{prefix}: compatWindow is required")
         else:
@@ -99,13 +101,24 @@ def validate(registry: Registry) -> list[str]:
 
         # Deprecation consistency
         if entry.status == "active":
-            if entry.deprecatedAt is not None and entry.deprecatedAt.strip():
+            if entry.deprecatedAt is not None:
                 errors.append(f"{prefix}: active status requires deprecatedAt=null")
-            if entry.deprecationReason is not None and entry.deprecationReason.strip():
+            if entry.deprecationReason is not None:
                 errors.append(f"{prefix}: active status requires deprecationReason=null")
         elif entry.status in ("deprecated", "removed"):
             if not entry.deprecatedAt or not entry.deprecatedAt.strip():
                 errors.append(f"{prefix}: {entry.status} status requires deprecatedAt")
+            else:
+                try:
+                    raw = entry.deprecatedAt.strip()
+                    if not re.fullmatch(r"\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:[.,]\d+)?(?:Z|[+-]\d{2}:\d{2})", raw):
+                        raise ValueError("RFC3339 timestamp required")
+                    deprecated_date = datetime.fromisoformat(raw.replace("Z", "+00:00")).astimezone(timezone.utc).date()
+                except ValueError:
+                    errors.append(f"{prefix}: invalid deprecatedAt timestamp")
+                else:
+                    if policy is not None and not policy.contains(deprecated_date):
+                        errors.append(f"{prefix}: deprecatedAt falls outside compatWindow")
             if not entry.deprecationReason or not entry.deprecationReason.strip():
                 errors.append(f"{prefix}: {entry.status} status requires deprecationReason")
 
@@ -197,7 +210,7 @@ def check_deprecation_gates(
     compat window has expired.
     """
     messages: list[str] = []
-    ref = reference_date or date.today()
+    ref = reference_date or datetime.now(timezone.utc).date()
 
     for entry in registry.entries:
         if entry.status == "deprecated":

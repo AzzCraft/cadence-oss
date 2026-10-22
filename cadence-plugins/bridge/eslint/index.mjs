@@ -25,7 +25,7 @@ function readStdin() {
 }
 
 function stableSort(items, keyFn) {
-  return [...items].sort((a, b) => keyFn(a).localeCompare(keyFn(b)));
+  return [...items].sort((a, b) => (keyFn(a) < keyFn(b) ? -1 : keyFn(a) > keyFn(b) ? 1 : 0));
 }
 
 function scan(content) {

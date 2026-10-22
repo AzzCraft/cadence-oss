@@ -2,6 +2,7 @@ package baseline
 
 import (
 	"bytes"
+	"crypto/sha256"
 	"encoding/json"
 	"fmt"
 	"github.com/AzzCraft/cadence-oss/cadence-core/internal/exactjson"
@@ -19,25 +20,31 @@ type Baseline struct {
 }
 
 func Load(path string) (Baseline, error) {
+	b, _, err := LoadWithDigest(path)
+	return b, err
+}
+
+// LoadWithDigest binds the exact bytes consumed, including external baselines.
+func LoadWithDigest(path string) (Baseline, string, error) {
 	b := Baseline{SchemaVersion: "1.0.0", Fingerprints: []string{}}
 	data, err := os.ReadFile(path)
 	if err != nil {
-		return b, err
+		return b, "", err
 	}
 	parsed, err := exactjson.Parse(data)
 	if err != nil {
-		return b, err
+		return b, "", err
 	}
 	object, ok := parsed.(map[string]any)
 	if !ok || object["schemaVersion"] != "1.0.0" || object["fingerprints"] == nil {
-		return b, fmt.Errorf("invalid baseline object")
+		return b, "", fmt.Errorf("invalid baseline object")
 	}
 	decoder := json.NewDecoder(bytes.NewReader(data))
 	decoder.DisallowUnknownFields()
 	if err := decoder.Decode(&b); err != nil {
-		return b, err
+		return b, "", err
 	}
-	return b, nil
+	return b, fmt.Sprintf("sha256:%x", sha256.Sum256(data)), nil
 }
 
 func Save(path string, violations []checks.Violation) error {

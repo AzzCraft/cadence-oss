@@ -110,7 +110,31 @@ ui:
                 },
             )
             write_text(repo / "sandbox.json", "{}")
-            write_json(repo / "suite_lock.json", {"schemaVersion": "1.0.0"})
+            suite_lock = {
+                "schemaVersion": "1.0.0",
+                "suiteId": "hermetic-test-suite",
+                "suiteVersion": "1.0.0",
+                "standardManifestVersion": "1.4.0",
+                "syncMode": "locked",
+                "allowCloneTip": False,
+                "defaultOverridePolicy": "forbidden",
+                "modules": {
+                    "standard": {
+                        "role": "standard_repo",
+                        "lockedRef": {
+                            "kind": "git",
+                            "uri": "https://example.invalid/das-standard.git",
+                            "pinType": "commit",
+                            "pinValue": "1" * 40,
+                            "floating": False,
+                        },
+                        "required": True,
+                        "overridePolicy": "forbidden",
+                        "allowedLocalState": ["present_locked_match"],
+                    },
+                },
+            }
+            write_json(repo / "suite_lock.json", suite_lock)
             write_json(
                 repo / "suite_version_closure.json",
                 {
@@ -226,6 +250,16 @@ ui:
             )
             self.assertEqual(doctor_proc.returncode, 0, "clean-room trimpath doctor failed\n" + doctor_proc.stdout)
             self.assertIn("status: OK", doctor_proc.stdout)
+
+            # The embedded lock schema must also remain active without a checkout.
+            suite_lock.pop("suiteId")
+            write_json(repo / "suite_lock.json", suite_lock)
+            rejected = subprocess.run(
+                [str(binary), "doctor", "--lock=false"], cwd=repo, env=env,
+                stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, timeout=120,
+            )
+            self.assertNotEqual(rejected.returncode, 0)
+            self.assertIn("suiteId", rejected.stdout)
 
 
 if __name__ == "__main__":

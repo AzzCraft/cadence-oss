@@ -451,6 +451,107 @@ class ResolverCLITests(unittest.TestCase):
 
 
 class RegistryCLIContractTests(unittest.TestCase):
+    def test_cli_rejects_ambiguous_wire_fields(self):
+        import subprocess
+        from tempfile import TemporaryDirectory
+        raw = '{"schemaVersion":"1.0.0","registryId":"TEST","entries":[{"kind":"plugin","id":"TEST","version":"1.0.0","ref":"TEST.py","status":"active","digest":"sha256:' + '1' * 64 + '","compatWindow":"current","deprecatedAt":null,"deprecationReason":null,"trust":{"signer":"TEST","allowlisted":true}}]}'
+        defects = [
+            ('"version":', '"Version":'),
+            ('"version":"1.0.0"', '"version":"1.0.0","Version":"2.0.0"'),
+            ('"registryId":', '"RegistryId":'),
+            ('"schemaVersion":"1.0.0",', ''),
+            ('"schemaVersion":"1.0.0"', '"schemaVersion":null'),
+            ('"schemaVersion":"1.0.0"', '"schemaVersion":" "'),
+            ('"signer":', '"Signer":'),
+            ('"allowlisted":true', '"allowlisted":null'),
+            (',"allowlisted":true', ''),
+            ('"allowlisted":true', '"allowlisted":"false"'),
+            ('"id":"TEST"', '"id":"TEST","unknown":true'),
+            ('"id":"TEST"', '"id":"TEST","\\u0069d":"other"'),
+            (raw, '{"schemaVersion":"1.0.0","registryId":"TEST","entries":null}'),
+        ]
+        with TemporaryDirectory(prefix='cadence-registry-wire-') as directory:
+            path = Path(directory) / 'registry.json'
+            def invoke(text):
+                path.write_text(text)
+                return subprocess.run([sys.executable, '-m', 'resolver.cli', 'validate', '--registry', str(path)], cwd=ROOT, text=True, capture_output=True)
+            for old, new in defects:
+                with self.subTest(field=old):
+                    result = invoke(raw.replace(old, new, 1))
+                    self.assertNotEqual(result.returncode, 0, result.stdout)
+                    self.assertIn('ERROR:', result.stderr)
+                    self.assertNotIn('Traceback', result.stderr)
+            for text in (raw, raw.replace('"allowlisted":true', '"allowlisted":false'), '{"schemaVersion":"1.0.0","registryId":"TEST","entries":[]}'):
+                result = invoke(text)
+                self.assertEqual(result.returncode, 0, result.stderr)
+
+    def test_cli_deprecation_contract(self):
+        import copy
+        import subprocess
+        from tempfile import TemporaryDirectory
+        with TemporaryDirectory(prefix="cadence-registry-dates-") as directory:
+            root = Path(directory)
+            target = root / "TEST.py"
+            target.write_text("# TEST artifact\n")
+            entry = {"kind": "plugin", "id": "TEST", "version": "1.0.0",
+                     "ref": target.name, "status": "active", "digest": _file_digest(target),
+                     "compatWindow": "current", "deprecatedAt": None, "deprecationReason": None,
+                     "trust": {"signer": "TEST", "allowlisted": True}}
+            variants = [("active", {}, (), True),
+                        ("missing-date", {}, ("deprecatedAt",), False),
+                        ("missing-reason", {}, ("deprecationReason",), False),
+                        ("empty-date", {"deprecatedAt": ""}, (), False),
+                        ("blank-reason", {"deprecationReason": " "}, (), False)]
+            for timestamp, valid in (("2020-01-01T00:00:00Z", True),
+                                     ("2021-01-01T01:00:00+02:00", True),
+                                     ("not-a-date", False), ("2020-01-01", False),
+                                     ("2020-01-01T00:00:00", False),
+                                     ("2021-01-01T00:00:00Z", False)):
+                variants.append((timestamp, {"status": "deprecated", "deprecatedAt": timestamp,
+                    "deprecationReason": "retired", "compatWindow": "until 2020-12-31"}, (), valid))
+            path = root / "registry.json"
+            for name, changes, omitted, valid in variants:
+                item = copy.deepcopy(entry)
+                item.update(changes)
+                for field in omitted:
+                    del item[field]
+                path.write_text(json.dumps({"schemaVersion": "1.0.0", "registryId": "TEST", "entries": [item]}))
+                for command in (("validate",), ("resolve", "plugin", "TEST", "--date", "2020-06-01")):
+                    with self.subTest(case=name, command=command[0]):
+                        result = subprocess.run([sys.executable, "-m", "resolver.cli", *command, "--registry", str(path)], cwd=ROOT, text=True, capture_output=True)
+                        self.assertEqual(result.returncode == 0, valid, result.stdout + result.stderr)
+                        self.assertNotIn("Traceback", result.stderr)
+
+    def test_default_reference_date_uses_utc(self):
+        from datetime import datetime, timezone
+        from tempfile import TemporaryDirectory
+        from unittest.mock import patch
+        from resolver import resolve, validate
+        class BoundaryDate(date):
+            @classmethod
+            def today(cls):
+                return cls(2021, 1, 1)  # Host has crossed midnight; UTC has not.
+        class BoundaryTime(datetime):
+            @classmethod
+            def now(cls, tz=None):
+                fixed = cls(2020, 12, 31, 23, 30, tzinfo=timezone.utc)
+                return fixed.astimezone(tz) if tz else cls(2021, 1, 1, 1, 30)
+        with TemporaryDirectory(prefix="cadence-registry-utc-") as directory:
+            target = Path(directory) / "TEST.py"
+            target.write_text("# TEST artifact\n")
+            entry = resolve.Entry(kind="plugin", id="TEST", ref=target.name, version="1.0.0",
+                status="deprecated", digest=_file_digest(target), compatWindow="until 2020-12-31",
+                deprecatedAt="2020-01-01T00:00:00Z", deprecationReason="retired",
+                trust=resolve.Trust(signer="TEST", allowlisted=True))
+            registry = resolve.Registry(schemaVersion="1.0.0", registryId="TEST", entries=[entry])
+            with patch.object(resolve, "date", BoundaryDate), patch.object(resolve, "datetime", BoundaryTime), \
+                    patch.object(validate, "date", BoundaryDate), patch.object(validate, "datetime", BoundaryTime):
+                with self.subTest(consumer="resolve"):
+                    result = resolve.resolve_entry(target.parent / "registry.json", registry, "plugin", "TEST")
+                    self.assertEqual(result.entry.id, "TEST")
+                with self.subTest(consumer="deprecation-gate"):
+                    self.assertFalse(any(message.startswith("ERROR:") for message in validate.check_deprecation_gates(registry)))
+
     def test_cli_resolve_enforces_structure_and_default_reference_date(self):
         from tempfile import TemporaryDirectory
         directory = TemporaryDirectory()
@@ -487,7 +588,7 @@ class RegistryCLIContractTests(unittest.TestCase):
                 self.assertIn("ERROR:", result.stderr, (defect, command, result))
                 self.assertNotIn("Traceback", result.stderr)
         expired = copy.deepcopy(original)
-        expired["entries"][0].update(status="deprecated", deprecatedAt="2020-01-01", deprecationReason="retired", compatWindow="until 2020-12-31")
+        expired["entries"][0].update(status="deprecated", deprecatedAt="2020-01-01T00:00:00Z", deprecationReason="retired", compatWindow="until 2020-12-31")
         self.assertEqual(invoke(expired, "validate").returncode, 0)
         self.assertNotEqual(invoke(expired).returncode, 0)
         self.assertNotEqual(invoke(expired, "resolve", "--date", date.today().isoformat()).returncode, 0)

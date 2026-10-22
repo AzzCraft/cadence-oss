@@ -82,7 +82,7 @@ func httpCoverageProbe(value any) (any, error) {
 		id, idOK := row["operationId"].(string)
 		method, methodOK := row["method"].(string)
 		path, pathOK := row["path"].(string)
-		if !idOK || !methodOK || !pathOK || len(id) > 128 || len(method) > 16 || len(path) > 2048 {
+		if !idOK || !methodOK || !pathOK || !httpinventory.ValidOperationID(id) || len(method) > 16 || len(path) > 2048 {
 			return nil, errors.New("invalid HTTP baseline fields")
 		}
 		baseline = append(baseline, httpinventory.Identity{OperationID: id, Route: httpinventory.Route{Method: method, Path: path}})
