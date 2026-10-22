@@ -21,6 +21,32 @@ import (
 //go:embed config.schema.json
 var embeddedConfigSchema []byte
 
+//go:embed suite_version_closure.schema.json
+var closureSchema []byte
+
+//go:embed suite_lock.schema.json
+var suiteLockSchema []byte
+
+func validateStandardSchema(data map[string]any, raw []byte, context string) error {
+	compiler := jsonschema.NewCompiler()
+	compiler.Draft = jsonschema.Draft2020
+	compiler.AssertFormat = true
+	compiler.LoadURL = func(string) (io.ReadCloser, error) {
+		return nil, errors.New("external Standard schema loading forbidden")
+	}
+	if err := compiler.AddResource("embedded://standard.json", bytes.NewReader(raw)); err != nil {
+		return err
+	}
+	schema, err := compiler.Compile("embedded://standard.json")
+	if err != nil {
+		return err
+	}
+	if err := schema.Validate(data); err != nil {
+		return fmt.Errorf("%s: Standard schema: %w", context, err)
+	}
+	return nil
+}
+
 const embeddedConfigSchemaID = "embedded://config.schema.json"
 
 // projectIDPattern enforces lowercase alphanumeric with hyphens, 3-64 chars.
@@ -573,6 +599,11 @@ func requireLocalFileRef(
 	if err != nil {
 		return err
 	}
+	if strings.HasSuffix(context, ".suiteLockRef") {
+		if err := validateStandardSchema(dec, suiteLockSchema, context); err != nil {
+			return err
+		}
+	}
 	for _, key := range expectedKeys {
 		if _, err := requireString(dec, key, context); err != nil {
 			return err
@@ -750,6 +781,9 @@ func sameStructuredRef(left any, right any) bool {
 func ValidateClosureRef(repoRoot string, closureRef string) error {
 	dec, err := loadJSONObject(repoRoot, closureRef, "closureRef")
 	if err != nil {
+		return err
+	}
+	if err := validateStandardSchema(dec, closureSchema, "closureRef"); err != nil {
 		return err
 	}
 	if err := rejectUnknownKeys(dec, map[string]struct{}{

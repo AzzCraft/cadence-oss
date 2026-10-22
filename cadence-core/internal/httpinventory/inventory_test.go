@@ -322,3 +322,21 @@ func TestSecurityReferenceDescriptions(t *testing.T) {
 		}
 	}
 }
+
+func TestOperationIDUsesUnicodeCharacters(t *testing.T) {
+	for _, character := range []string{"x", "中", "😀"} {
+		for _, count := range []int{60, 128, 129} {
+			id := strings.Repeat(character, count)
+			declaration, raw := sample(t, func(root map[string]any) {
+				root["paths"].(map[string]any)["/target"].(map[string]any)["get"].(map[string]any)["operationId"] = id
+			})
+			_, err := Normalize(declaration, raw)
+			if (err == nil) != (count <= 128) || ValidOperationID(id) != (count <= 128) {
+				t.Fatalf("%q length %d: %v", character, count, err)
+			}
+		}
+	}
+	if ValidOperationID(string([]byte{0xff})) {
+		t.Fatal("invalid UTF-8 accepted")
+	}
+}

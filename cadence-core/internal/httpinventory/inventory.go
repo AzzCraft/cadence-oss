@@ -14,6 +14,7 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"unicode/utf8"
 
 	"github.com/AzzCraft/cadence-oss/cadence-core/internal/exactjson"
 	"github.com/santhosh-tekuri/jsonschema/v5"
@@ -24,6 +25,12 @@ var declarationSchema []byte
 
 //go:embed http_inventory.schema.json
 var inventorySchema []byte
+
+// ValidOperationID matches the schema's Unicode character limit. Body and
+// document limits remain byte budgets and must not use this function.
+func ValidOperationID(id string) bool {
+	return id != "" && utf8.ValidString(id) && utf8.RuneCountInString(id) <= 128
+}
 
 func rejected() error {
 	return errors.New("http-inventory: unsupported, conflicting or incomplete declaration")
@@ -520,7 +527,7 @@ func Normalize(declaration any, originals map[string][]byte) (map[string]any, er
 				return nil, err
 			}
 			id, ok := op["operationId"].(string)
-			if !ok || id == "" || len(id) > 128 || ids[id] {
+			if !ok || !ValidOperationID(id) || ids[id] {
 				return nil, rejected()
 			}
 			ids[id] = true

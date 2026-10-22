@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import sys
 import os
 import shutil
 import subprocess
@@ -188,6 +189,21 @@ class ContractsHubRemediationSpecTests(unittest.TestCase):
                     self.assertNotEqual(run(Path(temp)).returncode,0)
                 fixture.write_bytes(original)
                 good=run(scratch,main=True);self.assertEqual(good.returncode,0,good.stdout+good.stderr)
+
+    def test_job_manifest_run_id_must_match_even_with_same_hash(self):
+        with tempfile.TemporaryDirectory() as temp:
+            target = Path(temp) / 'contracts'
+            shutil.copytree(ROOT/'contracts', target)
+            runner = target/'scripts/verify.py'
+            positive = subprocess.run([sys.executable, str(runner)], text=True, capture_output=True)
+            self.assertEqual(positive.returncode, 0, positive.stdout + positive.stderr)
+            path = next((target/'fixtures/job_envelope/valid').glob('*.json'))
+            value = json.loads(path.read_text())
+            value['runs'][0]['manifestRef']['runId'] = 'TEST-different-run'
+            path.write_text(json.dumps(value))
+            negative = subprocess.run([sys.executable, str(runner)], text=True, capture_output=True)
+            self.assertNotEqual(negative.returncode, 0)
+            self.assertIn('manifest refs must match', negative.stderr)
 
     def test_cht_001_verify_script_mentions_bootstrap(self) -> None:
         text = (ROOT / "scripts" / "verify").read_text(encoding="utf-8")

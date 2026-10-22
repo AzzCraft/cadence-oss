@@ -1730,3 +1730,39 @@ func TestEveryCrossRepoChangeAndIndependentDeploymentKeepsOriginalTrigger(t *tes
 		t.Fatal("unknown draft status became a validation exemption")
 	}
 }
+
+func TestProductAdoptionDoesNotDependOnPublishingTheStandard(t *testing.T) {
+	input := leafRequest(t)
+	ids := []string{"specific-product-adoption-still-separate", "adoption-actor-artifact-deployment-target-facts-policy-scope-time-binding", "adoption-qualified-scope-time-not-permanent-trust", "control-affecting-drift-stops-related-actions-reanalysis-reverification", "every-new-action-current-authority"}
+	for _, value := range []bool{true, false} {
+		setFacts(input, map[string]any{"activity.standard_release": false, "activity.product_adoption": value, "activity.package_activation": false, "activity.continued_operation": false, "activity.protected_action": value})
+		states := leafStates(t, input)
+		expected := "false"
+		if value {
+			expected = "true"
+		}
+		for _, suffix := range ids {
+			if states["das.governance.verification-release.s19."+suffix] != expected {
+				t.Fatalf("%s: want %s got %s", suffix, expected, states["das.governance.verification-release.s19."+suffix])
+			}
+		}
+		if states["das.governance.verification-release.s21.project-final-package-real-deployment-limited-adoption-continued-current-controls"] != expected {
+			t.Fatal("final adoption scope changed")
+		}
+		if states["das.governance.verification-release.s19.offline-full-body-modules-schemas-fixtures-migration-coverage-view-package"] != "false" {
+			t.Fatal("publisher duty leaked")
+		}
+	}
+	setFacts(input, map[string]any{"activity.standard_release": false})
+	if leafStates(t, input)["das.governance.verification-release.s19.adoption-qualified-scope-time-not-permanent-trust"] != "unknown" {
+		t.Fatal("missing adoption fact was defaulted")
+	}
+}
+
+func TestCurrentPreviewBindsBothCatalogs(t *testing.T) {
+	input := leafRequest(t)
+	input["catalog"].(map[string]any)["modules"].([]any)[0].(map[string]any)["title"] = "Changed display title"
+	if _, err := Preview(input); err == nil || !strings.Contains(err.Error(), "module catalog identity") {
+		t.Fatalf("unpinned module catalog accepted: %v", err)
+	}
+}

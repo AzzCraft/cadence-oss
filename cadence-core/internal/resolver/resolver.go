@@ -323,6 +323,10 @@ func Preview(input any) (map[string]any, error) {
 	// its fragments; runtime binding cannot itself approve policy or facts.
 	leaves := map[string]map[string]any{}
 	if v2 || v3 {
+		moduleDigest, err := exactjson.Digest(catalog)
+		if v3 && (err != nil || moduleDigest != supportedModuleDigest) {
+			return nil, errors.New("resolver: unsupported module catalog identity")
+		}
 		requirements := request["requirementsCatalog"].(map[string]any)
 		// The old closed v2 output promises incomplete mapping. Never emit a
 		// complete catalog through that identity, or infer support from a version

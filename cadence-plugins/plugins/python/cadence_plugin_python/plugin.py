@@ -14,6 +14,7 @@ Design goals:
 - zero third-party dependencies
 """
 
+import ast
 import json
 import os
 import re
@@ -25,19 +26,13 @@ def stable_sorted(items, key):
 
 def scan_imports(text: str):
     violations = []
-    lines = text.splitlines()
-    for idx, line in enumerate(lines, start=1):
-        m = re.search(r"^\s*(from\s+([\w\.]+)\s+import|import\s+([\w\.]+))", line)
-        if not m:
-            continue
-        mod = m.group(2) or m.group(3) or ""
-        if ".internal." in mod or mod.endswith(".internal") or ".src." in mod or mod.endswith(".src"):
-            violations.append({
-                "ruleId": "SDMM_DEEP_IMPORT",
-                "severity": "P1",
-                "message": f"Deep import detected: {mod}",
-                "line": idx,
-            })
+    tree = ast.parse(text)
+    for node in ast.walk(tree):
+        modules = [alias.name for alias in node.names] if isinstance(node, ast.Import) else ([node.module or ""] if isinstance(node, ast.ImportFrom) else [])
+        for mod in modules:
+            if ".internal." in mod or mod.endswith(".internal") or ".src." in mod or mod.endswith(".src"):
+                violations.append({"ruleId": "SDMM_DEEP_IMPORT", "severity": "P1",
+                                   "message": f"Deep import detected: {mod}", "line": node.lineno})
     return violations
 
 def build_ir(files):

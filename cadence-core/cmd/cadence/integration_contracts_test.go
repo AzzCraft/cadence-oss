@@ -5,6 +5,7 @@ import (
 	"encoding/base64"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/AzzCraft/cadence-oss/cadence-core/internal/exactjson"
@@ -165,5 +166,34 @@ func TestHTTPCoverageProbeUsesIndependentInputs(t *testing.T) {
 				t.Fatal(r)
 			}
 		})
+	}
+}
+
+func TestHTTPCoverageUsesUnicodeOperationIDLimit(t *testing.T) {
+	raw, err := os.ReadFile(filepath.Join("..", "..", "..", "cadence-protocol", "fixtures", "das_v1_5", "valid", "http_inventory.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, character := range []string{"x", "中", "😀"} {
+		for _, length := range []int{128, 129} {
+			value, err := exactjson.Parse(raw)
+			if err != nil {
+				t.Fatal(err)
+			}
+			inventory := value.(map[string]any)
+			operations := inventory["operations"].([]any)
+			if len(operations) != 1 {
+				t.Fatal("expected fixed single-operation fixture")
+			}
+			operation := operations[0].(map[string]any)
+			id := strings.Repeat(character, length)
+			operation["operationId"] = id
+			route := map[string]any{"method": operation["method"], "path": operation["path"]}
+			probe := map[string]any{"inventory": inventory, "baseline": []any{map[string]any{"operationId": id, "method": operation["method"], "path": operation["path"]}}, "observed": []any{route}, "observationComplete": true}
+			_, err = httpCoverageProbe(probe)
+			if (err == nil) != (length <= 128) {
+				t.Fatalf("%s/%d: %v", character, length, err)
+			}
+		}
 	}
 }

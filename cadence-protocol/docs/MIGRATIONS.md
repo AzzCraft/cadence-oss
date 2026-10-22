@@ -33,22 +33,28 @@ Migration work in this pass is naming-compatible rather than payload-breaking. T
 
 ## Migration Mechanism
 
-### Forward Migration (v1 -> v2)
+### Implemented conversion
 
-1. A migration function is registered for each `(fromVersion, toVersion)` pair.
-2. When a reader encounters an artifact with an older schema version:
-   - it applies the migration chain in order,
-   - validates the migrated artifact against the target schema,
-   - preserves the original artifact unchanged on disk.
+`tools/migrate.py` selects one of four explicit legacy kinds. It accepts the
+retained 0.9.0 fixtures (or the documented unversioned RunManifest) and the
+current 1.0.0 identity; other source identities are rejected. The result is
+explicitly labelled 1.0.0 and validated before an output file is written.
+There is no automatic multi-version migration chain.
 
 ### Backward Compatibility Window
 
-Each major version maintains backward-read compatibility for **N-1** major versions:
+The three retained RunManifest, PipelineResult and EvidenceBundle examples
+have enough information for the current conversion. The retained legacy
+JobEnvelope lacks required timestamps and profile/side-effect provenance,
+including run start/end times. Its CLI conversion is rejected; the original
+fixture is retained. A caller must supply accurate missing input information
+before requesting conversion. The tool never invents those facts.
 
-| Current | Can Read | Cannot Read |
-|---------|----------|-------------|
-| v2.x | v1.x, v2.x | v0.x |
-| v3.x | v2.x, v3.x | v1.x, v0.x |
+`scripts/verify-compat` checks the three supported conversions and this explicit
+JobEnvelope refusal. Current core-object helpers use the shipped offline
+schemas for required fields, optional output, dates and status enums. Passing
+those structural checks does not prove native evidence integrity or authorize
+an action. Unknown major versions are not accepted by guessing a format.
 
 ### No Backward Migration
 

@@ -40,7 +40,11 @@ func writeValidCadenceArtifacts(t *testing.T, root string) {
 	})
 	writeFile(t, filepath.Join(root, "sandbox.json"), "{}")
 	writeJSON(t, filepath.Join(root, "suite_lock.json"), map[string]any{
-		"schemaVersion": "1.0.0",
+		"schemaVersion": "1.0.0", "suiteId": "TEST-suite", "suiteVersion": "1.0.0", "standardManifestVersion": "1.4.0",
+		"syncMode": "locked", "allowCloneTip": false, "defaultOverridePolicy": "forbidden",
+		"modules": map[string]any{"TEST-product": map[string]any{"role": "product_repo", "required": true,
+			"lockedRef":      map[string]any{"kind": "git", "uri": "https://example.invalid/product", "pinType": "commit", "pinValue": "1111111111111111111111111111111111111111", "floating": false},
+			"overridePolicy": "forbidden", "allowedLocalState": []string{"present_locked_match"}}},
 	})
 	writeJSON(t, filepath.Join(root, "suite_version_closure.json"), map[string]any{
 		"schemaVersion":           "1.0.0",
@@ -359,7 +363,11 @@ func TestLoadRejectsLegacyToolingLockShape(t *testing.T) {
 	})
 	writeFile(t, filepath.Join(root, "sandbox.json"), "{}")
 	writeJSON(t, filepath.Join(root, "suite_lock.json"), map[string]any{
-		"schemaVersion": "1.0.0",
+		"schemaVersion": "1.0.0", "suiteId": "TEST-suite", "suiteVersion": "1.0.0", "standardManifestVersion": "1.4.0",
+		"syncMode": "locked", "allowCloneTip": false, "defaultOverridePolicy": "forbidden",
+		"modules": map[string]any{"TEST-product": map[string]any{"role": "product_repo", "required": true,
+			"lockedRef":      map[string]any{"kind": "git", "uri": "https://example.invalid/product", "pinType": "commit", "pinValue": "1111111111111111111111111111111111111111", "floating": false},
+			"overridePolicy": "forbidden", "allowedLocalState": []string{"present_locked_match"}}},
 	})
 	writeJSON(t, filepath.Join(root, "suite_version_closure.json"), map[string]any{
 		"schemaVersion":           "1.0.0",

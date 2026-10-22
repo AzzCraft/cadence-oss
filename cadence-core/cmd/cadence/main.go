@@ -71,7 +71,7 @@ func usage() {
 
 Usage:
   cadence verify [--profile dev|ci|full] [--out .cadence/out] [--alias latest] [--run-id <id>]
-  cadence scan [--json]
+  cadence scan [--json [--with-rule-trace]]
   cadence adopt
   cadence report --in <cadence-report.json|summary.json>
   cadence lock [--check]
@@ -257,6 +257,13 @@ func verifyCmd(args []string) {
 
 	// Compute strong references for evidence provenance before deriving the run ID.
 	configHash := computeConfigHash(repoRoot)
+	baselinePath := cfg.BaselinePath
+	bl, baselineDigest, baselineErr := baseline.LoadWithDigest(baselinePath)
+	if baselineErr != nil && (!os.IsNotExist(baselineErr) || cfg.BaselineExplicit) {
+		fmt.Fprintf(os.Stderr, "verify failed: baseline could not be read: %v\n", baselineErr)
+		os.Exit(1)
+	}
+	configHash = computeGovernedInputHash(configHash, baselinePath, baselineDigest)
 	sourceTreeRecords, sourceTreeHash, err := computeSourceTreeIdentity(repoRoot, identityExcluded)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "verify failed: source tree identity invalid: %v\n", err)
@@ -384,7 +391,7 @@ func verifyCmd(args []string) {
 	}
 
 	sandboxRequest := sandbox.CommandRequest{
-		Command: []string{os.Args[0], "scan", "--json"},
+		Command: []string{os.Args[0], "scan", "--json", "--with-rule-trace"},
 		WorkDir: repoRoot,
 		Env: map[string]string{
 			"PYTHONDONTWRITEBYTECODE": "1",
@@ -412,12 +419,16 @@ func verifyCmd(args []string) {
 		os.Exit(1)
 	}
 
-	var violations []checks.Violation
-	if err := json.Unmarshal(sandboxExecution.Stdout, &violations); err != nil {
+	var scanned struct {
+		Violations    []checks.Violation `json:"violations"`
+		ExecutedRules []string           `json:"executedRules"`
+	}
+	if err := json.Unmarshal(sandboxExecution.Stdout, &scanned); err != nil || scanned.ExecutedRules == nil {
 		fmt.Fprintf(os.Stderr, "verify failed: sandbox output invalid: %v\n", err)
 		os.Exit(1)
 	}
 
+	violations := scanned.Violations
 	pluginResults, pluginViolations, err := executeVerifyPlugins(
 		runOut,
 		repoRoot,
@@ -448,10 +459,7 @@ func verifyCmd(args []string) {
 	}
 
 	// Ratchet: suppress baseline fingerprints (if baseline exists).
-	baselinePath := cfg.BaselinePath
-	var bl baseline.Baseline
-	if b, err := baseline.Load(baselinePath); err == nil {
-		bl = b
+	if baselineErr == nil {
 		// Write baseline snapshot for audit trail.
 		snap := baseline.SnapshotBaseline(bl, "current")
 		if err := writeJSON(filepath.Join(runOut, "baseline-snapshot.json"), snap); err != nil {
@@ -464,8 +472,6 @@ func verifyCmd(args []string) {
 			}
 		}
 		violations = filtered
-	} else if !os.IsNotExist(err) || cfg.BaselineExplicit {
-		deliveryFailure(runOut, fmt.Errorf("baseline %s could not be read: %w", baselinePath, err))
 	}
 
 	sort.Slice(violations, func(i, j int) bool {
@@ -933,6 +939,7 @@ func verifyCmd(args []string) {
 		"waiver_applied": waiverApplied,
 		"waiver_source":  waiverSource,
 		"baselinePath":   baselinePath,
+		"baselineDigest": baselineDigest,
 		"inputIdentity":  "input-identity.json",
 		"dependencyHash": dependencyHash,
 		"warnings":       dependencyWarnings,
@@ -1009,7 +1016,7 @@ func verifyCmd(args []string) {
 	verifyReport := report.Generate(runID, cfg.ProjectID, reportFindings)
 	verifyReport.Summary = report.NewSummary(decision, len(reportFindings))
 	durationMs := time.Since(started).Milliseconds()
-	verifyReport = report.WithMetrics(verifyReport, len(sourceTreeRecords), len(reportFindings), int(durationMs))
+	verifyReport = report.WithMetrics(verifyReport, len(sourceTreeRecords), len(scanned.ExecutedRules), int(durationMs))
 	if err := report.Save(filepath.Join(runOut, "report-summary.json"), verifyReport); err != nil {
 		deliveryFailure(runOut, err)
 	}
@@ -2518,16 +2525,25 @@ func summarizePluginResults(results []plugins.RunResult) []map[string]any {
 func scanCmd(args []string) {
 	fs := flag.NewFlagSet("scan", flag.ExitOnError)
 	jsonOutput := fs.Bool("json", false, "emit machine-readable violations")
+	ruleTrace := fs.Bool("with-rule-trace", false, "include executed built-in rule IDs in JSON")
 	_ = fs.Parse(args)
+	if *ruleTrace && !*jsonOutput {
+		fmt.Fprintln(os.Stderr, "scan: --with-rule-trace requires --json")
+		os.Exit(2)
+	}
 
 	repoRoot := physicalRepoRoot()
-	vs, err := checks.RunAll(repoRoot)
+	vs, executed, err := checks.RunAllWithTrace(repoRoot)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "scan failed: %v\n", err)
 		os.Exit(1)
 	}
 	if *jsonOutput {
-		payload, err := json.Marshal(vs)
+		var value any = vs
+		if *ruleTrace {
+			value = map[string]any{"violations": vs, "executedRules": executed}
+		}
+		payload, err := json.Marshal(value)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "scan failed: %v\n", err)
 			os.Exit(1)

@@ -1,8 +1,10 @@
 package registry
 
 import (
+	"encoding/json"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 )
@@ -549,5 +551,121 @@ func TestResolveByRefValidatesOnlySelectedTargetAndRejectsAmbiguity(t *testing.T
 	alias.ID = "alias"
 	if _, err := ResolveByRefAt(regPath, Registry{Entries: []Entry{selected, alias}}, "runtimeProfile", path, time.Now()); err == nil {
 		t.Fatal("ambiguous target accepted")
+	}
+}
+
+func TestCompatibilityUntilIncludesWholeUTCDate(t *testing.T) {
+	policy, err := parseCompatWindow("until 2026-10-21")
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, item := range []struct {
+		value   string
+		allowed bool
+	}{{"2026-10-20T23:59:59Z", true}, {"2026-10-21T23:59:59Z", true}, {"2026-10-22T00:00:00Z", false}, {"2026-10-22T01:00:00+02:00", true}} {
+		ts, err := time.Parse(time.RFC3339, item.value)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if policy.Contains(ts) != item.allowed {
+			t.Fatal(item)
+		}
+	}
+}
+
+func TestRegistryLoaderRejectsMissingVersionAndAmbiguousJSON(t *testing.T) {
+	raw := `{"schemaVersion":"1.0.0","registryId":"TEST","entries":[{"kind":"plugin","id":"TEST","version":"1.0.0","ref":"TEST.py","status":"active","digest":"sha256:1111111111111111111111111111111111111111111111111111111111111111","compatWindow":"current","deprecatedAt":null,"deprecationReason":null,"trust":{"signer":"TEST","allowlisted":true}}]}`
+	path := filepath.Join(t.TempDir(), "registry.json")
+	for _, text := range []string{raw, strings.Replace(raw, `"version":"1.0.0",`, "", 1), strings.Replace(raw, `"id":"TEST"`, `"id":"other","id":"TEST"`, 1), strings.Replace(raw, `"registryId":"TEST"`, `"registryId":"TEST","unknown":true`, 1)} {
+		if err := os.WriteFile(path, []byte(text), 0o600); err != nil {
+			t.Fatal(err)
+		}
+		_, err := Load(path)
+		if (err == nil) != (text == raw) {
+			t.Fatalf("registry acceptance mismatch: %v", err)
+		}
+	}
+}
+
+func TestRegistryWireKeysAndTypes(t *testing.T) {
+	raw := `{"schemaVersion":"1.0.0","registryId":"TEST","entries":[{"kind":"plugin","id":"TEST","version":"1.0.0","ref":"TEST.py","status":"active","digest":"sha256:1111111111111111111111111111111111111111111111111111111111111111","compatWindow":"current","deprecatedAt":null,"deprecationReason":null,"trust":{"signer":"TEST","allowlisted":true}}]}`
+	cases := []struct{ from, to string }{
+		{`"version":`, `"Version":`},
+		{`"version":"1.0.0"`, `"version":"1.0.0","Version":"2.0.0"`},
+		{`"registryId":`, `"RegistryId":`},
+		{`"schemaVersion":"1.0.0",`, ``},
+		{`"schemaVersion":"1.0.0"`, `"schemaVersion":null`},
+		{`"schemaVersion":"1.0.0"`, `"schemaVersion":" "`},
+		{`"signer":`, `"Signer":`},
+		{`"allowlisted":true`, `"allowlisted":null`},
+		{`,"allowlisted":true`, ``},
+		{`"allowlisted":true`, `"allowlisted":"false"`},
+		{`"id":"TEST"`, `"id":"TEST","unknown":true`},
+		{`"id":"TEST"`, `"id":"TEST","\u0069d":"other"`},
+		{raw, `{"schemaVersion":"1.0.0","registryId":"TEST","entries":null}`},
+	}
+	path := filepath.Join(t.TempDir(), "registry.json")
+	for _, tc := range cases {
+		if err := os.WriteFile(path, []byte(strings.Replace(raw, tc.from, tc.to, 1)), 0o600); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := Load(path); err == nil {
+			t.Errorf("accepted malformed field mutation %s", tc.from)
+		}
+	}
+	for _, text := range []string{raw, strings.Replace(raw, `"allowlisted":true`, `"allowlisted":false`, 1), `{"schemaVersion":"1.0.0","registryId":"TEST","entries":[]}`} {
+		if err := os.WriteFile(path, []byte(text), 0o600); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := Load(path); err != nil {
+			t.Errorf("valid control rejected: %v", err)
+		}
+	}
+}
+
+func TestRegistryDeprecationContract(t *testing.T) {
+	active := `{"schemaVersion":"1.0.0","registryId":"TEST","entries":[{"kind":"plugin","id":"TEST","version":"1.0.0","ref":"TEST.py","status":"active","digest":"sha256:1111111111111111111111111111111111111111111111111111111111111111","compatWindow":"current","deprecatedAt":null,"deprecationReason":null,"trust":{"signer":"TEST","allowlisted":false}}]}`
+	deprecated := strings.NewReplacer(`"active"`, `"deprecated"`, `"current"`, `"until 2020-12-31"`, `"deprecatedAt":null`, `"deprecatedAt":"2020-01-01T00:00:00Z"`, `"deprecationReason":null`, `"deprecationReason":"retired"`).Replace(active)
+	path := filepath.Join(t.TempDir(), "registry.json")
+	for _, tc := range []struct {
+		name, text string
+		valid      bool
+	}{
+		{"active", active, true},
+		{"deprecated", deprecated, true},
+		{"removed", strings.Replace(deprecated, `"deprecated"`, `"removed"`, 1), true},
+		{"last-UTC-day", strings.Replace(deprecated, "2020-01-01T00:00:00Z", "2021-01-01T01:00:00+02:00", 1), true},
+		{"missing-date", strings.Replace(active, `"deprecatedAt":null,`, "", 1), false},
+		{"missing-reason", strings.Replace(active, `"deprecationReason":null,`, "", 1), false},
+		{"active-empty-date", strings.Replace(active, `"deprecatedAt":null`, `"deprecatedAt":""`, 1), false},
+		{"active-blank-reason", strings.Replace(active, `"deprecationReason":null`, `"deprecationReason":" "`, 1), false},
+		{"invalid-date", strings.Replace(deprecated, "2020-01-01T00:00:00Z", "not-a-date", 1), false},
+		{"date-only", strings.Replace(deprecated, "2020-01-01T00:00:00Z", "2020-01-01", 1), false},
+		{"naive-time", strings.Replace(deprecated, "2020-01-01T00:00:00Z", "2020-01-01T00:00:00", 1), false},
+		{"outside-window", strings.Replace(deprecated, "2020-01-01T00:00:00Z", "2021-01-01T00:00:00Z", 1), false},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			if err := os.WriteFile(path, []byte(tc.text), 0o600); err != nil {
+				t.Fatal(err)
+			}
+			reg, err := Load(path)
+			if (err == nil) != tc.valid {
+				t.Fatalf("valid=%v: %v", tc.valid, err)
+			}
+			if !tc.valid {
+				return
+			}
+			// The exported structs must preserve required nulls and false on write.
+			encoded, err := json.Marshal(reg)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if err := os.WriteFile(path, encoded, 0o600); err != nil {
+				t.Fatal(err)
+			}
+			if _, err := Load(path); err != nil {
+				t.Fatalf("round trip: %v", err)
+			}
+		})
 	}
 }

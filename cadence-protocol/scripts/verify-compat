@@ -49,6 +49,18 @@ for row in "${MATRIX[@]}"; do
     exit 1
   fi
   out_name="$(basename "$input_path" .json)_migrated.json"
+  if [[ "$kind" == "legacy-job-envelope" ]]; then
+    # This retained 0.9 sample lacks current required provenance. Do not invent
+    # dates/profile/side-effect semantics merely to label it a current object.
+    if python3 ./tools/migrate.py --kind "$kind" --input "$input_path" \
+        --output "$tmpdir/$out_name" >"$tmpdir/job-rejection.log" 2>&1; then
+      echo "FAIL: incomplete legacy job was silently promoted" >&2
+      exit 1
+    fi
+    test ! -e "$tmpdir/$out_name"
+    echo "OK: incomplete legacy job migration refused; original fixture retained"
+    continue
+  fi
   python3 ./tools/migrate.py \
     --kind "$kind" \
     --input "$input_path" \
@@ -72,4 +84,4 @@ PY
   pass_count=$((pass_count + 1))
 done
 
-echo "[cadence-protocol] compat OK: $pass_count migrations verified"
+echo "[cadence-protocol] compat OK: $pass_count migrations verified; incomplete legacy job explicitly refused"

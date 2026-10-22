@@ -189,3 +189,71 @@ func TestRepeatedFindingsRetainActualLinesAndDistinctIdentity(t *testing.T) {
 		t.Fatalf("locations collapsed: %+v", findings)
 	}
 }
+
+func TestRootDirectoryNameNeverExemptsSource(t *testing.T) {
+	for _, name := range []string{"ordinary", "build", "dist", "node_modules", ".cadence"} {
+		t.Run(name, func(t *testing.T) {
+			root := filepath.Join(t.TempDir(), name)
+			if err := os.Mkdir(root, 0o755); err != nil {
+				t.Fatal(err)
+			}
+			writeTestFile(t, root, "input.env", "TEST_AUTH_TOKEN=synthetic\n")
+			found, err := RunAll(root)
+			if err != nil || len(found) != 1 || found[0].RuleID != "SEC_TEST_AUTH_TOKEN" {
+				t.Fatalf("root exempted: %v %v", found, err)
+			}
+		})
+	}
+}
+
+func TestJSImportDeclarationBoundariesAndEscapes(t *testing.T) {
+	for _, tc := range []struct {
+		source string
+		want   int
+	}{
+		{"const first = 1, second = 2\nexport { first }\nexport { second }\nimport value from 'pkg/internal/value'\n", 1},
+		{`import value from 'pkg\u002finternal\u002fvalue';`, 1},
+		{`export { value } from 'pkg\x2fsrc\x2fvalue';`, 1},
+		{`import('pkg\u{2f}internal\/value');`, 1},
+		{"import 'pkg/inte\\\nrnal/value';", 1},
+		{`import value from 'pkg\\u002finternal/value';`, 0},
+		{"const text = \"import value from 'pkg/internal/example'\";\n// import 'pkg/src/comment';", 0},
+	} {
+		root := t.TempDir()
+		writeTestFile(t, root, "input.ts", tc.source)
+		found, err := RunAll(root)
+		if err != nil || len(found) != tc.want {
+			t.Fatalf("%q: got %+v, %v; want %d", tc.source, found, err, tc.want)
+		}
+		if tc.want > 0 && found[0].Message != "Deep import detected: pkg/internal/value" && found[0].Message != "Deep import detected: pkg/src/value" {
+			t.Fatalf("module literal not normalized: %+v", found)
+		}
+	}
+}
+
+func TestImportsAndSecretContentRetainDistinctFindings(t *testing.T) {
+	root := t.TempDir()
+	writeTestFile(t, root, "input.ts", "import 'pkg/internal/side';\nimport {\n x\n} /* comment */ from 'pkg/src/multi';\nexport { x } from 'pkg/internal/export';\n// import 'pkg/internal/comment';\nconst text = \"import 'pkg/internal/string'\";\nimport { from as local } from 'pkg/internal/named';\nexport { from } from 'pkg/src/named-export';\n")
+	found, executed, err := RunAllWithTrace(root)
+	if err != nil || len(found) != 5 || len(executed) != 9 {
+		t.Fatalf("imports/trace: %v %v %v", found, executed, err)
+	}
+	writeTestFile(t, root, "key.env", "token='synthetic-first-token'\n")
+	a, _ := RunAll(root)
+	writeTestFile(t, root, "key.env", "token='synthetic-other-token'\n")
+	b, _ := RunAll(root)
+	var first, second string
+	for _, item := range a {
+		if item.File == "key.env" {
+			first = item.Fingerprint
+		}
+	}
+	for _, item := range b {
+		if item.File == "key.env" {
+			second = item.Fingerprint
+		}
+	}
+	if first == "" || second == "" || first == second {
+		t.Fatal("new content reused old baseline identity")
+	}
+}

@@ -32,21 +32,44 @@ function stableSort(arr, keyFn) {
   });
 }
 
+function decodeModuleLiteral(literal) {
+  // Decode string escapes without evaluating source code or resolving modules.
+  return literal.slice(1, -1).replace(/\\(?:u[dD][89aAbB][0-9a-fA-F]{2}\\u[dD][c-fC-F][0-9a-fA-F]{2}|u\{[0-9a-fA-F]+\}|u[0-9a-fA-F]{4}|x[0-9a-fA-F]{2}|\r\n|[\s\S])/g, escape => {
+    const code = escape.slice(1);
+    if (['\n', '\r', '\r\n', '\u2028', '\u2029'].includes(code)) return '';
+    if (code.startsWith('u{') || code.startsWith('x')) {
+      const value = parseInt(code.startsWith('x') ? code.slice(1) : code.slice(2, -1), 16);
+      return value <= 0x10ffff ? String.fromCodePoint(value) : escape;
+    }
+    if (code === 'v') return '\v';
+    if (code === '0') return '\0';
+    try { return JSON.parse('"' + escape + '"'); } catch { return code; }
+  });
+}
+
 function scanImports(content) {
   const violations = [];
-  const lines = content.split(/\r?\n/);
-  for (let i = 0; i < lines.length; i++) {
-    const line = lines[i];
-    const m = line.match(/\b(from\s+['\"]([^'\"]+)['\"])|\bimport\(['\"]([^'\"]+)['\"]\)/);
-    if (!m) continue;
-    const imp = m[2] || m[3] || '';
-    if (imp.includes('/internal/') || imp.includes('/src/')) {
-      violations.push({
-        ruleId: 'SDMM_DEEP_IMPORT',
-        severity: 'P1',
-        message: `Deep import detected: ${imp}`,
-        line: i + 1,
-      });
+  const pattern = /"(?:\\[\s\S]|[^"\\])*"|'(?:\\[\s\S]|[^'\\])*'|`(?:\\[\s\S]|[^`\\])*`|\/\*[\s\S]*?\*\/|\/\/[^\n]*|[A-Za-z_$][A-Za-z0-9_$]*|[^\s]/g;
+  const tokens = [...content.matchAll(pattern)].map(m => ({value:m[0], index:m.index ?? 0})).filter(t => !t.value.startsWith('//') && !t.value.startsWith('/*'));
+  function add(index) {
+    const literal = tokens[index].value;
+    if (!literal.startsWith('"') && !literal.startsWith("'")) return;
+    const module = decodeModuleLiteral(literal);
+    if (module.includes('/internal/') || module.includes('/src/')) {
+      violations.push({ruleId:'SDMM_DEEP_IMPORT', severity:'P1', message:`Deep import detected: ${module}`, line:content.slice(0,tokens[index].index).split('\n').length});
+    }
+  }
+  for (let i=0; i<tokens.length; i++) {
+    const current=tokens[i].value;
+    if (current!=='import' && current!=='export') continue;
+    if (i>0 && tokens[i-1].value==='.') continue;
+    if (i+1>=tokens.length) continue;
+    const next=tokens[i+1].value;
+    if (current==='import' && (next.startsWith('"') || next.startsWith("'"))) {add(i+1); continue;}
+    if (current==='import' && next==='(' && i+2<tokens.length) {add(i+2); continue;}
+    for (let j=i+1; j+1<tokens.length; j++) {
+      if ([';', '=', 'import', 'export'].includes(tokens[j].value)) break;
+      if (tokens[j].value==='from' && (tokens[j+1].value.startsWith('"') || tokens[j+1].value.startsWith("'"))) {add(j+1); i=j+1; break;}
     }
   }
   return violations;

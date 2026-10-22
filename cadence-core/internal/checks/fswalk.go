@@ -70,6 +70,9 @@ func walkFilesDetailed(repoRoot string, options walkOptions, fn func(record File
 
 		name := d.Name()
 		if d.IsDir() {
+			if rel == "." {
+				return nil
+			}
 			if skipDirs[name] {
 				return filepath.SkipDir
 			}
