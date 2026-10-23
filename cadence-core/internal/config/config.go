@@ -877,6 +877,9 @@ func ValidateToolingLock(repoRoot string, toolingLock string, closureRef string,
 	if err != nil {
 		return err
 	}
+	if err := validateStandardSchema(dec, toolingSchema, "toolingLock"); err != nil {
+		return err
+	}
 	if err := rejectUnknownKeys(dec, map[string]struct{}{
 		"$schema": {}, "schemaVersion": {}, "standardManifestVersion": {}, "sourceOfTruth": {}, "verifyRuntime": {}, "standardSnapshotRef": {}, "suiteVersionClosureRef": {}, "suiteLockRef": {}, "verifyRegistryRef": {}, "generatorTemplateVersion": {}, "policyPackVersion": {}, "toolchain": {}, "mirrors": {},
 	}, "toolingLock"); err != nil {

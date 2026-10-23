@@ -591,3 +591,19 @@ func TestDualToolingLockProductAndSuiteContexts(t *testing.T) {
 		})
 	}
 }
+
+func TestToolingStandard15RequiresFullCommitPins(t *testing.T) {
+	for _, pin := range []string{"aaaaaaa", strings.Repeat("a", 40)} {
+		root := t.TempDir()
+		writeValidCadenceArtifacts(t, root)
+		tooling, _ := loadJSONObject(root, "tooling_lock.json", "fixture")
+		tooling["standardManifestVersion"] = "1.5.0-beta.1"
+		tooling["sourceOfTruth"].(map[string]any)["pinValue"] = pin
+		tooling["verifyRuntime"].(map[string]any)["pinValue"] = strings.Repeat("4", 40)
+		writeJSON(t, filepath.Join(root, "tooling_lock.json"), tooling)
+		err := ValidateToolingLock(root, "tooling_lock.json", "suite_version_closure.json", "registry.json")
+		if (err == nil) != (len(pin) == 40) {
+			t.Fatalf("pin=%s err=%v", pin, err)
+		}
+	}
+}
