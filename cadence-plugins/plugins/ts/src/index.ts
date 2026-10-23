@@ -69,8 +69,11 @@ function tokenizeJS(content: string) {
     }
   }
   function code(expression: boolean) {
-    let canRegex = true, previous = '';
-    const parens: boolean[] = [], blocks: boolean[] = [];
+    let canRegex = true, previous = '', statementStart = !expression, brackets = 0;
+    // A body remembers whether its closing brace ends a declaration or a value.
+    const pending: {kind:string;declaration:boolean;parens:number;braces:number;brackets:number}[] = [];
+    const parens: boolean[] = [];
+    const blocks: {regexAfter:boolean;statements:boolean;parens:number}[] = [];
     while (i < content.length) {
       const c = content[i];
       if (/\s/.test(c)) { i++; continue; }
@@ -93,7 +96,7 @@ function tokenizeJS(content: string) {
           }
           if (closed) {
             while (j < content.length && word(content[j])) j++;
-            tokens.push({value:'<regexp>',index:start}); i = j; canRegex = false; previous = '<regexp>'; continue;
+            tokens.push({value:'<regexp>',index:start}); i = j; canRegex = false; previous = '<regexp>'; statementStart = false; continue;
           }
         }
       }
@@ -102,22 +105,49 @@ function tokenizeJS(content: string) {
           if (content[i] === '\\') { i += 2; continue; }
           if (content[i] === c) { i++; break; } i++;
         }
-        add(start,i); canRegex = false; previous = '<string>'; continue;
+        add(start,i); canRegex = false; previous = '<string>'; statementStart = false; continue;
       }
-      if (c === '`') { template(); canRegex = false; previous = '<template>'; continue; }
+      if (c === '`') { template(); canRegex = false; previous = '<template>'; statementStart = false; continue; }
       if (word(c)) {
         while (i < content.length && word(content[i])) i++;
-        add(start,i); previous = content.slice(start,i);
+        add(start,i); const value = content.slice(start,i);
+        if (['function','class'].includes(value) && previous !== '.') {
+          pending.push({kind:value, declaration:statementStart, parens:parens.length, braces:blocks.length, brackets});
+        }
+        statementStart = ['else','do','try','finally'].includes(value) ||
+          (statementStart && ['export','default','async'].includes(value));
+        previous = value;
         canRegex = ['return','throw','case','delete','void','typeof','new','in','of','yield','await','else','do','instanceof'].includes(previous); continue;
       }
       i++;
       if (i < content.length && ((c === '+' || c === '-') && content[i] === c || c === '=' && content[i] === '>')) i++;
       const value = content.slice(start,i); add(start,i);
+      const body = pending[pending.length-1];
+      const atBodyDepth = body && body.parens === parens.length && body.braces === blocks.length && body.brackets === brackets;
+      const wasStatementStart = statementStart;
+      statementStart = false;
       if (value === '(') { parens.push(['if','while','for','switch','catch','with'].includes(previous)); canRegex = true; }
-      else if (value === ')') canRegex = parens.pop() ?? false;
-      else if (value === '{') { blocks.push(['',')',';','else','try','finally','do','=>'].includes(previous)); canRegex = true; }
-      else if (value === '}') canRegex = blocks.pop() ?? true;
-      else canRegex = ![']','.','++','--'].includes(value);
+      else if (value === ')') { canRegex = parens.pop() ?? false; statementStart = canRegex; }
+      else if (value === '{') {
+        const construct = atBodyDepth && (body.kind === 'class' || previous === ')');
+        const statements = construct || wasStatementStart || previous === ')' || previous === '=>';
+        const regexAfter = construct ? body.declaration : statements && previous !== '=>';
+        if (construct) pending.pop();
+        blocks.push({regexAfter, statements:!!statements, parens:parens.length});
+        canRegex = true; statementStart = !!statements;
+      }
+      else if (value === '}') {
+        canRegex = blocks.pop()?.regexAfter ?? true; statementStart = canRegex;
+        while (pending.length && pending[pending.length-1].braces > blocks.length) pending.pop();
+      }
+      else {
+        canRegex = ![']','.','++','--'].includes(value);
+        if (value === '[') brackets++;
+        if (value === ']') brackets--;
+        const scope = blocks[blocks.length-1];
+        if (value === ';' || value === ':') statementStart = scope ? scope.statements && scope.parens === parens.length : !expression && parens.length === 0;
+        if (atBodyDepth && [';',':',','].includes(value)) pending.pop();
+      }
       previous = value;
     }
   }

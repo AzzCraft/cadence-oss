@@ -103,5 +103,53 @@
     "lines": [
       2
     ]
+  },
+  {
+    "name": "function-expression-division",
+    "source": "const ratio = function() {} / import('pkg/internal/value') / 2;",
+    "lines": [
+      1
+    ]
+  },
+  {
+    "name": "class-declaration-regexp",
+    "source": "class A {} /import \"pkg\\/internal\\/value\"/.test(text);",
+    "lines": []
+  },
+  {
+    "name": "function-declaration-regexp",
+    "source": "function f() {} /import \"pkg\\/internal\\/value\"/.test(text);",
+    "lines": []
+  },
+  {
+    "name": "named-function-expression-division",
+    "source": "const ratio = function f() {} / import('pkg/internal/value') / 2;",
+    "lines": [
+      1
+    ]
+  },
+  {
+    "name": "class-expression-division",
+    "source": "const ratio = class {} / import('pkg/internal/value') / 2;",
+    "lines": [
+      1
+    ]
+  },
+  {
+    "name": "named-class-expression-division",
+    "source": "const ratio = class A {} / import('pkg/internal/value') / 2;",
+    "lines": [
+      1
+    ]
+  },
+  {
+    "name": "nested-default-body-regexp",
+    "source": "function f(arg = function() { return {}; }) {} /import \"pkg\\/internal\\/value\"/.test(text);",
+    "lines": []
+  },
+  {
+    "name": "nested-class-body-regexp",
+    "source": "class A extends class {} {} /import \"pkg\\/internal\\/value\"/.test(text);",
+    "lines": []
   }
 ]

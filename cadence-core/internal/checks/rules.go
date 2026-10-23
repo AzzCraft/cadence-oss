@@ -131,7 +131,19 @@ func tokenizeJS(source []byte) []jsToken {
 	}
 	code = func(expression bool) {
 		canRegex, previous := true, ""
-		parens, blocks := []bool{}, []bool{}
+		statementStart, brackets := !expression, 0
+		// Remember whether a body closes a declaration or an expression value.
+		type bodyContext struct {
+			kind                     string
+			declaration              bool
+			parens, braces, brackets int
+		}
+		type braceContext struct {
+			regexAfter, statements bool
+			parens                 int
+		}
+		pending := []bodyContext{}
+		parens, blocks := []bool{}, []braceContext{}
 		for i < len(source) {
 			c := source[i]
 			if c == ' ' || c == '\t' || c == '\r' || c == '\n' {
@@ -184,6 +196,7 @@ func tokenizeJS(source []byte) []jsToken {
 						}
 						tokens = append(tokens, jsToken{"<regexp>", start})
 						i, canRegex, previous = j, false, "<regexp>"
+						statementStart = false
 						continue
 					}
 				}
@@ -204,11 +217,13 @@ func tokenizeJS(source []byte) []jsToken {
 				i = min(i, len(source))
 				add(start, i)
 				canRegex, previous = false, "<string>"
+				statementStart = false
 				continue
 			}
 			if c == '`' {
 				template()
 				canRegex, previous = false, "<template>"
+				statementStart = false
 				continue
 			}
 			if word(c) {
@@ -216,7 +231,13 @@ func tokenizeJS(source []byte) []jsToken {
 					i++
 				}
 				add(start, i)
-				previous = string(source[start:i])
+				value := string(source[start:i])
+				if (value == "function" || value == "class") && previous != "." {
+					pending = append(pending, bodyContext{value, statementStart, len(parens), len(blocks), brackets})
+				}
+				statementStart = strings.Contains("|else|do|try|finally|", "|"+value+"|") ||
+					(statementStart && strings.Contains("|export|default|async|", "|"+value+"|"))
+				previous = value
 				canRegex = strings.Contains("|return|throw|case|delete|void|typeof|new|in|of|yield|await|else|do|instanceof|", "|"+previous+"|")
 				continue
 			}
@@ -226,6 +247,14 @@ func tokenizeJS(source []byte) []jsToken {
 			}
 			value := string(source[start:i])
 			add(start, i)
+			var body bodyContext
+			atBodyDepth := false
+			if len(pending) > 0 {
+				body = pending[len(pending)-1]
+				atBodyDepth = body.parens == len(parens) && body.braces == len(blocks) && body.brackets == brackets
+			}
+			wasStatementStart := statementStart
+			statementStart = false
 			switch value {
 			case "(":
 				parens = append(parens, strings.Contains("|if|while|for|switch|catch|with|", "|"+previous+"|"))
@@ -236,20 +265,46 @@ func tokenizeJS(source []byte) []jsToken {
 					canRegex = parens[len(parens)-1]
 					parens = parens[:len(parens)-1]
 				}
+				statementStart = canRegex
 			case "{":
-				block := previous == "" || strings.Contains("|)|;|else|try|finally|do|=>|", "|"+previous+"|")
-				blocks = append(blocks, block)
+				construct := atBodyDepth && (body.kind == "class" || previous == ")")
+				statements := construct || wasStatementStart || previous == ")" || previous == "=>"
+				regexAfter := statements && previous != "=>"
+				if construct {
+					regexAfter = body.declaration
+					pending = pending[:len(pending)-1]
+				}
+				blocks = append(blocks, braceContext{regexAfter, statements, len(parens)})
 				canRegex = true
+				statementStart = statements
 			case "}":
 				canRegex = true
 				if len(blocks) > 0 {
-					canRegex = blocks[len(blocks)-1]
+					canRegex = blocks[len(blocks)-1].regexAfter
 					blocks = blocks[:len(blocks)-1]
 				}
-			case "]", ".", "++", "--":
-				canRegex = false
+				statementStart = canRegex
+				for len(pending) > 0 && pending[len(pending)-1].braces > len(blocks) {
+					pending = pending[:len(pending)-1]
+				}
 			default:
-				canRegex = true
+				canRegex = value != "]" && value != "." && value != "++" && value != "--"
+				if value == "[" {
+					brackets++
+				}
+				if value == "]" {
+					brackets--
+				}
+				if value == ";" || value == ":" {
+					statementStart = !expression && len(parens) == 0
+					if len(blocks) > 0 {
+						scope := blocks[len(blocks)-1]
+						statementStart = scope.statements && scope.parens == len(parens)
+					}
+				}
+				if atBodyDepth && (value == ";" || value == ":" || value == ",") {
+					pending = pending[:len(pending)-1]
+				}
 			}
 			previous = value
 		}
