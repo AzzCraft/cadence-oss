@@ -258,6 +258,7 @@ def validate_job_envelope(j: Dict[str, Any]) -> None:
     for run in runs:
         if not isinstance(run, dict):
             raise ValueError('runs[] must be object')
+        validate_pipeline_result(run['result'])
         mr = run.get('manifestRef') or {}
         res = run.get('result') or {}
         if isinstance(mr, dict) and isinstance(res, dict):

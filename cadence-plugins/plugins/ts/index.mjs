@@ -47,13 +47,87 @@ function decodeModuleLiteral(literal) {
   });
 }
 
+function tokenizeJS(content) {
+  const tokens = [];
+  let i = 0;
+  const word = c => /[A-Za-z0-9_$]/.test(c);
+  const add = (start, end) => tokens.push({value:content.slice(start,end), index:start});
+  function template() {
+    const start = i, slot = tokens.length;
+    tokens.push({value:'<template>', index:start}); i++;
+    let interpolated = false;
+    while (i < content.length) {
+      if (content[i] === '\\') { i += 2; continue; }
+      if (content[i] === '`') {
+        i++; if (!interpolated) tokens[slot].value = content.slice(start,i); return;
+      }
+      if (content[i] === '$' && content[i+1] === '{') { interpolated = true; i += 2; code(true); }
+      else i++;
+    }
+  }
+  function code(expression) {
+    let canRegex = true, previous = '';
+    const parens = [], blocks = [];
+    while (i < content.length) {
+      const c = content[i];
+      if (/\s/.test(c)) { i++; continue; }
+      if (c === '}' && expression && blocks.length === 0) { i++; return; }
+      const start = i;
+      if (c === '/' && i+1 < content.length) {
+        if (content[i+1] === '/') { while (i < content.length && content[i] !== '\n') i++; continue; }
+        if (content[i+1] === '*') {
+          i += 2; while (i+1 < content.length && !(content[i] === '*' && content[i+1] === '/')) i++;
+          i = Math.min(i+2,content.length); continue;
+        }
+        if (canRegex) {
+          let j = i+1, inClass = false, closed = false;
+          while (j < content.length && !['\n','\r'].includes(content[j])) {
+            if (content[j] === '\\') { j += 2; continue; }
+            if (content[j] === '[') inClass = true;
+            if (content[j] === ']') inClass = false;
+            if (content[j] === '/' && !inClass) { j++; closed = true; break; }
+            j++;
+          }
+          if (closed) {
+            while (j < content.length && word(content[j])) j++;
+            tokens.push({value:'<regexp>',index:start}); i = j; canRegex = false; previous = '<regexp>'; continue;
+          }
+        }
+      }
+      if (c === "'" || c === '"') {
+        i++; while (i < content.length) {
+          if (content[i] === '\\') { i += 2; continue; }
+          if (content[i] === c) { i++; break; } i++;
+        }
+        add(start,i); canRegex = false; previous = '<string>'; continue;
+      }
+      if (c === '`') { template(); canRegex = false; previous = '<template>'; continue; }
+      if (word(c)) {
+        while (i < content.length && word(content[i])) i++;
+        add(start,i); previous = content.slice(start,i);
+        canRegex = ['return','throw','case','delete','void','typeof','new','in','of','yield','await','else','do','instanceof'].includes(previous); continue;
+      }
+      i++;
+      if (i < content.length && ((c === '+' || c === '-') && content[i] === c || c === '=' && content[i] === '>')) i++;
+      const value = content.slice(start,i); add(start,i);
+      if (value === '(') { parens.push(['if','while','for','switch','catch','with'].includes(previous)); canRegex = true; }
+      else if (value === ')') canRegex = parens.pop() ?? false;
+      else if (value === '{') { blocks.push(['',')',';','else','try','finally','do','=>'].includes(previous)); canRegex = true; }
+      else if (value === '}') canRegex = blocks.pop() ?? true;
+      else canRegex = ![']','.','++','--'].includes(value);
+      previous = value;
+    }
+  }
+  code(false);
+  return tokens;
+}
+
 function scanImports(content) {
   const violations = [];
-  const pattern = /"(?:\\[\s\S]|[^"\\])*"|'(?:\\[\s\S]|[^'\\])*'|`(?:\\[\s\S]|[^`\\])*`|\/\*[\s\S]*?\*\/|\/\/[^\n]*|[A-Za-z_$][A-Za-z0-9_$]*|[^\s]/g;
-  const tokens = [...content.matchAll(pattern)].map(m => ({value:m[0], index:m.index ?? 0})).filter(t => !t.value.startsWith('//') && !t.value.startsWith('/*'));
+  const tokens = tokenizeJS(content);
   function add(index) {
     const literal = tokens[index].value;
-    if (!literal.startsWith('"') && !literal.startsWith("'")) return;
+    if (!['"', "'", '`'].includes(literal[0])) return;
     const module = decodeModuleLiteral(literal);
     if (module.includes('/internal/') || module.includes('/src/')) {
       violations.push({ruleId:'SDMM_DEEP_IMPORT', severity:'P1', message:`Deep import detected: ${module}`, line:content.slice(0,tokens[index].index).split('\n').length});

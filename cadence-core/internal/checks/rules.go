@@ -87,7 +87,176 @@ func RunAllWithTrace(repoRoot string) ([]Violation, []string, error) {
 // Tokenize import declarations without treating comments or string contents as
 // code. This supports static, side-effect, named re-export and literal dynamic
 // imports; it is not a whole-language semantic/type checker.
-var jsTokens = regexp.MustCompile("(?s)\"(?:\\\\.|[^\"\\\\])*\"|'(?:\\\\.|[^'\\\\])*'|`(?:\\\\.|[^`\\\\])*`|/\\*.*?\\*/|//[^\\n]*|[A-Za-z_$][A-Za-z0-9_$]*|[^\\s]")
+type jsToken struct {
+	value  string
+	offset int
+}
+
+// Keep template text and regex bodies opaque, but scan template expressions as
+// code. This is a lexical import scanner; nonconstant module names are not evaluated.
+func tokenizeJS(source []byte) []jsToken {
+	tokens := []jsToken{}
+	i := 0
+	var code func(bool)
+	var template func()
+	word := func(c byte) bool {
+		return c >= 'a' && c <= 'z' || c >= 'A' && c <= 'Z' || c >= '0' && c <= '9' || c == '_' || c == '$'
+	}
+	add := func(start, end int) { tokens = append(tokens, jsToken{string(source[start:end]), start}) }
+	template = func() {
+		start, slot := i, len(tokens)
+		tokens = append(tokens, jsToken{"<template>", start})
+		i++
+		interpolated := false
+		for i < len(source) {
+			if source[i] == '\\' {
+				i += 2
+				continue
+			}
+			if source[i] == '`' {
+				i++
+				if !interpolated {
+					tokens[slot].value = string(source[start:i])
+				}
+				return
+			}
+			if source[i] == '$' && i+1 < len(source) && source[i+1] == '{' {
+				interpolated = true
+				i += 2
+				code(true)
+			} else {
+				i++
+			}
+		}
+	}
+	code = func(expression bool) {
+		canRegex, previous := true, ""
+		parens, blocks := []bool{}, []bool{}
+		for i < len(source) {
+			c := source[i]
+			if c == ' ' || c == '\t' || c == '\r' || c == '\n' {
+				i++
+				continue
+			}
+			if c == '}' && expression && len(blocks) == 0 {
+				i++
+				return
+			}
+			start := i
+			if c == '/' && i+1 < len(source) {
+				if source[i+1] == '/' {
+					for i < len(source) && source[i] != '\n' {
+						i++
+					}
+					continue
+				}
+				if source[i+1] == '*' {
+					i += 2
+					for i+1 < len(source) && !(source[i] == '*' && source[i+1] == '/') {
+						i++
+					}
+					i = min(i+2, len(source))
+					continue
+				}
+				if canRegex {
+					j, inClass, closed := i+1, false, false
+					for j < len(source) && source[j] != '\n' && source[j] != '\r' {
+						if source[j] == '\\' {
+							j += 2
+							continue
+						}
+						if source[j] == '[' {
+							inClass = true
+						}
+						if source[j] == ']' {
+							inClass = false
+						}
+						if source[j] == '/' && !inClass {
+							j++
+							closed = true
+							break
+						}
+						j++
+					}
+					if closed {
+						for j < len(source) && word(source[j]) {
+							j++
+						}
+						tokens = append(tokens, jsToken{"<regexp>", start})
+						i, canRegex, previous = j, false, "<regexp>"
+						continue
+					}
+				}
+			}
+			if c == '\'' || c == '"' {
+				i++
+				for i < len(source) {
+					if source[i] == '\\' {
+						i += 2
+						continue
+					}
+					if source[i] == c {
+						i++
+						break
+					}
+					i++
+				}
+				i = min(i, len(source))
+				add(start, i)
+				canRegex, previous = false, "<string>"
+				continue
+			}
+			if c == '`' {
+				template()
+				canRegex, previous = false, "<template>"
+				continue
+			}
+			if word(c) {
+				for i < len(source) && word(source[i]) {
+					i++
+				}
+				add(start, i)
+				previous = string(source[start:i])
+				canRegex = strings.Contains("|return|throw|case|delete|void|typeof|new|in|of|yield|await|else|do|instanceof|", "|"+previous+"|")
+				continue
+			}
+			i++
+			if i < len(source) && ((c == '+' || c == '-') && source[i] == c || c == '=' && source[i] == '>') {
+				i++
+			}
+			value := string(source[start:i])
+			add(start, i)
+			switch value {
+			case "(":
+				parens = append(parens, strings.Contains("|if|while|for|switch|catch|with|", "|"+previous+"|"))
+				canRegex = true
+			case ")":
+				canRegex = false
+				if len(parens) > 0 {
+					canRegex = parens[len(parens)-1]
+					parens = parens[:len(parens)-1]
+				}
+			case "{":
+				block := previous == "" || strings.Contains("|)|;|else|try|finally|do|=>|", "|"+previous+"|")
+				blocks = append(blocks, block)
+				canRegex = true
+			case "}":
+				canRegex = true
+				if len(blocks) > 0 {
+					canRegex = blocks[len(blocks)-1]
+					blocks = blocks[:len(blocks)-1]
+				}
+			case "]", ".", "++", "--":
+				canRegex = false
+			default:
+				canRegex = true
+			}
+			previous = value
+		}
+	}
+	code(false)
+	return tokens
+}
 
 // Normalize JS string escapes once; never execute source to decode an import.
 var jsEscape = regexp.MustCompile(`\\(?:u[dD][89aAbB][0-9a-fA-F]{2}\\u[dD][c-fC-F][0-9a-fA-F]{2}|u\{[0-9a-fA-F]+\}|u[0-9a-fA-F]{4}|x[0-9a-fA-F]{2}|\r\n|[\s\S])`)
@@ -128,22 +297,11 @@ type jsImport struct {
 }
 
 func importedJSModules(source []byte) []jsImport {
-	type token struct {
-		value  string
-		offset int
-	}
-	var tokens []token
-	for _, loc := range jsTokens.FindAllIndex(source, -1) {
-		value := string(source[loc[0]:loc[1]])
-		if strings.HasPrefix(value, "//") || strings.HasPrefix(value, "/*") {
-			continue
-		}
-		tokens = append(tokens, token{value, loc[0]})
-	}
+	tokens := tokenizeJS(source)
 	var result []jsImport
 	add := func(index int) {
 		value := tokens[index].value
-		if len(value) >= 2 && (value[0] == '\'' || value[0] == '"') {
+		if len(value) >= 2 && (value[0] == '\'' || value[0] == '"' || value[0] == '`') {
 			result = append(result, jsImport{decodeJSModuleLiteral(value), bytes.Count(source[:tokens[index].offset], []byte("\n")) + 1})
 		}
 	}

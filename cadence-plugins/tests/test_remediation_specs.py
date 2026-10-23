@@ -157,3 +157,18 @@ def test_delivered_ts_plugin_bounds_declarations_and_decodes_literals(tmp_path):
         assert len(violations) == expected, (source, violations)
         if expected:
             assert violations[0]['message'].endswith(('pkg/internal/value', 'pkg/src/value'))
+
+
+def test_delivered_ts_plugin_template_and_regexp_contexts(tmp_path):
+    import json
+    import subprocess
+    cases = json.loads((ROOT.parent/'cadence-core/internal/checks/testdata/js_import_contexts.json').read_text())
+    request = dict(schemaVersion='1.0.0', protocolVersion='1.0.0', repoRoot=str(tmp_path), files=['input.js'], mode='scan')
+    for case in cases:
+        syntax = subprocess.run(['node', '--input-type=module', '--check'], input=case['source'], text=True, capture_output=True)
+        assert syntax.returncode == 0, (case['name'], syntax.stderr)
+        (tmp_path/'input.js').write_text(case['source'])
+        run = subprocess.run(['node', str(ROOT/'plugins/ts/index.mjs')], input=json.dumps(request), text=True, capture_output=True, check=True)
+        findings = json.loads(run.stdout)['violations']
+        assert [f['line'] for f in findings] == case['lines'], (case['name'], findings)
+        assert all(f['ruleId'] == 'SDMM_DEEP_IMPORT' for f in findings)

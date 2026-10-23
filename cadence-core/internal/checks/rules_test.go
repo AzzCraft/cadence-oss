@@ -1,10 +1,41 @@
 package checks
 
 import (
+	"encoding/json"
 	"os"
 	"path/filepath"
 	"testing"
 )
+
+func TestJSImportTemplateAndRegexpContexts(t *testing.T) {
+	raw, err := os.ReadFile("testdata/js_import_contexts.json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	var cases []struct {
+		Name   string
+		Source string
+		Lines  []int
+	}
+	if err := json.Unmarshal(raw, &cases); err != nil {
+		t.Fatal(err)
+	}
+	for _, tc := range cases {
+		t.Run(tc.Name, func(t *testing.T) {
+			root := t.TempDir()
+			writeTestFile(t, root, "input.js", tc.Source)
+			found, err := RunAll(root)
+			if err != nil || len(found) != len(tc.Lines) {
+				t.Fatalf("%v %v; want lines %v", found, err, tc.Lines)
+			}
+			for i, finding := range found {
+				if finding.RuleID != "SDMM_DEEP_IMPORT" || finding.Line != tc.Lines[i] {
+					t.Fatalf("wrong finding: %+v", finding)
+				}
+			}
+		})
+	}
+}
 
 func writeTestFile(t *testing.T, root, rel, content string) {
 	t.Helper()

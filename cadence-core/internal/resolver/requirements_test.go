@@ -1759,6 +1759,35 @@ func TestProductAdoptionDoesNotDependOnPublishingTheStandard(t *testing.T) {
 	}
 }
 
+func TestDownloadInstallActivationUsesProductEvents(t *testing.T) {
+	id := "das.governance.verification-release.s21.download-install-activation-separate-history-not-new-adoption"
+	for _, tc := range []struct {
+		facts map[string]any
+		want  string
+	}{
+		{map[string]any{"activity.standard_release": false, "activity.product_adoption": true}, "true"},
+		{map[string]any{"activity.standard_release": true, "activity.product_adoption": false, "activity.package_activation": false}, "false"},
+		{map[string]any{"activity.standard_release": true, "activity.product_adoption": true}, "true"},
+		{map[string]any{"activity.package_activation": true}, "true"},
+		{map[string]any{"activity.standard_release": false}, "unknown"},
+	} {
+		input := leafRequest(t)
+		setFacts(input, tc.facts)
+		if got := leafStates(t, input)[id]; got != tc.want {
+			t.Fatalf("%v: want %s, got %s", tc.facts, tc.want, got)
+		}
+	}
+	input := leafRequest(t)
+	input["facts"] = []any{
+		map[string]any{"key": "activity.product_adoption", "value": true, "sourceRef": "fixture:A"},
+		map[string]any{"key": "activity.product_adoption", "value": false, "sourceRef": "fixture:B"},
+		map[string]any{"key": "activity.package_activation", "value": false, "sourceRef": "fixture:C"},
+	}
+	if got := leafStates(t, input)[id]; got != "conflict" {
+		t.Fatal("conflicting adoption facts lost", got)
+	}
+}
+
 func TestCurrentPreviewBindsBothCatalogs(t *testing.T) {
 	input := leafRequest(t)
 	input["catalog"].(map[string]any)["modules"].([]any)[0].(map[string]any)["title"] = "Changed display title"

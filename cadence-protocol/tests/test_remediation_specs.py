@@ -198,3 +198,35 @@ def test_schema_rejections_keep_public_value_error_contract():
     with pytest.raises(ValueError, match='runId') as raised:
         validate_run_manifest(invalid)
     assert isinstance(raised.value.__cause__, ValidationError)
+
+
+def test_nested_pipeline_results_use_complete_validator_and_cli(tmp_path):
+    from copy import deepcopy
+    import subprocess
+    import sys
+    import pytest
+    from tools.validate import validate_job_envelope, validate_pipeline_result
+
+    job = json.loads((ROOT/'fixtures/job_envelope/valid/basic.json').read_text())
+    job['runs'].append(deepcopy(job['runs'][0]))
+    for filename, fixture in [('run-manifest.json', 'run_manifest'), ('pipeline-result.json', 'pipeline_result')]:
+        (tmp_path/filename).write_bytes((ROOT/'fixtures'/fixture/'valid/basic.json').read_bytes())
+    for defect in ['valid', 'no-output', 'error', 'cancelled', 'version', 'runId', 'hash']:
+        case = deepcopy(job)
+        child = case['runs'][1]['result']
+        if defect == 'no-output': child.pop('output', None)
+        elif defect in ('error', 'cancelled'): child.update(status=defect); child.pop('error', None)
+        elif defect == 'version': child['schemaVersion'] = '2.0.0'
+        elif defect == 'runId': child['manifestRef']['runId'] = 'other'
+        elif defect == 'hash': child['manifestRef']['manifestHash'] = 'sha256:'+'a'*64
+        valid = defect in ('valid', 'no-output')
+        direct_valid = valid or defect in ('runId', 'hash')
+        if direct_valid: validate_pipeline_result(child)
+        else:
+            with pytest.raises(ValueError): validate_pipeline_result(child)
+        if valid: validate_job_envelope(case)
+        else:
+            with pytest.raises(ValueError): validate_job_envelope(case)
+        (tmp_path/'job-envelope.json').write_text(json.dumps(case))
+        run = subprocess.run([sys.executable, str(ROOT/'tools/validate_artifacts.py'), '--profile', 'protocol/v1', str(tmp_path)], capture_output=True, text=True)
+        assert (run.returncode == 0) is valid, (defect, run.stdout, run.stderr)
