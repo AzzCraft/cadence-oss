@@ -546,3 +546,48 @@ func TestMirrorKindsAndConditionalSnapshot(t *testing.T) {
 		}
 	}
 }
+
+func TestDualToolingLockProductAndSuiteContexts(t *testing.T) {
+	for _, failure := range []string{"none", "product-path", "missing-upstream", "runtime-drift"} {
+		t.Run(failure, func(t *testing.T) {
+			root := t.TempDir()
+			writeValidCadenceArtifacts(t, root)
+			upstream := filepath.Join(root, "tooling", "suite")
+			writeValidCadenceArtifacts(t, upstream)
+			closure, _ := loadJSONObject(root, "suite_version_closure.json", "fixture")
+			tooling, _ := loadJSONObject(root, "tooling_lock.json", "fixture")
+			upstreamLock, _ := loadJSONObject(upstream, "suite_lock.json", "fixture")
+			originalRefs := closure["refs"].(map[string]any)
+			entries := map[string]any{}
+			for name, module := range map[string]string{"standard": "das-standard", "factory": "dasops", "verifyRuntime": "cadence-oss"} {
+				role := map[string]string{"standard": "standard_repo", "factory": "factory_repo", "verifyRuntime": "verify_runtime_repo"}[name]
+				entries[module] = map[string]any{"role": role, "required": true, "lockedRef": originalRefs[name], "overridePolicy": "forbidden", "allowedLocalState": []string{"present_locked_match"}}
+			}
+			upstreamLock["modules"] = entries
+			writeJSON(t, filepath.Join(upstream, "suite_lock.json"), upstreamLock)
+			closure["lockRefs"] = map[string]any{
+				"suiteToolingLock": map[string]any{"kind": "file", "uri": "tooling/suite/tooling_lock.json", "pinType": "manifest", "pinValue": "tooling/suite/tooling_lock.json", "floating": false},
+				"repoToolingLock":  map[string]any{"kind": "file", "uri": "tooling_lock.json", "pinType": "manifest", "pinValue": "tooling_lock.json", "floating": false},
+			}
+			closure["suiteLockRef"] = map[string]any{"kind": "file", "uri": "tooling/suite/suite_lock.json", "pinType": "manifest", "pinValue": "tooling/suite/suite_lock.json", "floating": false}
+			tooling["suiteLockRef"] = closure["suiteLockRef"]
+			if failure == "product-path" {
+				closure["lockRefs"].(map[string]any)["repoToolingLock"].(map[string]any)["uri"] = "other.json"
+			}
+			if failure == "missing-upstream" {
+				os.Remove(filepath.Join(upstream, "suite_lock.json"))
+			}
+			if failure == "runtime-drift" {
+				original, _ := loadJSONObject(upstream, "tooling_lock.json", "fixture")
+				original["verifyRuntime"].(map[string]any)["pinValue"] = "9999999"
+				writeJSON(t, filepath.Join(upstream, "tooling_lock.json"), original)
+			}
+			writeJSON(t, filepath.Join(root, "suite_version_closure.json"), closure)
+			writeJSON(t, filepath.Join(root, "tooling_lock.json"), tooling)
+			err := ValidateClosureToolingAlignment(root, "suite_version_closure.json", "tooling_lock.json")
+			if (err == nil) != (failure == "none") {
+				t.Fatalf("failure=%s err=%v", failure, err)
+			}
+		})
+	}
+}

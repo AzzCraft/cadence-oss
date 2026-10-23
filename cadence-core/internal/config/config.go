@@ -27,6 +27,9 @@ var closureSchema []byte
 //go:embed suite_lock.schema.json
 var suiteLockSchema []byte
 
+//go:embed tooling_lock.schema.json
+var toolingSchema []byte
+
 func validateStandardSchema(data map[string]any, raw []byte, context string) error {
 	compiler := jsonschema.NewCompiler()
 	compiler.Draft = jsonschema.Draft2020
@@ -982,14 +985,124 @@ func ValidateClosureToolingAlignment(repoRoot string, closureRef string, tooling
 		if !ok {
 			return fmt.Errorf("closureRef.lockRefs must be an object")
 		}
-		if rawToolingRef, ok := lockRefs["suiteToolingLock"]; ok {
+		key := "suiteToolingLock"
+		if _, ok := lockRefs["repoToolingLock"]; ok {
+			key = "repoToolingLock"
+		}
+		if rawToolingRef, ok := lockRefs[key]; ok {
 			if resolved, ok := resolveLocalFileRefPath(repoRoot, rawToolingRef); ok {
 				expected := filepath.Clean(filepath.Join(repoRoot, toolingLock))
 				if resolved != expected {
-					return fmt.Errorf("closure/tooling mismatch: lockRefs.suiteToolingLock must point to %s", toolingLock)
+					return fmt.Errorf("closure/tooling mismatch: lockRefs.%s must point to %s", key, toolingLock)
 				}
 			}
 		}
+		if key == "repoToolingLock" {
+			upstreamPath, ok := resolveLocalFileRefPath(repoRoot, lockRefs["suiteToolingLock"])
+			if !ok {
+				return fmt.Errorf("suiteToolingLock must be a local file")
+			}
+			absoluteRoot, err := filepath.EvalSymlinks(repoRoot)
+			if err != nil {
+				return err
+			}
+			upstreamPath, err = filepath.EvalSymlinks(upstreamPath)
+			if err != nil {
+				return err
+			}
+			relative, err := filepath.Rel(absoluteRoot, upstreamPath)
+			if err != nil || relative == ".." || strings.HasPrefix(relative, ".."+string(filepath.Separator)) {
+				return fmt.Errorf("suiteToolingLock escapes product root")
+			}
+			upstream, err := loadJSONObjectAtPath(upstreamPath, "suiteToolingLock")
+			if err != nil {
+				return err
+			}
+			if err := validateStandardSchema(upstream, toolingSchema, "suiteToolingLock"); err != nil {
+				return err
+			}
+			suiteRoot := filepath.Dir(upstreamPath)
+			for _, name := range []string{"suiteVersionClosureRef", "suiteLockRef"} {
+				resolved, ok := resolveLocalFileRefPath(suiteRoot, upstream[name])
+				if !ok {
+					return fmt.Errorf("upstream %s must be local", name)
+				}
+				physical, err := filepath.EvalSymlinks(resolved)
+				if err != nil {
+					return err
+				}
+				relative, err := filepath.Rel(suiteRoot, physical)
+				if err != nil || relative == ".." || strings.HasPrefix(relative, ".."+string(filepath.Separator)) {
+					return fmt.Errorf("upstream %s escapes Suite root", name)
+				}
+				if err := requireLocalFileRef(suiteRoot, upstream[name], "suiteToolingLock."+name, []string{"schemaVersion"}); err != nil {
+					return err
+				}
+			}
+			originalPath, _ := resolveLocalFileRefPath(suiteRoot, upstream["suiteVersionClosureRef"])
+			original, err := loadJSONObjectAtPath(originalPath, "upstream closure")
+			if err != nil {
+				return err
+			}
+			if err := validateStandardSchema(original, closureSchema, "upstream closure"); err != nil {
+				return err
+			}
+			originalRefs, err := requireObject(original, "refs", "upstream closure")
+			if err != nil {
+				return err
+			}
+			for _, name := range []string{"standard", "suite", "factory", "verifyRuntime"} {
+				if !sameStructuredRef(refs[name], originalRefs[name]) {
+					return fmt.Errorf("upstream closure mismatch: refs.%s", name)
+				}
+			}
+			for _, name := range []string{"standardVersion", "standardManifestVersion", "suiteVersion", "factoryVersion", "verifyRuntimeVersion"} {
+				if closure[name] != original[name] {
+					return fmt.Errorf("upstream closure mismatch: %s", name)
+				}
+			}
+			if upstream["standardManifestVersion"] != closure["standardManifestVersion"] {
+				return fmt.Errorf("upstream Standard edition differs")
+			}
+			originalLockRefs, err := requireObject(original, "lockRefs", "upstream closure")
+			if err != nil {
+				return err
+			}
+			selectedUpstream, ok := resolveLocalFileRefPath(suiteRoot, originalLockRefs["suiteToolingLock"])
+			if !ok || selectedUpstream != upstreamPath {
+				return fmt.Errorf("upstream tooling path differs")
+			}
+			if !sameStructuredRef(upstream["verifyRuntime"], tooling["verifyRuntime"]) {
+				return fmt.Errorf("upstream runtime mismatch")
+			}
+			upstreamLockPath, _ := resolveLocalFileRefPath(suiteRoot, upstream["suiteLockRef"])
+			suiteLock, err := loadJSONObjectAtPath(upstreamLockPath, "upstream Suite lock")
+			if err != nil {
+				return err
+			}
+			if suiteLock["suiteVersion"] != closure["suiteVersion"] || suiteLock["standardManifestVersion"] != closure["standardManifestVersion"] {
+				return fmt.Errorf("upstream Suite lock version differs")
+			}
+			modules, err := requireObject(suiteLock, "modules", "upstream Suite lock")
+			if err != nil {
+				return err
+			}
+			for name, module := range map[string]string{"standard": "das-standard", "factory": "dasops", "verifyRuntime": "cadence-oss"} {
+				entry, err := requireObject(modules, module, "upstream Suite modules")
+				if err != nil {
+					return err
+				}
+				if !sameStructuredRef(entry["lockedRef"], refs[name]) {
+					return fmt.Errorf("upstream Suite module differs: %s", module)
+				}
+			}
+			productLockPath, _ := resolveLocalFileRefPath(repoRoot, closure["suiteLockRef"])
+			toolingLockPath, _ := resolveLocalFileRefPath(repoRoot, tooling["suiteLockRef"])
+			if upstreamLockPath != productLockPath || productLockPath != toolingLockPath {
+				return fmt.Errorf("suiteLockRef paths differ")
+			}
+		}
+
 	}
 	return nil
 }
