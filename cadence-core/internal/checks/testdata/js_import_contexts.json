@@ -1,0 +1,155 @@
+[
+  {
+    "name": "constant-template",
+    "source": "const p = import(`pkg/internal/value`);",
+    "lines": [
+      1
+    ]
+  },
+  {
+    "name": "template-expression",
+    "source": "const p = `value ${await import('pkg/internal/value')}`;",
+    "lines": [
+      1
+    ]
+  },
+  {
+    "name": "regexp",
+    "source": "const pattern = /import \"pkg\\/internal\\/value\"/;",
+    "lines": []
+  },
+  {
+    "name": "static",
+    "source": "import x from 'pkg/internal/value';",
+    "lines": [
+      1
+    ]
+  },
+  {
+    "name": "dynamic",
+    "source": "const p = import('pkg/internal/value');",
+    "lines": [
+      1
+    ]
+  },
+  {
+    "name": "template-text",
+    "source": "const text = `import 'pkg/internal/value'`;",
+    "lines": []
+  },
+  {
+    "name": "regexp-class",
+    "source": "const pattern = /[\\/]import \"pkg\\/internal\\/value\"/;",
+    "lines": []
+  },
+  {
+    "name": "nested-template",
+    "source": "const p = `outer ${`inner ${await import('pkg/src/value')}`}`;",
+    "lines": [
+      1
+    ]
+  },
+  {
+    "name": "escaped-interpolation",
+    "source": "const text = `\\${import('pkg/internal/example')}`;",
+    "lines": []
+  },
+  {
+    "name": "division",
+    "source": "const ratio = value / 2; import('pkg/internal/value');",
+    "lines": [
+      1
+    ]
+  },
+  {
+    "name": "regexp-after-control",
+    "source": "if (ok) /import \"pkg\\/internal\\/value\"/.test(text); import('pkg/src/value');",
+    "lines": [
+      1
+    ]
+  },
+  {
+    "name": "nonconstant-template",
+    "source": "const p = import(`pkg/${name}/internal/value`);",
+    "lines": []
+  },
+  {
+    "name": "interpolated-string",
+    "source": "const p = import(`${'pkg/internal/value'}`);",
+    "lines": []
+  },
+  {
+    "name": "regexp-in-template",
+    "source": "const p = `value ${/import 'pkg\\/internal\\/value'/.test(text)}`;",
+    "lines": []
+  },
+  {
+    "name": "object-division",
+    "source": "const p = ({value:2}) / 2; import('pkg/internal/value');",
+    "lines": [
+      1
+    ]
+  },
+  {
+    "name": "multiline",
+    "source": "const p = `text\n${await import('pkg/src/value')}`;",
+    "lines": [
+      2
+    ]
+  },
+  {
+    "name": "comment",
+    "source": "/* import('pkg/internal/comment') */\nimport('pkg/src/value');",
+    "lines": [
+      2
+    ]
+  },
+  {
+    "name": "function-expression-division",
+    "source": "const ratio = function() {} / import('pkg/internal/value') / 2;",
+    "lines": [
+      1
+    ]
+  },
+  {
+    "name": "class-declaration-regexp",
+    "source": "class A {} /import \"pkg\\/internal\\/value\"/.test(text);",
+    "lines": []
+  },
+  {
+    "name": "function-declaration-regexp",
+    "source": "function f() {} /import \"pkg\\/internal\\/value\"/.test(text);",
+    "lines": []
+  },
+  {
+    "name": "named-function-expression-division",
+    "source": "const ratio = function f() {} / import('pkg/internal/value') / 2;",
+    "lines": [
+      1
+    ]
+  },
+  {
+    "name": "class-expression-division",
+    "source": "const ratio = class {} / import('pkg/internal/value') / 2;",
+    "lines": [
+      1
+    ]
+  },
+  {
+    "name": "named-class-expression-division",
+    "source": "const ratio = class A {} / import('pkg/internal/value') / 2;",
+    "lines": [
+      1
+    ]
+  },
+  {
+    "name": "nested-default-body-regexp",
+    "source": "function f(arg = function() { return {}; }) {} /import \"pkg\\/internal\\/value\"/.test(text);",
+    "lines": []
+  },
+  {
+    "name": "nested-class-body-regexp",
+    "source": "class A extends class {} {} /import \"pkg\\/internal\\/value\"/.test(text);",
+    "lines": []
+  }
+]

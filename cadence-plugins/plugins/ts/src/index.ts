@@ -50,13 +50,117 @@ function decodeModuleLiteral(literal: string): string {
   });
 }
 
+function tokenizeJS(content: string) {
+  const tokens: {value:string;index:number}[] = [];
+  let i = 0;
+  const word = (c: string) => /[A-Za-z0-9_$]/.test(c);
+  const add = (start: number, end: number) => tokens.push({value:content.slice(start,end), index:start});
+  function template() {
+    const start = i, slot = tokens.length;
+    tokens.push({value:'<template>', index:start}); i++;
+    let interpolated = false;
+    while (i < content.length) {
+      if (content[i] === '\\') { i += 2; continue; }
+      if (content[i] === '`') {
+        i++; if (!interpolated) tokens[slot].value = content.slice(start,i); return;
+      }
+      if (content[i] === '$' && content[i+1] === '{') { interpolated = true; i += 2; code(true); }
+      else i++;
+    }
+  }
+  function code(expression: boolean) {
+    let canRegex = true, previous = '', statementStart = !expression, brackets = 0;
+    // A body remembers whether its closing brace ends a declaration or a value.
+    const pending: {kind:string;declaration:boolean;parens:number;braces:number;brackets:number}[] = [];
+    const parens: boolean[] = [];
+    const blocks: {regexAfter:boolean;statements:boolean;parens:number}[] = [];
+    while (i < content.length) {
+      const c = content[i];
+      if (/\s/.test(c)) { i++; continue; }
+      if (c === '}' && expression && blocks.length === 0) { i++; return; }
+      const start = i;
+      if (c === '/' && i+1 < content.length) {
+        if (content[i+1] === '/') { while (i < content.length && content[i] !== '\n') i++; continue; }
+        if (content[i+1] === '*') {
+          i += 2; while (i+1 < content.length && !(content[i] === '*' && content[i+1] === '/')) i++;
+          i = Math.min(i+2,content.length); continue;
+        }
+        if (canRegex) {
+          let j = i+1, inClass = false, closed = false;
+          while (j < content.length && !['\n','\r'].includes(content[j])) {
+            if (content[j] === '\\') { j += 2; continue; }
+            if (content[j] === '[') inClass = true;
+            if (content[j] === ']') inClass = false;
+            if (content[j] === '/' && !inClass) { j++; closed = true; break; }
+            j++;
+          }
+          if (closed) {
+            while (j < content.length && word(content[j])) j++;
+            tokens.push({value:'<regexp>',index:start}); i = j; canRegex = false; previous = '<regexp>'; statementStart = false; continue;
+          }
+        }
+      }
+      if (c === "'" || c === '"') {
+        i++; while (i < content.length) {
+          if (content[i] === '\\') { i += 2; continue; }
+          if (content[i] === c) { i++; break; } i++;
+        }
+        add(start,i); canRegex = false; previous = '<string>'; statementStart = false; continue;
+      }
+      if (c === '`') { template(); canRegex = false; previous = '<template>'; statementStart = false; continue; }
+      if (word(c)) {
+        while (i < content.length && word(content[i])) i++;
+        add(start,i); const value = content.slice(start,i);
+        if (['function','class'].includes(value) && previous !== '.') {
+          pending.push({kind:value, declaration:statementStart, parens:parens.length, braces:blocks.length, brackets});
+        }
+        statementStart = ['else','do','try','finally'].includes(value) ||
+          (statementStart && ['export','default','async'].includes(value));
+        previous = value;
+        canRegex = ['return','throw','case','delete','void','typeof','new','in','of','yield','await','else','do','instanceof'].includes(previous); continue;
+      }
+      i++;
+      if (i < content.length && ((c === '+' || c === '-') && content[i] === c || c === '=' && content[i] === '>')) i++;
+      const value = content.slice(start,i); add(start,i);
+      const body = pending[pending.length-1];
+      const atBodyDepth = body && body.parens === parens.length && body.braces === blocks.length && body.brackets === brackets;
+      const wasStatementStart = statementStart;
+      statementStart = false;
+      if (value === '(') { parens.push(['if','while','for','switch','catch','with'].includes(previous)); canRegex = true; }
+      else if (value === ')') { canRegex = parens.pop() ?? false; statementStart = canRegex; }
+      else if (value === '{') {
+        const construct = atBodyDepth && (body.kind === 'class' || previous === ')');
+        const statements = construct || wasStatementStart || previous === ')' || previous === '=>';
+        const regexAfter = construct ? body.declaration : statements && previous !== '=>';
+        if (construct) pending.pop();
+        blocks.push({regexAfter, statements:!!statements, parens:parens.length});
+        canRegex = true; statementStart = !!statements;
+      }
+      else if (value === '}') {
+        canRegex = blocks.pop()?.regexAfter ?? true; statementStart = canRegex;
+        while (pending.length && pending[pending.length-1].braces > blocks.length) pending.pop();
+      }
+      else {
+        canRegex = ![']','.','++','--'].includes(value);
+        if (value === '[') brackets++;
+        if (value === ']') brackets--;
+        const scope = blocks[blocks.length-1];
+        if (value === ';' || value === ':') statementStart = scope ? scope.statements && scope.parens === parens.length : !expression && parens.length === 0;
+        if (atBodyDepth && [';',':',','].includes(value)) pending.pop();
+      }
+      previous = value;
+    }
+  }
+  code(false);
+  return tokens;
+}
+
 function scanImports(content: string): Violation[] {
   const violations: Violation[] = [];
-  const pattern = /"(?:\\[\s\S]|[^"\\])*"|'(?:\\[\s\S]|[^'\\])*'|`(?:\\[\s\S]|[^`\\])*`|\/\*[\s\S]*?\*\/|\/\/[^\n]*|[A-Za-z_$][A-Za-z0-9_$]*|[^\s]/g;
-  const tokens = [...content.matchAll(pattern)].map(m => ({value:m[0], index:m.index ?? 0})).filter(t => !t.value.startsWith('//') && !t.value.startsWith('/*'));
+  const tokens = tokenizeJS(content);
   function add(index: number) {
     const literal = tokens[index].value;
-    if (!literal.startsWith('"') && !literal.startsWith("'")) return;
+    if (!['"', "'", '`'].includes(literal[0])) return;
     const module = decodeModuleLiteral(literal);
     if (module.includes('/internal/') || module.includes('/src/')) {
       violations.push({ruleId:'SDMM_DEEP_IMPORT', severity:'P1', message:`Deep import detected: ${module}`, line:content.slice(0,tokens[index].index).split('\n').length});
