@@ -28,8 +28,13 @@ for path in files:
     runtime = data.get('runtimeCompatibility')
     if not isinstance(runtime, dict) or any(not isinstance(runtime.get(k), str) or not runtime[k] for k in ('cadenceCore', 'protocol')):
         raise SystemExit(f'{path}: runtime compatibility is missing')
-    if not isinstance(data.get('rules'), list) or not data['rules']:
+    # This named adapter selects existing core checks; it declares no new rules.
+    # Do not make empty rule sets valid for ordinary policy packs.
+    metadata_only = path.parent.name == data['id'] == 'scaffold-v15'
+    if not isinstance(data.get('rules'), list) or (not data['rules'] and not metadata_only):
         raise SystemExit(f'{path}: rules must be a non-empty list')
+    if metadata_only and data['rules']:
+        raise SystemExit(f'{path}: metadata-only scaffold adapter must not declare rules')
 print(f'OK: {len(files)} policy packs validated')
 PYVALIDATE
 

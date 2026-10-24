@@ -2,5 +2,8 @@ id: scaffold-v15
 schemaVersion: 1.0.0
 version: 1.0.0
 channel: beta
+runtimeCompatibility:
+  cadenceCore: ">=1.2.0-beta.1 <1.3.0"
+  protocol: "1.4.x"
 description: "Metadata-only selection for existing core secret, JS import and fixture checks. Does not certify DAS 1.5 conformance or execute UI checks."
 rules: []
