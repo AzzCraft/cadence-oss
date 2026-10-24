@@ -2,6 +2,10 @@
 from __future__ import annotations
 
 import unittest
+import os
+import shutil
+import subprocess
+import tempfile
 from pathlib import Path
 from tests._root_contract import repository_root_for_test_file
 
@@ -10,6 +14,45 @@ ROOT = repository_root_for_test_file(__file__)
 
 
 class PolicyPacksRemediationSpecTests(unittest.TestCase):
+
+    def test_metadata_only_adapter_preserves_normal_pack_validation(self) -> None:
+        import yaml
+        with tempfile.TemporaryDirectory(prefix='cadence-policy-validation-') as temp:
+            root = Path(temp)
+            for name in ('packs', 'scripts'):
+                shutil.copytree(ROOT / name, root / name)
+            # Exercise the real shell entry without recursively copying this test.
+            (root / 'tests').mkdir()
+            (root / 'tests/test_control.py').write_text('def test_control(): pass\n')
+            env = os.environ.copy()
+            env.pop('PYTHONPATH', None)
+            def verify():
+                return subprocess.run(['bash', 'scripts/verify'], cwd=root, env=env,
+                                      capture_output=True, text=True, timeout=30)
+            control = verify()
+            self.assertEqual(control.returncode, 0, control.stdout + control.stderr)
+            adapter = root / 'packs/scaffold-v15/pack.yaml'
+            original = adapter.read_bytes()
+            value = yaml.safe_load(original)
+            del value['runtimeCompatibility']
+            adapter.write_text(yaml.safe_dump(value))
+            missing = verify()
+            self.assertNotEqual(missing.returncode, 0)
+            self.assertIn('runtime compatibility is missing', missing.stdout + missing.stderr)
+            value = yaml.safe_load(original)
+            value['rules'] = [{'ruleId': 'unexpected'}]
+            adapter.write_text(yaml.safe_dump(value))
+            unexpected = verify()
+            self.assertNotEqual(unexpected.returncode, 0)
+            self.assertIn('must not declare rules', unexpected.stdout + unexpected.stderr)
+            adapter.write_bytes(original)
+            ordinary = root / 'packs/core-v146-baseline/pack.yaml'
+            value = yaml.safe_load(ordinary.read_text())
+            value['rules'] = []
+            ordinary.write_text(yaml.safe_dump(value))
+            empty = verify()
+            self.assertNotEqual(empty.returncode, 0)
+            self.assertIn('rules must be a non-empty list', empty.stdout + empty.stderr)
 
     # --- Item 11: cadence-policy-packs has v1.4.0 families ---
 

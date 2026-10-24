@@ -33,6 +33,21 @@
         "signer": "cadence-oss-team",
         "allowlisted": true
       }
+    },
+    {
+      "kind": "policyPack",
+      "id": "scaffold-v15",
+      "version": "1.0.0",
+      "status": "active",
+      "digest": "sha256:9d29a481484c5b469a2fe4a76752be602be04e266bf4466678c72c97c5cdb83d",
+      "deprecatedAt": null,
+      "deprecationReason": null,
+      "compatWindow": "current",
+      "ref": "../../cadence-policy-packs/packs/scaffold-v15/pack.yaml",
+      "trust": {
+        "signer": "cadence-oss-team",
+        "allowlisted": true
+      }
     }
   ]
 }

@@ -105,3 +105,11 @@ emit a v1 software anchor only after using and verifying a concrete local softwa
 signer. External signer hardware custody is unknown and produces no hardware anchor.
 This release does not implement a verified hardware-provider attestation adapter;
 installations requiring hardware must not treat an absent anchor as satisfying it.
+
+### Product and Suite tooling locks
+
+A closure with `repoToolingLock` selects the product lock for native alignment;
+legacy closures without it retain their single-lock behavior. The preserved
+Suite tooling lock and its local references are validated in the Suite subtree.
+The `scaffold-v15` policy entry is explicitly metadata-only: it selects the
+existing core checks and adds no DAS compliance or UI execution capability.
