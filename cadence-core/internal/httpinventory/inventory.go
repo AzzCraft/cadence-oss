@@ -164,6 +164,9 @@ func children(value map[string]any, base string, depth int, kind string, visit f
 			continue
 		}
 		childKind := "auto"
+		if key == "components" {
+			childKind = "components"
+		}
 		if kind == "schema" {
 			childKind = "schema"
 		}
@@ -180,6 +183,16 @@ func children(value map[string]any, base string, depth int, kind string, visit f
 		}
 		if kind != "schema" && key == "examples" {
 			mappingKind = "example"
+		}
+		if kind == "components" {
+			switch key {
+			case "schemas":
+				mappingKind = "schema"
+			case "examples":
+				mappingKind = "example"
+			case "parameters", "headers", "requestBodies", "responses", "links", "callbacks", "securitySchemes", "pathItems":
+				mappingKind = "structural"
+			}
 		}
 		if mappingKind != "" {
 			entries, err := object(child)

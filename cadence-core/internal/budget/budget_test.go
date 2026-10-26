@@ -58,3 +58,20 @@ func TestNotTerminatedInitially(t *testing.T) {
 		t.Fatal("new budget has reason")
 	}
 }
+
+func TestNegativeChargeNeverAddsCapacity(t *testing.T) {
+	b := New(1, time.Second, 1)
+	if !errors.Is(b.ChargeTokens(-1), ErrInvalidCharge) || !errors.Is(b.ChargeTime(-time.Second), ErrInvalidCharge) {
+		t.Fatal("negative charge accepted")
+	}
+	if b.Terminated() {
+		t.Fatal("invalid input terminated budget")
+	}
+	if b.ChargeTokens(1) != nil || !errors.Is(b.ChargeTokens(1), ErrTerminated) {
+		t.Fatal("capacity changed")
+	}
+	b = New(1, time.Second, 1)
+	if b.ChargeTime(time.Second) != nil || !errors.Is(b.ChargeTime(1), ErrTerminated) {
+		t.Fatal("time capacity changed")
+	}
+}

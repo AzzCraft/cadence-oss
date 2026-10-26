@@ -426,9 +426,13 @@ func loadJSONObjectAtPath(path string, label string) (map[string]any, error) {
 	if err != nil {
 		return nil, fmt.Errorf("%s: cannot read %s: %w", label, path, err)
 	}
-	var dec map[string]any
-	if err := json.Unmarshal(data, &dec); err != nil {
+	parsed, err := exactjson.Parse(data)
+	if err != nil {
 		return nil, fmt.Errorf("%s: %s is not valid JSON: %w", label, path, err)
+	}
+	dec, ok := parsed.(map[string]any)
+	if !ok {
+		return nil, fmt.Errorf("%s: JSON object required", label)
 	}
 	return dec, nil
 }
@@ -983,6 +987,13 @@ func ValidateClosureToolingAlignment(repoRoot string, closureRef string, tooling
 			return fmt.Errorf("closure/tooling mismatch: verifyRuntime refs differ")
 		}
 	}
+	if closure["suiteLockRef"] != nil || tooling["suiteLockRef"] != nil {
+		left, leftOK := resolveLocalFileRefPath(repoRoot, closure["suiteLockRef"])
+		right, rightOK := resolveLocalFileRefPath(repoRoot, tooling["suiteLockRef"])
+		if !leftOK || !rightOK || left != right {
+			return fmt.Errorf("closure/tooling mismatch: suiteLockRef paths differ")
+		}
+	}
 	if rawLockRefs, ok := closure["lockRefs"]; ok {
 		lockRefs, ok := rawLockRefs.(map[string]any)
 		if !ok {
@@ -1079,6 +1090,10 @@ func ValidateClosureToolingAlignment(repoRoot string, closureRef string, tooling
 				return fmt.Errorf("upstream runtime mismatch")
 			}
 			upstreamLockPath, _ := resolveLocalFileRefPath(suiteRoot, upstream["suiteLockRef"])
+			originalLockPath, ok := resolveLocalFileRefPath(suiteRoot, original["suiteLockRef"])
+			if !ok || originalLockPath != upstreamLockPath {
+				return fmt.Errorf("upstream closure/tooling suiteLockRef paths differ")
+			}
 			suiteLock, err := loadJSONObjectAtPath(upstreamLockPath, "upstream Suite lock")
 			if err != nil {
 				return err

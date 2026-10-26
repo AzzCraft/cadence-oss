@@ -230,3 +230,28 @@ def test_nested_pipeline_results_use_complete_validator_and_cli(tmp_path):
         (tmp_path/'job-envelope.json').write_text(json.dumps(case))
         run = subprocess.run([sys.executable, str(ROOT/'tools/validate_artifacts.py'), '--profile', 'protocol/v1', str(tmp_path)], capture_output=True, text=True)
         assert (run.returncode == 0) is valid, (defect, run.stdout, run.stderr)
+
+
+def test_migration_cli_preserves_decimal_and_migrates_nested_legacy(tmp_path):
+    import subprocess
+    import sys
+    from decimal import Decimal
+    from tools import migrate
+    from tools.validate import validate_job_envelope
+    source=json.loads((ROOT/'fixtures/run_manifest/valid/basic.json').read_text())
+    source['schemaVersion']='0.9.0'
+    source['determinism']['seed']=Decimal('9007199254740993.0')
+    input_path=tmp_path/'input.json';output=tmp_path/'output.json'
+    input_path.write_text(migrate.lossless_json(source))
+    result=subprocess.run([sys.executable,str(ROOT/'tools/migrate.py'),'--kind','legacy-run-manifest','--input',str(input_path),'--output',str(output)],capture_output=True,text=True)
+    assert result.returncode==0,result.stderr
+    assert json.loads(output.read_text(),parse_float=Decimal)['determinism']['seed']==Decimal('9007199254740993.0')
+    job=json.loads((ROOT/'fixtures/job_envelope/valid/basic.json').read_text())
+    job['schemaVersion']='0.9.0';job['runs'][0]['result']['schemaVersion']='0.9.0'
+    converted=migrate.migrate_legacy_job_envelope(job)
+    validate_job_envelope(converted)
+    assert converted['runs'][0]['result']['schemaVersion']=='1.0.0'
+    assert job['runs'][0]['result']['schemaVersion']=='0.9.0'
+    job['runs'][0]['result']['schemaVersion']='9.0.0'
+    import pytest
+    with pytest.raises(ValueError,match='unsupported'):migrate.migrate_legacy_job_envelope(job)

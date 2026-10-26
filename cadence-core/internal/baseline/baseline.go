@@ -56,6 +56,7 @@ func Save(path string, violations []checks.Violation) error {
 	for fp := range m {
 		fps = append(fps, fp)
 	}
+	sort.Strings(fps)
 	b := Baseline{SchemaVersion: "1.0.0", Fingerprints: fps}
 	data, err := json.MarshalIndent(b, "", "  ")
 	if err != nil {

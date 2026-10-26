@@ -5,6 +5,8 @@ from __future__ import annotations
 
 import argparse
 import json
+from copy import deepcopy
+from decimal import Decimal
 from pathlib import Path
 
 
@@ -28,11 +30,17 @@ def migrate_legacy_pipeline_result(payload: dict) -> dict:
 
 
 def migrate_legacy_job_envelope(payload: dict) -> dict:
-    migrated = dict(payload)
+    migrated = deepcopy(payload)
     version = payload.get('schemaVersion')
     if version not in ('0.9.0', '1.0.0'):
         raise ValueError('unsupported migration source schemaVersion')
     migrated['schemaVersion'] = '1.0.0'
+    if not isinstance(migrated.get('runs'), list):
+        raise ValueError('JobEnvelope runs must be a list')
+    for run in migrated['runs']:
+        if not isinstance(run, dict) or not isinstance(run.get('result'), dict):
+            raise ValueError('JobEnvelope runs[].result must be an object')
+        run['result'] = migrate_legacy_pipeline_result(run['result'])
     return migrated
 
 
@@ -53,6 +61,18 @@ MIGRATION_REGISTRY: dict[str, callable] = {
 }
 
 
+def lossless_json(value):
+    """Emit parsed legacy numbers without routing them through binary64/JCS."""
+    if isinstance(value, Decimal):
+        if not value.is_finite(): raise ValueError('nonfinite migration number')
+        return str(value)
+    if isinstance(value, dict):
+        return '{' + ','.join(json.dumps(key) + ':' + lossless_json(child) for key, child in sorted(value.items())) + '}'
+    if isinstance(value, list):
+        return '[' + ','.join(lossless_json(child) for child in value) + ']'
+    return json.dumps(value, allow_nan=False)
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(prog="migrate.py")
     parser.add_argument("--kind", required=True)
@@ -60,7 +80,9 @@ def main() -> int:
     parser.add_argument("--output", required=True)
     args = parser.parse_args()
 
-    data = json.loads(Path(args.input).read_text(encoding="utf-8"))
+    import exact_json
+    data = exact_json.parse(Path(args.input).read_bytes())
+    if not isinstance(data, dict): raise ValueError("migration requires an object")
     fn = MIGRATION_REGISTRY.get(args.kind)
     if fn is None:
         raise SystemExit(f"unsupported migration kind: {args.kind} (known: {', '.join(sorted(MIGRATION_REGISTRY))})")
@@ -71,7 +93,7 @@ def main() -> int:
         'legacy-evidence-bundle':'validate_evidence_bundle'}[args.kind])
     validator(migrated)
 
-    Path(args.output).write_text(json.dumps(migrated, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    Path(args.output).write_text(lossless_json(migrated) + "\n", encoding="utf-8")
     return 0
 
 

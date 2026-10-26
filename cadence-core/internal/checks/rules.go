@@ -10,7 +10,17 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"unicode"
+	"unicode/utf8"
 )
+
+func isJSSourceExtension(ext string) bool {
+	switch ext {
+	case ".js", ".jsx", ".ts", ".tsx", ".mjs", ".cjs", ".mts", ".cts":
+		return true
+	}
+	return false
+}
 
 // RunAll runs the built-in baseline rules.
 func RunAll(repoRoot string) ([]Violation, error) {
@@ -53,7 +63,7 @@ func RunAllWithTrace(repoRoot string) ([]Violation, []string, error) {
 		}
 
 		ext := strings.ToLower(filepath.Ext(relPath))
-		if ext == ".ts" || ext == ".tsx" || ext == ".js" || ext == ".jsx" {
+		if isJSSourceExtension(ext) {
 			executed["SDMM_DEEP_IMPORT"] = true
 			for _, module := range importedJSModules(b) {
 				if strings.Contains(module.value, "/internal/") || strings.Contains(module.value, "/src/") {
@@ -99,8 +109,15 @@ func tokenizeJS(source []byte) []jsToken {
 	i := 0
 	var code func(bool)
 	var template func()
-	word := func(c byte) bool {
-		return c >= 'a' && c <= 'z' || c >= 'A' && c <= 'Z' || c >= '0' && c <= '9' || c == '_' || c == '$'
+	wordWidth := func(index int) int {
+		if index >= len(source) {
+			return 0
+		}
+		c, width := utf8.DecodeRune(source[index:])
+		if c == '_' || c == '$' || c == '\u200c' || c == '\u200d' || unicode.IsLetter(c) || unicode.IsDigit(c) || unicode.Is(unicode.Nl, c) || unicode.Is(unicode.Mn, c) || unicode.Is(unicode.Mc, c) || unicode.Is(unicode.Pc, c) || unicode.Is(unicode.Other_ID_Start, c) || unicode.Is(unicode.Other_ID_Continue, c) {
+			return width
+		}
+		return 0
 	}
 	add := func(start, end int) { tokens = append(tokens, jsToken{string(source[start:end]), start}) }
 	template = func() {
@@ -191,8 +208,8 @@ func tokenizeJS(source []byte) []jsToken {
 						j++
 					}
 					if closed {
-						for j < len(source) && word(source[j]) {
-							j++
+						for j < len(source) && wordWidth(j) > 0 {
+							j += wordWidth(j)
 						}
 						tokens = append(tokens, jsToken{"<regexp>", start})
 						i, canRegex, previous = j, false, "<regexp>"
@@ -226,9 +243,9 @@ func tokenizeJS(source []byte) []jsToken {
 				statementStart = false
 				continue
 			}
-			if word(c) {
-				for i < len(source) && word(source[i]) {
-					i++
+			if wordWidth(i) > 0 {
+				for i < len(source) && wordWidth(i) > 0 {
+					i += wordWidth(i)
 				}
 				add(start, i)
 				value := string(source[start:i])
@@ -237,6 +254,9 @@ func tokenizeJS(source []byte) []jsToken {
 				}
 				statementStart = strings.Contains("|else|do|try|finally|", "|"+value+"|") ||
 					(statementStart && strings.Contains("|export|default|async|", "|"+value+"|"))
+				if value == "await" && previous == "for" {
+					value = "for-await"
+				}
 				previous = value
 				canRegex = strings.Contains("|return|throw|case|delete|void|typeof|new|in|of|yield|await|else|do|instanceof|", "|"+previous+"|")
 				continue
@@ -257,7 +277,7 @@ func tokenizeJS(source []byte) []jsToken {
 			statementStart = false
 			switch value {
 			case "(":
-				parens = append(parens, strings.Contains("|if|while|for|switch|catch|with|", "|"+previous+"|"))
+				parens = append(parens, strings.Contains("|if|while|for|for-await|switch|catch|with|", "|"+previous+"|"))
 				canRegex = true
 			case ")":
 				canRegex = false
