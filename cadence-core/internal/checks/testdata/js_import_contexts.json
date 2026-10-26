@@ -151,5 +151,43 @@
     "name": "nested-class-body-regexp",
     "source": "class A extends class {} {} /import \"pkg\\/internal\\/value\"/.test(text);",
     "lines": []
+  },
+  {
+    "name": "unicode-0",
+    "source": "const 变量 = 8; const value = 变量 / import('pkg/internal/value').then(f);",
+    "lines": [
+      1
+    ]
+  },
+  {
+    "name": "unicode-1",
+    "source": "const α = 8; const value = α / import('pkg/internal/value').then(f);",
+    "lines": [
+      1
+    ]
+  },
+  {
+    "name": "unicode-2",
+    "source": "const 𐐀value = 8; const value = 𐐀value / import('pkg/internal/value').then(f);",
+    "lines": [
+      1
+    ]
+  },
+  {
+    "name": "unicode-3",
+    "source": "const á = 8; const value = á / import('pkg/internal/value').then(f);",
+    "lines": [
+      1
+    ]
+  },
+  {
+    "name": "unicode-letter-number-division",
+    "source": "const Ⅳ = 8; const value = Ⅳ / import('pkg/internal/value').then(f);",
+    "lines": [1]
+  },
+  {
+    "name": "for-await-regex-body",
+    "source": "async function f(xs) { for await (const x of xs) /import('pkg\\/internal\\/value')/.test(x); }",
+    "lines": []
   }
 ]

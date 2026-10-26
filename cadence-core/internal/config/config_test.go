@@ -548,7 +548,7 @@ func TestMirrorKindsAndConditionalSnapshot(t *testing.T) {
 }
 
 func TestDualToolingLockProductAndSuiteContexts(t *testing.T) {
-	for _, failure := range []string{"none", "product-path", "missing-upstream", "runtime-drift"} {
+	for _, failure := range []string{"none", "product-path", "missing-upstream", "runtime-drift", "upstream-suite-ref"} {
 		t.Run(failure, func(t *testing.T) {
 			root := t.TempDir()
 			writeValidCadenceArtifacts(t, root)
@@ -576,6 +576,11 @@ func TestDualToolingLockProductAndSuiteContexts(t *testing.T) {
 			}
 			if failure == "missing-upstream" {
 				os.Remove(filepath.Join(upstream, "suite_lock.json"))
+			}
+			if failure == "upstream-suite-ref" {
+				original, _ := loadJSONObject(upstream, "suite_version_closure.json", "fixture")
+				original["suiteLockRef"].(map[string]any)["uri"] = "other.json"
+				writeJSON(t, filepath.Join(upstream, "suite_version_closure.json"), original)
 			}
 			if failure == "runtime-drift" {
 				original, _ := loadJSONObject(upstream, "tooling_lock.json", "fixture")
@@ -605,5 +610,26 @@ func TestToolingStandard15RequiresFullCommitPins(t *testing.T) {
 		if (err == nil) != (len(pin) == 40) {
 			t.Fatalf("pin=%s err=%v", pin, err)
 		}
+	}
+}
+
+func TestRawJSONDuplicateKeysAndSingleLockReferences(t *testing.T) {
+	root := t.TempDir()
+	for _, raw := range []string{`{"x":1,"x":2}`, `{"nested":{"x":1,"x":2}}`} {
+		path := filepath.Join(root, "duplicate.json")
+		writeFile(t, path, raw)
+		if _, err := loadJSONObjectAtPath(path, "fixture"); err == nil {
+			t.Fatal("duplicate accepted")
+		}
+	}
+	writeValidCadenceArtifacts(t, root)
+	if err := ValidateClosureToolingAlignment(root, "suite_version_closure.json", "tooling_lock.json"); err != nil {
+		t.Fatal(err)
+	}
+	closure, _ := loadJSONObject(root, "suite_version_closure.json", "fixture")
+	closure["suiteLockRef"].(map[string]any)["uri"] = "different.json"
+	writeJSON(t, filepath.Join(root, "suite_version_closure.json"), closure)
+	if err := ValidateClosureToolingAlignment(root, "suite_version_closure.json", "tooling_lock.json"); err == nil {
+		t.Fatal("single lock reference drift accepted")
 	}
 }

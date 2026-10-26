@@ -152,7 +152,7 @@ func TestGroupByFile(t *testing.T) {
 }
 
 func TestContractFixtureLayouts(t *testing.T) {
-	for _, name := range []string{"payment.schema.json", "payment.json"} {
+	for _, name := range []string{"payment.schema.json", "payment.json", "payment.JSON", "payment.SCHEMA.JSON", "payment.Schema.Json"} {
 		for _, layout := range []string{"canonical", "legacy"} {
 			root := t.TempDir()
 			if err := os.MkdirAll(filepath.Join(root, "contracts/schemas"), 0700); err != nil {
@@ -286,5 +286,16 @@ func TestImportsAndSecretContentRetainDistinctFindings(t *testing.T) {
 	}
 	if first == "" || second == "" || first == second {
 		t.Fatal("new content reused old baseline identity")
+	}
+}
+
+func TestAllJavaScriptExtensionsReachImportRule(t *testing.T) {
+	for _, ext := range []string{"js", "jsx", "ts", "tsx", "mjs", "cjs", "mts", "cts"} {
+		root := t.TempDir()
+		writeTestFile(t, root, "input."+ext, `import x from "@pkg/internal/x";`)
+		found, err := RunAll(root)
+		if err != nil || len(found) != 1 || found[0].RuleID != "SDMM_DEEP_IMPORT" {
+			t.Fatalf("%s: %v %v", ext, found, err)
+		}
 	}
 }

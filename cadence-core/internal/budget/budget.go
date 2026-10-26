@@ -25,9 +25,9 @@ const (
 
 // Budget tracks remaining capacity along three axes.
 type Budget struct {
-	mu              sync.Mutex
-	TokensRemaining int64
-	TimeRemaining   time.Duration
+	mu               sync.Mutex
+	TokensRemaining  int64
+	TimeRemaining    time.Duration
 	PluginsRemaining int
 
 	terminated bool
@@ -74,11 +74,14 @@ func (b *Budget) ChargeTokens(n int64) error {
 	if b.terminated {
 		return ErrTerminated
 	}
-	b.TokensRemaining -= n
-	if b.TokensRemaining < 0 {
+	if n < 0 {
+		return ErrInvalidCharge
+	}
+	if n > b.TokensRemaining {
 		b.terminate(ReasonTokensExhausted)
 		return ErrTerminated
 	}
+	b.TokensRemaining -= n
 	return nil
 }
 
@@ -89,11 +92,14 @@ func (b *Budget) ChargeTime(d time.Duration) error {
 	if b.terminated {
 		return ErrTerminated
 	}
-	b.TimeRemaining -= d
-	if b.TimeRemaining < 0 {
+	if d < 0 {
+		return ErrInvalidCharge
+	}
+	if d > b.TimeRemaining {
 		b.terminate(ReasonTimeExhausted)
 		return ErrTerminated
 	}
+	b.TimeRemaining -= d
 	return nil
 }
 
@@ -115,3 +121,6 @@ func (b *Budget) ChargePlugin() error {
 // ErrTerminated is returned when a charge cannot be applied because the
 // budget is exhausted.
 var ErrTerminated = errors.New("budget terminated")
+
+// ErrInvalidCharge rejects negative consumption without changing capacity.
+var ErrInvalidCharge = errors.New("invalid negative budget charge")

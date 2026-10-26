@@ -6,6 +6,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"flag"
 	"fmt"
 	"gopkg.in/yaml.v3"
@@ -2624,6 +2625,10 @@ func lockCmd(args []string) {
 	out := fs.String("out", "cadence.lock", "output lock file")
 	check := fs.Bool("check", false, "validate the lock file")
 	_ = fs.Parse(args)
+	if fs.NArg() != 0 {
+		fmt.Fprintln(os.Stderr, "lock: unexpected positional arguments; use lock [--out FILE] [--check]")
+		os.Exit(2)
+	}
 
 	lockPath := *out
 	if *check {
@@ -2753,7 +2758,9 @@ func doctorCmd(args []string) {
 	// Ensure we can write to .cadence/ (local evidence cache).
 	tmpDir := filepath.Join(repoRoot, ".cadence", "tmp")
 	if err := os.MkdirAll(tmpDir, 0o755); err != nil {
-		problems = append(problems, "cannot create .cadence/tmp (permissions)")
+		problems = append(problems, "cannot create .cadence/tmp: "+err.Error())
+	} else if err := probeWritableDirectory(tmpDir); err != nil {
+		problems = append(problems, "cannot write .cadence/tmp: "+err.Error())
 	}
 
 	fmt.Println("Cadence Doctor")
@@ -2872,4 +2879,16 @@ func renderMarkdownSummary(summary map[string]any, violations []checks.Violation
 
 func escapePipes(s string) string {
 	return strings.ReplaceAll(s, "|", "\\|")
+}
+
+// Probe the actual write operation; an existing directory is not proof of access.
+func probeWritableDirectory(dir string) error {
+	file, err := os.CreateTemp(dir, ".doctor-*")
+	if err != nil {
+		return err
+	}
+	_, writeErr := file.Write([]byte("probe"))
+	closeErr := file.Close()
+	removeErr := os.Remove(file.Name())
+	return errors.Join(writeErr, closeErr, removeErr)
 }

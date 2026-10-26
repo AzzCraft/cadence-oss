@@ -151,6 +151,21 @@
         "signer": "cadence-oss-team",
         "allowlisted": true
       }
+    },
+    {
+      "kind": "policyPack",
+      "id": "core-v146-baseline",
+      "version": "1.4.0",
+      "status": "active",
+      "digest": "sha256:9ad9696258f568b22a0b59699f738ab0807409120c5b207d594c76aa0623bb18",
+      "deprecatedAt": null,
+      "deprecationReason": null,
+      "compatWindow": "current",
+      "ref": "../cadence-policy-packs/packs/core-v146-baseline/pack.yaml",
+      "trust": {
+        "signer": "cadence-oss-team",
+        "allowlisted": true
+      }
     }
   ]
 }

@@ -53,7 +53,7 @@ function decodeModuleLiteral(literal: string): string {
 function tokenizeJS(content: string) {
   const tokens: {value:string;index:number}[] = [];
   let i = 0;
-  const word = (c: string) => /[A-Za-z0-9_$]/.test(c);
+  const word = (c: string) => /[\p{ID_Continue}$]/u.test(c);
   const add = (start: number, end: number) => tokens.push({value:content.slice(start,end), index:start});
   function template() {
     const start = i, slot = tokens.length;
@@ -75,7 +75,7 @@ function tokenizeJS(content: string) {
     const parens: boolean[] = [];
     const blocks: {regexAfter:boolean;statements:boolean;parens:number}[] = [];
     while (i < content.length) {
-      const c = content[i];
+      const c = String.fromCodePoint(content.codePointAt(i)!);
       if (/\s/.test(c)) { i++; continue; }
       if (c === '}' && expression && blocks.length === 0) { i++; return; }
       const start = i;
@@ -109,14 +109,14 @@ function tokenizeJS(content: string) {
       }
       if (c === '`') { template(); canRegex = false; previous = '<template>'; statementStart = false; continue; }
       if (word(c)) {
-        while (i < content.length && word(content[i])) i++;
+        while (i < content.length) { const point = String.fromCodePoint(content.codePointAt(i)!); if (!word(point)) break; i += point.length; }
         add(start,i); const value = content.slice(start,i);
         if (['function','class'].includes(value) && previous !== '.') {
           pending.push({kind:value, declaration:statementStart, parens:parens.length, braces:blocks.length, brackets});
         }
         statementStart = ['else','do','try','finally'].includes(value) ||
           (statementStart && ['export','default','async'].includes(value));
-        previous = value;
+        previous = value === 'await' && previous === 'for' ? 'for-await' : value;
         canRegex = ['return','throw','case','delete','void','typeof','new','in','of','yield','await','else','do','instanceof'].includes(previous); continue;
       }
       i++;
@@ -126,7 +126,7 @@ function tokenizeJS(content: string) {
       const atBodyDepth = body && body.parens === parens.length && body.braces === blocks.length && body.brackets === brackets;
       const wasStatementStart = statementStart;
       statementStart = false;
-      if (value === '(') { parens.push(['if','while','for','switch','catch','with'].includes(previous)); canRegex = true; }
+      if (value === '(') { parens.push(['if','while','for','for-await','switch','catch','with'].includes(previous)); canRegex = true; }
       else if (value === ')') { canRegex = parens.pop() ?? false; statementStart = canRegex; }
       else if (value === '{') {
         const construct = atBodyDepth && (body.kind === 'class' || previous === ')');

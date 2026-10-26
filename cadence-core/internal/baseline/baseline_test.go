@@ -1,6 +1,8 @@
 package baseline
 
 import (
+	"bytes"
+	"github.com/AzzCraft/cadence-oss/cadence-core/internal/checks"
 	"os"
 	"path/filepath"
 	"testing"
@@ -58,6 +60,28 @@ func TestLoadRejectsMalformedBaselineAndRoundTripsSavedValues(t *testing.T) {
 		t.Fatal(err)
 	}
 	if got, err := Load(path); err != nil || len(got.Fingerprints) != 0 {
+		t.Fatal(got, err)
+	}
+}
+
+func TestSaveUsesStableFingerprintOrder(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "baseline.json")
+	values := []checks.Violation{{Fingerprint: "z"}, {Fingerprint: "a"}, {Fingerprint: "z"}}
+	if err := Save(path, values); err != nil {
+		t.Fatal(err)
+	}
+	first, _ := os.ReadFile(path)
+	for i := 0; i < 10; i++ {
+		if err := Save(path, values); err != nil {
+			t.Fatal(err)
+		}
+		next, _ := os.ReadFile(path)
+		if !bytes.Equal(first, next) {
+			t.Fatal("unstable baseline")
+		}
+	}
+	got, err := Load(path)
+	if err != nil || len(got.Fingerprints) != 2 || got.Fingerprints[0] != "a" {
 		t.Fatal(got, err)
 	}
 }

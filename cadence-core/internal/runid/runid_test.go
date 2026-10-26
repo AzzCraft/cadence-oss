@@ -33,3 +33,12 @@ func TestMakeIsHexAnd64Chars(t *testing.T) {
 		t.Fatalf("expected 64-char hex, got %d", len(id))
 	}
 }
+
+func TestEmbeddedDelimitersCannotChangeFieldBoundaries(t *testing.T) {
+	if Make(Inputs{WorkspaceHash: "a\nprofile=b", Profile: "c", Attempt: 1}) == Make(Inputs{WorkspaceHash: "a", Profile: "b\nprofile=c", Attempt: 1}) {
+		t.Fatal("field collision")
+	}
+	if Make(Inputs{WorkspaceHash: "w", Profile: "p", Extra: map[string]string{"a": "b\nc=d"}}) == Make(Inputs{WorkspaceHash: "w", Profile: "p", Extra: map[string]string{"a": "b", "c": "d"}}) {
+		t.Fatal("extra collision")
+	}
+}

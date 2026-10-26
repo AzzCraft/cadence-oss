@@ -43,7 +43,10 @@ func checkContractCompleteness(repoRoot string) ([]Violation, error) {
 		if definitionLibrary(schema) {
 			return nil
 		}
-		base := strings.TrimSuffix(strings.TrimSuffix(d.Name(), ".json"), ".schema")
+		base := d.Name()[:len(d.Name())-len(".json")]
+		if strings.HasSuffix(strings.ToLower(base), ".schema") {
+			base = base[:len(base)-len(".schema")]
+		}
 		fixtureDir := filepath.Join(repoRoot, "contracts", "fixtures", base)
 		ok := false
 		// Canonical template layout requires valid and invalid examples. Legacy

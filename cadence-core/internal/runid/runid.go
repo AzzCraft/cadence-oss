@@ -8,10 +8,10 @@ package runid
 
 import (
 	"crypto/sha256"
+	"encoding/binary"
 	"encoding/hex"
 	"fmt"
 	"sort"
-	"strings"
 
 	"github.com/AzzCraft/cadence-oss/cadence-core/internal/clock"
 )
@@ -40,24 +40,27 @@ type Diagnostic struct {
 // Make returns a stable hex-encoded SHA-256 of canonical Inputs.
 func Make(in Inputs) string {
 	h := sha256.New()
-	h.Write([]byte("workspaceHash="))
-	h.Write([]byte(in.WorkspaceHash))
-	h.Write([]byte("\nprofile="))
-	h.Write([]byte(in.Profile))
-	h.Write([]byte(fmt.Sprintf("\nattempt=%d\n", in.Attempt)))
+	// v2 length-delimits every arbitrary string, including invalid UTF-8 bytes.
+	// This internal helper has no CLI/persisted-ID compatibility contract.
+	h.Write([]byte("cadence-runid-v2\x00"))
+	field := func(value string) {
+		var size [8]byte
+		binary.BigEndian.PutUint64(size[:], uint64(len(value)))
+		h.Write(size[:])
+		h.Write([]byte(value))
+	}
+	field(in.WorkspaceHash)
+	field(in.Profile)
+	field(fmt.Sprint(in.Attempt))
 	keys := make([]string, 0, len(in.Extra))
-	for k := range in.Extra {
-		keys = append(keys, k)
+	for key := range in.Extra {
+		keys = append(keys, key)
 	}
 	sort.Strings(keys)
-	var sb strings.Builder
-	for _, k := range keys {
-		sb.WriteString(k)
-		sb.WriteByte('=')
-		sb.WriteString(in.Extra[k])
-		sb.WriteByte('\n')
+	for _, key := range keys {
+		field(key)
+		field(in.Extra[key])
 	}
-	h.Write([]byte(sb.String()))
 	return hex.EncodeToString(h.Sum(nil))
 }
 

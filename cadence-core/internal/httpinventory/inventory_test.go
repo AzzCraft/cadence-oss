@@ -340,3 +340,22 @@ func TestOperationIDUsesUnicodeCharacters(t *testing.T) {
 		t.Fatal("invalid UTF-8 accepted")
 	}
 }
+
+func TestComponentNamesAreNotSchemaKeywords(t *testing.T) {
+	for _, name := range []string{"example", "default", "ItemQuery"} {
+		for _, missing := range []bool{false, true} {
+			declaration, raw := sample(t, func(root map[string]any) {
+				target := "#/components/schemas/Node"
+				if missing {
+					target = "#/components/schemas/Missing"
+				}
+				root["components"].(map[string]any)["parameters"] = map[string]any{name: map[string]any{"name": "q", "in": "query", "schema": map[string]any{"$ref": target}}}
+				root["paths"].(map[string]any)["/target"].(map[string]any)["get"].(map[string]any)["parameters"] = []any{map[string]any{"$ref": "#/components/parameters/" + name}}
+			})
+			_, err := Normalize(declaration, raw)
+			if (err != nil) != missing {
+				t.Fatalf("%s missing=%v: %v", name, missing, err)
+			}
+		}
+	}
+}

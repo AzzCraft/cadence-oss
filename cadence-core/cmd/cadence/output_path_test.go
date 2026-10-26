@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"io"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"runtime"
 	"strings"
@@ -146,5 +147,46 @@ func TestLegacyLockRejectsWrongNestingAndTypes(t *testing.T) {
 		if _, _, err := parseLegacyLock([]byte(bad)); err == nil {
 			t.Errorf("invalid legacy lock accepted: %s", bad)
 		}
+	}
+}
+
+func TestLockPositionalArgumentsCannotWrite(t *testing.T) {
+	if os.Getenv("CADENCE_LOCK_ARGS_CHILD") == "1" {
+		lockCmd([]string{"unexpected", "--check"})
+		return
+	}
+	root := t.TempDir()
+	path := filepath.Join(root, "cadence.lock")
+	before := []byte("preserve this lock\n")
+	os.WriteFile(path, before, 0600)
+	cmd := exec.Command(os.Args[0], "-test.run=^TestLockPositionalArgumentsCannotWrite$")
+	cmd.Dir = root
+	cmd.Env = append(os.Environ(), "CADENCE_LOCK_ARGS_CHILD=1")
+	output, err := cmd.CombinedOutput()
+	if err == nil || !strings.Contains(string(output), "unexpected positional") {
+		t.Fatal(string(output), err)
+	}
+	after, _ := os.ReadFile(path)
+	if string(after) != string(before) {
+		t.Fatal("lock changed")
+	}
+}
+
+func TestDoctorProbesDirectoryAndRemovesProbe(t *testing.T) {
+	root := t.TempDir()
+	if err := probeWritableDirectory(root); err != nil {
+		t.Fatal(err)
+	}
+	entries, _ := os.ReadDir(root)
+	if len(entries) != 0 {
+		t.Fatal("probe leaked")
+	}
+	if runtime.GOOS == "windows" || os.Geteuid() == 0 {
+		t.Skip("read-only mode test requires non-root Unix")
+	}
+	os.Chmod(root, 0500)
+	defer os.Chmod(root, 0700)
+	if err := probeWritableDirectory(root); err == nil {
+		t.Fatal("read-only directory accepted")
 	}
 }
