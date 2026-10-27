@@ -325,6 +325,54 @@ jobs:
           run-id: "${{ inputs.materials_run_id }}"
           github-token: "${{ github.token }}"
           path: "${{ runner.temp }}/tool-materials"
+      - name: Restore archived Go toolchain permissions
+        shell: bash
+        env:
+          MATERIAL_SHA: "${{ inputs.materials_sha256 }}"
+        run: |
+          set -euo pipefail
+          python3 -I -B - <<'PY'
+          import importlib.util,os,shutil,tarfile
+          from pathlib import Path,PurePosixPath
+          spec=importlib.util.spec_from_file_location('build_control','build-control/tools/release/build_tool_assets.py')
+          control=importlib.util.module_from_spec(spec);spec.loader.exec_module(control)
+          root=Path(os.environ['RUNNER_TEMP'])/'tool-materials'
+          manifest=root/'build-materials.json'
+          if control.sha(manifest)!=os.environ['MATERIAL_SHA']:
+              raise SystemExit('materials control digest differs')
+          config=control.load_exact(manifest)
+          relative=PurePosixPath(config['goRoot'])
+          if relative.is_absolute() or str(relative)!=config['goRoot'] or not relative.parts or '..' in relative.parts:
+              raise SystemExit('Go root escapes material root')
+          target=root/relative
+          if os.path.lexists(target):raise SystemExit('Go toolchain destination already exists')
+          for parent in target.parents:
+              if parent==root:break
+              if parent.is_symlink():raise SystemExit('linked Go parent refused')
+          bundle=root/'go-toolchain.tar'
+          if bundle.is_symlink() or not bundle.is_file():raise SystemExit('ordinary go-toolchain.tar required')
+          with tarfile.open(bundle,'r:') as archive:
+              members=[];names=set();total=0
+              for member in archive:
+                  name=PurePosixPath(member.name)
+                  if (not (member.isfile() or member.isdir()) or name.is_absolute()
+                          or str(name)!=member.name.rstrip('/') or '..' in name.parts
+                          or not name.is_relative_to(relative) or name in names
+                          or member.mode & ~0o777 or member.size<0):
+                      raise SystemExit('nonregular or noncanonical Go archive member')
+                  names.add(name);members.append(member);total+=member.size
+                  if len(members)>25000 or total>2*1024**3:
+                      raise SystemExit('Go archive exceeds finite build budget')
+              for member in members:
+                  output=root/member.name
+                  if member.isdir():output.mkdir(parents=True,exist_ok=True);continue
+                  output.parent.mkdir(parents=True,exist_ok=True)
+                  with archive.extractfile(member) as source, output.open('xb') as dest:
+                      shutil.copyfileobj(source,dest)
+                  output.chmod(member.mode)
+          if control.tree_digest(target)!=config['goTreeSha256']:
+              raise SystemExit('Go toolchain bytes or modes differ')
+          PY
       - name: Build and install exact tool asset in isolated domains
         id: tool_assets
         shell: bash
