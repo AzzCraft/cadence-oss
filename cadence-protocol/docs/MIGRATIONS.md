@@ -41,6 +41,14 @@ current 1.0.0 identity; other source identities are rejected. The result is
 explicitly labelled 1.0.0 and validated before an output file is written.
 There is no automatic multi-version migration chain.
 
+Use a separate output file. The CLI rejects the input path itself, symbolic
+links and hardlink aliases of the input. It validates and serializes the entire
+result before publishing a same-directory temporary file with atomic replacement.
+A failed conversion or replacement preserves the source and any prior output;
+replacing an output hardlink does not change its other names. Existing output
+permissions are retained; new outputs use mode 0600. Only this invocation's
+unique temporary file is removed on failure.
+
 ### Backward Compatibility Window
 
 The three retained RunManifest, PipelineResult and EvidenceBundle examples

@@ -255,3 +255,52 @@ def test_migration_cli_preserves_decimal_and_migrates_nested_legacy(tmp_path):
     job['runs'][0]['result']['schemaVersion']='9.0.0'
     import pytest
     with pytest.raises(ValueError,match='unsupported'):migrate.migrate_legacy_job_envelope(job)
+
+
+def test_migration_cli_preserves_source_and_output_aliases(tmp_path):
+    import os
+    import subprocess
+    import sys
+    source=json.loads((ROOT/'fixtures/run_manifest/valid/basic.json').read_text())
+    source['schemaVersion']='0.9.0'
+    input_path=tmp_path/'input.json';input_path.write_text(json.dumps(source))
+    original=input_path.read_bytes()
+    def run(output):
+        return subprocess.run([sys.executable,str(ROOT/'tools/migrate.py'),
+            '--kind','legacy-run-manifest','--input',str(input_path),'--output',str(output)],
+            capture_output=True,text=True)
+    for mode in ('same','hardlink','symlink'):
+        output=input_path if mode=='same' else tmp_path/mode
+        if mode=='hardlink':os.link(input_path,output)
+        if mode=='symlink':output.symlink_to(input_path)
+        result=run(output)
+        assert result.returncode!=0,(mode,result.stdout,result.stderr)
+        assert input_path.read_bytes()==original
+        if mode!='same':output.unlink()
+    output=tmp_path/'result.json';unrelated=tmp_path/'unrelated.json'
+    unrelated.write_bytes(b'preserve unrelated user data');os.link(unrelated,output)
+    output.chmod(0o640)
+    result=run(output);assert result.returncode==0,result.stderr
+    assert unrelated.read_bytes()==b'preserve unrelated user data'
+    assert input_path.read_bytes()==original
+    assert json.loads(output.read_text())['schemaVersion']=='1.0.0'
+    assert output.stat().st_mode & 0o777 == 0o640
+
+
+def test_migration_failed_publication_preserves_existing_output(tmp_path,monkeypatch):
+    import os
+    import sys
+    import pytest
+    from tools import migrate
+    source=json.loads((ROOT/'fixtures/run_manifest/valid/basic.json').read_text())
+    source['schemaVersion']='0.9.0'
+    input_path=tmp_path/'input.json';input_path.write_text(json.dumps(source))
+    output=tmp_path/'output.json';output.write_bytes(b'previous output')
+    before={p.name:p.read_bytes() for p in tmp_path.iterdir()}
+    monkeypatch.setattr(sys,'argv',['migrate','--kind','legacy-run-manifest',
+        '--input',str(input_path),'--output',str(output)])
+    monkeypatch.syspath_prepend(str(ROOT/'tools'))
+    def refuse(*args):raise OSError('controlled publication failure')
+    monkeypatch.setattr(os,'replace',refuse)
+    with pytest.raises(OSError,match='controlled publication failure'):migrate.main()
+    assert {p.name:p.read_bytes() for p in tmp_path.iterdir()}==before

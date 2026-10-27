@@ -5,6 +5,9 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
+import stat
+import tempfile
 from copy import deepcopy
 from decimal import Decimal
 from pathlib import Path
@@ -80,8 +83,14 @@ def main() -> int:
     parser.add_argument("--output", required=True)
     args = parser.parse_args()
 
+    input_path, output_path = Path(args.input), Path(args.output)
+    if (output_path.resolve() == input_path.resolve()
+            or output_path.exists() and output_path.samefile(input_path)):
+        raise ValueError('migration output must differ from the input file')
+    if output_path.is_symlink() or output_path.exists() and not output_path.is_file():
+        raise ValueError('migration output must be a regular file, not a link or directory')
     import exact_json
-    data = exact_json.parse(Path(args.input).read_bytes())
+    data = exact_json.parse(input_path.read_bytes())
     if not isinstance(data, dict): raise ValueError("migration requires an object")
     fn = MIGRATION_REGISTRY.get(args.kind)
     if fn is None:
@@ -93,7 +102,16 @@ def main() -> int:
         'legacy-evidence-bundle':'validate_evidence_bundle'}[args.kind])
     validator(migrated)
 
-    Path(args.output).write_text(lossless_json(migrated) + "\n", encoding="utf-8")
+    content = lossless_json(migrated) + "\n"
+    mode = stat.S_IMODE(output_path.stat().st_mode) if output_path.exists() else 0o600
+    fd, name = tempfile.mkstemp(prefix='.cadence-migrate-', dir=output_path.parent)
+    try:
+        with os.fdopen(fd, 'w', encoding='utf-8') as stream:
+            stream.write(content)
+            os.fchmod(stream.fileno(), mode)
+        os.replace(name, output_path)
+    finally:
+        Path(name).unlink(missing_ok=True)
     return 0
 
 
