@@ -61,7 +61,16 @@ empty values for this beta or change the historical validation route.
 2. Add `goRoot` (relative extracted Go toolchain directory) and `goTreeSha256`.
    Compute the latter with `tree_digest` in `tools/release/build_tool_assets.py`:
    it binds paths, permission modes, sizes and file digests, not a tarball hash.
-   Preserve those bytes and modes when preparing the Actions artifact.
+   Pack that directory as `go-toolchain.tar`, preserving its paths and modes:
+   `tar -cf go-toolchain.tar -C MATERIALS_ROOT GO_ROOT`. Here `GO_ROOT` is the
+   same relative directory as `goRoot`, for example `go`. Upload the tar beside
+   `build-materials.json` and the optional image archive; do not upload an
+   expanded Go directory. [Actions artifact transport](https://github.com/actions/upload-artifact#permission-loss)
+   resets file permissions and would otherwise strip Go's executable bits.
+   The release workflow verifies the pinned manifest before extracting ordinary,
+   bounded entries under `goRoot`, refuses existing destinations and links, then
+   checks the restored tree digest before invoking the builder. No manifest
+   schema or local-directory builder input changes are required.
 3. From an approved materials-preparation workflow in this same GitHub
    repository, upload the entire directory with `actions/upload-artifact`, so
    `build-materials.json` is at the downloaded artifact root. This repository
